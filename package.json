@@ -1,0 +1,29 @@
+{
+  "name": "holocron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Holocron - boveda documental empresarial para proyectos, documentos, RFIs, IA documental y CLM.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,sql}\"",
+    "test": "node --test tests/*.test.mjs",
+    "test:types": "C:\\laragon\\www\\boveda2\\node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --noEmit --incremental false && C:\\laragon\\www\\boveda2\\node_modules\\.bin\\tsc.cmd -p apps/web/tsconfig.json --noEmit --incremental false"
+  },
+  "dependencies": {
+    "@nestjs/platform-express": "^11.1.27",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

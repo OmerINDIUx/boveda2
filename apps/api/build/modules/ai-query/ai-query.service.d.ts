@@ -1,0 +1,61 @@
+import { Repository } from 'typeorm';
+import { AccessScopeService } from '../../common/access-scope.service';
+import { AuditService } from '../audit/audit.service';
+import { DocumentChunk } from '../documents/document-chunk.entity';
+import { DocumentPermission } from '../documents/document-permission.entity';
+import { DocumentRecord } from '../documents/document.entity';
+import { ProjectMember } from '../projects/project-member.entity';
+import { User } from '../users/user.entity';
+import { DocumentVersion } from '../versions/document-version.entity';
+import { AskDocumentQueryDto } from './dto/ask-document-query.dto';
+import { DocumentIndexingService } from './document-indexing.service';
+import { DocumentQueryHistory } from './document-query-history.entity';
+type CitationPayload = {
+    chunkId: string;
+    documentId: string;
+    documentName: string;
+    versionId?: string;
+    versionLabel: string;
+    pageNumber?: number;
+    sectionLabel?: string;
+    fragment: string;
+    score: number;
+};
+export declare class AiQueryService {
+    private readonly documents;
+    private readonly versions;
+    private readonly chunks;
+    private readonly permissions;
+    private readonly history;
+    private readonly users;
+    private readonly members;
+    private readonly scope;
+    private readonly indexing;
+    private readonly audit;
+    constructor(documents: Repository<DocumentRecord>, versions: Repository<DocumentVersion>, chunks: Repository<DocumentChunk>, permissions: Repository<DocumentPermission>, history: Repository<DocumentQueryHistory>, users: Repository<User>, members: Repository<ProjectMember>, scope: AccessScopeService, indexing: DocumentIndexingService, audit: AuditService);
+    ask(userId: string, dto: AskDocumentQueryDto): Promise<{
+        id: string;
+        question: string;
+        answer: string;
+        status: "answered" | "insufficient_information";
+        scopedDocumentCount: number;
+        citations: CitationPayload[] | {
+            chunkId: string;
+            documentId: string;
+            documentName: string;
+            versionId: string | undefined;
+            versionLabel: string;
+            pageNumber: number | undefined;
+            sectionLabel: string | undefined;
+            fragment: string;
+            score: number;
+        }[];
+    }>;
+    historyForUser(userId: string): Promise<DocumentQueryHistory[]>;
+    private getVisibleDocuments;
+    private buildGroundedResponse;
+    private toCitations;
+    private composeAnswer;
+    private trimFragment;
+}
+export {};

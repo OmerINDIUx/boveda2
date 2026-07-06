@@ -1,0 +1,30 @@
+import { DocumentRecord } from '../documents/document.entity';
+import { Project } from '../projects/project.entity';
+import { User } from '../users/user.entity';
+import { RfiAttachment } from './rfi-attachment.entity';
+import { RfiComment } from './rfi-comment.entity';
+import { RfiHistory } from './rfi-history.entity';
+export declare class Rfi {
+    id: string;
+    projectId: string;
+    project: Project;
+    documentId?: string;
+    document?: DocumentRecord;
+    title: string;
+    description: string;
+    answer?: string;
+    status: 'open' | 'in_progress' | 'answered' | 'closed' | 'overdue';
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+    dueDate?: string;
+    createdById: string;
+    requester: User;
+    assignedToId?: string;
+    assignedTo?: User;
+    closedAt?: Date;
+    comments: RfiComment[];
+    attachments: RfiAttachment[];
+    history: RfiHistory[];
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt?: Date;
+}

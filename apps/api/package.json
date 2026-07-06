@@ -1,0 +1,45 @@
+{
+  "name": "@holocron/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json && node scripts/start-build.mjs",
+    "dev:simple": "node dev-server.js",
+    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "start": "node scripts/start-build.mjs",
+    "lint": "eslint \"src/**/*.ts\"",
+    "db:reset": "node scripts/reset-db.mjs",
+    "db:migrate": "node scripts/run-sql.mjs migrations",
+    "db:seed": "node scripts/run-sql.mjs seeders"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.27",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.27",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/platform-express": "^11.1.27",
+    "@nestjs/swagger": "^11.4.5",
+    "@nestjs/typeorm": "^11.0.3",
+    "bcrypt": "^5.1.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "mysql2": "^3.11.0",
+    "next": "16.2.10",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.23",
+    "@nestjs/schematics": "^11.1.0",
+    "@nestjs/testing": "^11.1.27",
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^20.14.15",
+    "@types/passport-jwt": "^4.0.1",
+    "eslint": "^9.8.0",
+    "typescript": "^5.5.4"
+  }
+}

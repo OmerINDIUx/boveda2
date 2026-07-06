@@ -1,0 +1,14 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: holocron-mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: holocron
+    ports:
+      - "3306:3306"
+    volumes:
+      - holocron_mysql:/var/lib/mysql
+
+volumes:
+  holocron_mysql:
