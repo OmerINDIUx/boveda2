@@ -18,7 +18,7 @@ export class VersionsService {
       base64Content: dto.base64Content,
       revision: dto.revision,
       notes: dto.notes,
-      sizeBytes: dto.sizeBytes
+      sizeBytes: dto.sizeBytes,
     });
   }
 }

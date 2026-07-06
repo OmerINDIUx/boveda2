@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 export function SectionHeader({
   title,
   description,
-  action
+  action,
 }: {
   title: string;
   description: string;

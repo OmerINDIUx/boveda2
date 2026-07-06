@@ -1,5 +1,8 @@
 import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
-import { PROJECT_CATALOG_CATEGORIES, type ProjectCatalogCategory } from '../project-catalog-option.entity';
+import {
+  PROJECT_CATALOG_CATEGORIES,
+  type ProjectCatalogCategory,
+} from '../project-catalog-option.entity';
 
 export class CreateProjectCatalogOptionDto {
   @IsIn(PROJECT_CATALOG_CATEGORIES)

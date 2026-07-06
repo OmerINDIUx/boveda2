@@ -1,2 +1,1 @@
-export declare class AuditModule {
-}
+export declare class AuditModule {}

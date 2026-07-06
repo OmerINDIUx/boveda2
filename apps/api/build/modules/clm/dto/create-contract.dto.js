@@ -1,111 +1,201 @@
-"use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+var __decorate =
+  (this && this.__decorate) ||
+  function (decorators, target, key, desc) {
+    var c = arguments.length,
+      r =
+        c < 3
+          ? target
+          : desc === null
+            ? (desc = Object.getOwnPropertyDescriptor(target, key))
+            : desc,
+      d;
+    if (typeof Reflect === 'object' && typeof Reflect.decorate === 'function')
+      r = Reflect.decorate(decorators, target, key, desc);
+    else
+      for (var i = decorators.length - 1; i >= 0; i--)
+        if ((d = decorators[i]))
+          r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return (c > 3 && r && Object.defineProperty(target, key, r), r);
+  };
+var __metadata =
+  (this && this.__metadata) ||
+  function (k, v) {
+    if (typeof Reflect === 'object' && typeof Reflect.metadata === 'function')
+      return Reflect.metadata(k, v);
+  };
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.CreateContractDto = void 0;
-const class_validator_1 = require("class-validator");
+const class_validator_1 = require('class-validator');
 class CreateContractDto {
-    projectId;
-    name;
-    supplierName;
-    clientName;
-    responsibleArea;
-    contractType;
-    status;
-    startDate;
-    endDate;
-    renewalDate;
-    amount;
-    currency;
-    responsibleUserId;
-    mainDocumentId;
-    renewalNoticeDays;
-    closeReason;
+  projectId;
+  name;
+  supplierName;
+  clientName;
+  responsibleArea;
+  contractType;
+  status;
+  startDate;
+  endDate;
+  renewalDate;
+  amount;
+  currency;
+  responsibleUserId;
+  mainDocumentId;
+  renewalNoticeDays;
+  closeReason;
 }
 exports.CreateContractDto = CreateContractDto;
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "projectId", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "name", void 0);
-__decorate([
+__decorate(
+  [(0, class_validator_1.IsString)(), __metadata('design:type', String)],
+  CreateContractDto.prototype,
+  'projectId',
+  void 0
+);
+__decorate(
+  [(0, class_validator_1.IsString)(), __metadata('design:type', String)],
+  CreateContractDto.prototype,
+  'name',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "supplierName", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'supplierName',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "clientName", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'clientName',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "responsibleArea", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'responsibleArea',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "contractType", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'contractType',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "status", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'status',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "startDate", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'startDate',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "endDate", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'endDate',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "renewalDate", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'renewalDate',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "amount", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'amount',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "currency", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'currency',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "responsibleUserId", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'responsibleUserId',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "mainDocumentId", void 0);
-__decorate([
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'mainDocumentId',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", Object)
-], CreateContractDto.prototype, "renewalNoticeDays", void 0);
-__decorate([
+    __metadata('design:type', Object),
+  ],
+  CreateContractDto.prototype,
+  'renewalNoticeDays',
+  void 0
+);
+__decorate(
+  [
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateContractDto.prototype, "closeReason", void 0);
+    __metadata('design:type', String),
+  ],
+  CreateContractDto.prototype,
+  'closeReason',
+  void 0
+);
 //# sourceMappingURL=create-contract.dto.js.map

@@ -19,7 +19,6 @@ import {
   Highlighter,
   Layers3,
   MessageSquareMore,
-  MousePointerClick,
   Paintbrush,
   Palette,
   PanelRightOpen,
@@ -36,7 +35,7 @@ import {
   Undo2,
   Upload,
   X,
-  UserCircle2
+  UserCircle2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasPermission } from '../../lib/auth';
@@ -45,7 +44,13 @@ import { PermissionKey } from '../../lib/permissions';
 
 type ProjectOption = { id: string; name: string; code: string };
 type DisciplineOption = { id: string; name: string; code: string };
-type FolderOption = { id: string; name: string; path: string; parentId?: string; disciplineId?: string };
+type FolderOption = {
+  id: string;
+  name: string;
+  path: string;
+  parentId?: string;
+  disciplineId?: string;
+};
 type UserOption = { id: string; name: string; email: string };
 type ProjectMemberOption = {
   id: string;
@@ -111,8 +116,20 @@ type DocumentDetail = DocumentListItem & {
   preview: { available: boolean; mimeType: string | null; url: string | null };
   metadata: Array<{ id: string; metaKey: string; metaValue?: string; valueType: string }>;
   versions: DocumentVersion[];
-  comments: Array<{ id: string; body: string; createdAt: string; author: { id: string; name: string; email: string } | null }>;
-  audit: Array<{ id: string; action: string; createdAt: string; actorId?: string; beforeState?: unknown; afterState?: unknown }>;
+  comments: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: { id: string; name: string; email: string } | null;
+  }>;
+  audit: Array<{
+    id: string;
+    action: string;
+    createdAt: string;
+    actorId?: string;
+    beforeState?: unknown;
+    afterState?: unknown;
+  }>;
 };
 
 type FilePayload = {
@@ -136,17 +153,6 @@ type UploadForm = {
   status: string;
   revision: string;
   notes: string;
-};
-
-type ReviewDraft = {
-  stamp: string;
-  category: string;
-  severity: string;
-  page: string;
-  location: string;
-  actionRequired: string;
-  checklist: string[];
-  note: string;
 };
 
 type ReviewAnnotation = {
@@ -190,29 +196,39 @@ const emptyUploadForm: UploadForm = {
   responsibleUserId: '',
   status: 'draft',
   revision: 'A',
-  notes: ''
+  notes: '',
 };
 
-const reviewChecklistOptions = ['Alcance', 'Normativa', 'Coordinacion', 'Cantidades', 'Firma y sello', 'Fechas', 'Version vigente'];
-const reviewStampOptions = ['Aprobado', 'Aprobado con comentarios', 'Requiere correccion', 'Rechazado', 'Informativo'];
-
-const emptyReviewDraft: ReviewDraft = {
-  stamp: 'Requiere correccion',
-  category: 'Observacion',
-  severity: 'media',
-  page: '',
-  location: '',
-  actionRequired: '',
-  checklist: [],
-  note: ''
-};
+const reviewStampOptions = [
+  'Aprobado',
+  'Aprobado con comentarios',
+  'Requiere correccion',
+  'Rechazado',
+  'Informativo',
+];
 
 const reviewToolOptions = [
-  { value: 'comment', label: 'Comentario', help: 'Haz click en el archivo para marcar el punto y luego escribe la observacion.' },
-  { value: 'text', label: 'Texto', help: 'Haz click en el archivo y escribe texto literal dentro del documento.' },
-  { value: 'draw', label: 'Trazo', help: 'Mantén presionado y dibuja libremente sobre el documento.' },
-  { value: 'highlight', label: 'Resaltado', help: 'Arrastra para marcar un bloque o una zona importante.' },
-  { value: 'stamp', label: 'Sello', help: 'Elige el sello y colocalo con un click.' }
+  {
+    value: 'comment',
+    label: 'Comentario',
+    help: 'Haz click en el archivo para marcar el punto y luego escribe la observacion.',
+  },
+  {
+    value: 'text',
+    label: 'Texto',
+    help: 'Haz click en el archivo y escribe texto literal dentro del documento.',
+  },
+  {
+    value: 'draw',
+    label: 'Trazo',
+    help: 'Mantén presionado y dibuja libremente sobre el documento.',
+  },
+  {
+    value: 'highlight',
+    label: 'Resaltado',
+    help: 'Arrastra para marcar un bloque o una zona importante.',
+  },
+  { value: 'stamp', label: 'Sello', help: 'Elige el sello y colocalo con un click.' },
 ] as const;
 
 const reviewColorOptions = [
@@ -221,7 +237,7 @@ const reviewColorOptions = [
   { value: '#ca8a04', label: 'Amarillo' },
   { value: '#15803d', label: 'Verde' },
   { value: '#0369a1', label: 'Azul' },
-  { value: '#7c3aed', label: 'Morado' }
+  { value: '#7c3aed', label: 'Morado' },
 ] as const;
 
 function renderReviewToolIcon(tool: (typeof reviewToolOptions)[number]['value']) {
@@ -237,7 +253,10 @@ function buildAnnotationSignature(items: ReviewAnnotation[]) {
     [...items]
       .map((item) => ({
         ...item,
-        path: item.path?.map((point) => ({ x: Number(point.x.toFixed(4)), y: Number(point.y.toFixed(4)) }))
+        path: item.path?.map((point) => ({
+          x: Number(point.x.toFixed(4)),
+          y: Number(point.y.toFixed(4)),
+        })),
       }))
       .sort((left, right) => left.id.localeCompare(right.id))
   );
@@ -277,14 +296,17 @@ async function fileToPayload(file: File): Promise<FilePayload> {
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
     base64Content,
-    sizeBytes: file.size
+    sizeBytes: file.size,
   };
 }
 
 async function fetchProtectedBlob(path: string) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`, {
-    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}
-  });
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`,
+    {
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    }
+  );
 
   if (!response.ok) {
     throw new Error('No fue posible descargar el archivo');
@@ -323,21 +345,6 @@ function renewalFrequencyLabel(value?: string | null) {
   }
 }
 
-function buildReviewComment(review: ReviewDraft) {
-  return [
-    '[REVIEW]',
-    `Sello: ${review.stamp}`,
-    `Categoria: ${review.category}`,
-    `Severidad: ${review.severity}`,
-    `Pagina: ${review.page || 'Sin pagina'}`,
-    `Ubicacion: ${review.location || 'Sin ubicacion'}`,
-    `Checklist: ${review.checklist.length ? review.checklist.join(', ') : 'Sin checklist'}`,
-    `Accion: ${review.actionRequired || 'Sin accion definida'}`,
-    'Nota:',
-    review.note.trim()
-  ].join('\n');
-}
-
 function parseReviewComment(body: string) {
   if (!body.startsWith('[REVIEW]')) return null;
 
@@ -352,8 +359,14 @@ function parseReviewComment(body: string) {
     page: field('Pagina'),
     location: field('Ubicacion'),
     actionRequired: field('Accion'),
-    checklist: checklist && checklist !== 'Sin checklist' ? checklist.split(',').map((item) => item.trim()).filter(Boolean) : [],
-    note: noteIndex >= 0 ? body.slice(noteIndex + 'Nota:'.length).trim() : ''
+    checklist:
+      checklist && checklist !== 'Sin checklist'
+        ? checklist
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [],
+    note: noteIndex >= 0 ? body.slice(noteIndex + 'Nota:'.length).trim() : '',
   };
 }
 
@@ -372,7 +385,12 @@ function parseAnnotationComment(body: string) {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const className = status === 'approved' || status === 'published' ? 'success' : status === 'expired' || status === 'rejected' ? 'danger' : 'warning';
+  const className =
+    status === 'approved' || status === 'published'
+      ? 'success'
+      : status === 'expired' || status === 'rejected'
+        ? 'danger'
+        : 'warning';
   return <span className={`pill ${className}`}>{normalizeLabel(status)}</span>;
 }
 
@@ -381,7 +399,7 @@ function TextField({
   value,
   onChange,
   type = 'text',
-  placeholder
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -392,7 +410,12 @@ function TextField({
   return (
     <div className="field">
       <label>{label}</label>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
     </div>
   );
 }
@@ -402,7 +425,7 @@ function SelectField({
   value,
   onChange,
   options,
-  placeholder = 'Selecciona'
+  placeholder = 'Selecciona',
 }: {
   label: string;
   value: string;
@@ -425,7 +448,15 @@ function SelectField({
   );
 }
 
-function QuickMetric({ icon: Icon, label, value }: { icon: typeof FilePlus2; label: string; value: number }) {
+function QuickMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof FilePlus2;
+  label: string;
+  value: number;
+}) {
   return (
     <article className="card span-3 project-metric info">
       <Icon size={20} />
@@ -436,7 +467,8 @@ function QuickMetric({ icon: Icon, label, value }: { icon: typeof FilePlus2; lab
 }
 
 type ExplorerPreset = 'all' | 'pending' | 'renewable' | 'recent' | 'unfiled';
-type DashboardExplorerPreset = ExplorerPreset | 'approved' | 'draft' | 'inReview' | 'expired' | 'expiring';
+type DashboardExplorerPreset =
+  ExplorerPreset | 'approved' | 'draft' | 'inReview' | 'expired' | 'expiring';
 
 type FolderDraft = {
   name: string;
@@ -445,7 +477,7 @@ type FolderDraft = {
 
 const emptyFolderDraft: FolderDraft = {
   name: '',
-  disciplineId: ''
+  disciplineId: '',
 };
 
 function sanitizeFolderName(value: string) {
@@ -483,7 +515,11 @@ function buildFolderChildrenMap(folders: FolderOption[]) {
   }, {});
 }
 
-function isFolderInside(folder: FolderOption, selectedFolderId: string, folderMap: Map<string, FolderOption>) {
+function isFolderInside(
+  folder: FolderOption,
+  selectedFolderId: string,
+  folderMap: Map<string, FolderOption>
+) {
   if (!selectedFolderId) return true;
   if (folder.id === selectedFolderId) return true;
 
@@ -510,7 +546,17 @@ function getFolderBreadcrumbs(folderId: string, folderMap: Map<string, FolderOpt
 }
 
 function normalizeExplorerPreset(value: string | null): DashboardExplorerPreset {
-  if (value === 'pending' || value === 'renewable' || value === 'recent' || value === 'unfiled' || value === 'approved' || value === 'draft' || value === 'inReview' || value === 'expired' || value === 'expiring') {
+  if (
+    value === 'pending' ||
+    value === 'renewable' ||
+    value === 'recent' ||
+    value === 'unfiled' ||
+    value === 'approved' ||
+    value === 'draft' ||
+    value === 'inReview' ||
+    value === 'expired' ||
+    value === 'expiring'
+  ) {
     return value;
   }
   return 'all';
@@ -572,7 +618,7 @@ export function DocumentsListPage() {
       try {
         const [projectsResponse, disciplinesResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<DisciplineOption[]>('/folders/disciplines', getToken() ?? undefined)
+          apiGet<DisciplineOption[]>('/folders/disciplines', getToken() ?? undefined),
         ]);
 
         if (!active) return;
@@ -585,7 +631,9 @@ export function DocumentsListPage() {
         }
       } catch (catalogError) {
         if (!active) return;
-        setError(getErrorMessage(catalogError, 'No fue posible cargar los proyectos o disciplinas.'));
+        setError(
+          getErrorMessage(catalogError, 'No fue posible cargar los proyectos o disciplinas.')
+        );
       }
     }
 
@@ -605,8 +653,16 @@ export function DocumentsListPage() {
         if (search) query.set('search', search);
         if (selectedProjectId) query.set('projectId', selectedProjectId);
         const [documentsResponse, foldersResponse] = await Promise.all([
-          apiGet<DocumentListItem[]>(`/documents${query.toString() ? `?${query.toString()}` : ''}`, getToken() ?? undefined),
-          selectedProjectId ? apiGet<FolderOption[]>(`/folders?projectId=${encodeURIComponent(selectedProjectId)}`, getToken() ?? undefined) : Promise.resolve([])
+          apiGet<DocumentListItem[]>(
+            `/documents${query.toString() ? `?${query.toString()}` : ''}`,
+            getToken() ?? undefined
+          ),
+          selectedProjectId
+            ? apiGet<FolderOption[]>(
+                `/folders?projectId=${encodeURIComponent(selectedProjectId)}`,
+                getToken() ?? undefined
+              )
+            : Promise.resolve([]),
         ]);
         if (!active) return;
         setDocuments(documentsResponse);
@@ -667,17 +723,26 @@ export function DocumentsListPage() {
 
   const folderMap = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const folderChildrenMap = useMemo(() => buildFolderChildrenMap(folders), [folders]);
-  const folderBreadcrumbs = useMemo(() => getFolderBreadcrumbs(selectedFolderId, folderMap), [folderMap, selectedFolderId]);
+  const folderBreadcrumbs = useMemo(
+    () => getFolderBreadcrumbs(selectedFolderId, folderMap),
+    [folderMap, selectedFolderId]
+  );
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((item) => {
       if (selectedPreset === 'pending' && item.status !== 'pending_approval') return false;
       if (selectedPreset === 'renewable' && !item.renewable) return false;
       if (selectedPreset === 'unfiled' && item.folderId) return false;
-      if (selectedPreset === 'approved' && !['approved', 'published'].includes(item.status)) return false;
+      if (selectedPreset === 'approved' && !['approved', 'published'].includes(item.status))
+        return false;
       if (selectedPreset === 'draft' && item.status !== 'draft') return false;
-      if (selectedPreset === 'inReview' && !['in_review', 'pending_approval'].includes(item.status)) return false;
-      if (selectedPreset === 'expired' && !(item.status === 'expired' || isPastOrToday(item.dueDate))) return false;
+      if (selectedPreset === 'inReview' && !['in_review', 'pending_approval'].includes(item.status))
+        return false;
+      if (
+        selectedPreset === 'expired' &&
+        !(item.status === 'expired' || isPastOrToday(item.dueDate))
+      )
+        return false;
       if (selectedPreset === 'expiring' && !isWithinNextDays(item.dueDate, 7)) return false;
       if (selectedPreset === 'recent') {
         const updatedAt = new Date(item.updatedAt).getTime();
@@ -693,18 +758,30 @@ export function DocumentsListPage() {
   }, [documents, folderMap, selectedFolderId, selectedPreset]);
 
   const selectedDocument = useMemo(
-    () => filteredDocuments.find((item) => item.id === selectedDocumentId) ?? filteredDocuments[0] ?? null,
+    () =>
+      filteredDocuments.find((item) => item.id === selectedDocumentId) ??
+      filteredDocuments[0] ??
+      null,
     [filteredDocuments, selectedDocumentId]
   );
 
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? documents.find((item) => item.projectId === selectedProjectId)?.project ?? null,
+    () =>
+      projects.find((project) => project.id === selectedProjectId) ??
+      documents.find((item) => item.projectId === selectedProjectId)?.project ??
+      null,
     [documents, projects, selectedProjectId]
   );
 
-  const projectCount = useMemo(() => new Set(documents.map((item) => item.projectId)).size, [documents]);
+  const projectCount = useMemo(
+    () => new Set(documents.map((item) => item.projectId)).size,
+    [documents]
+  );
   const rootFolders = useMemo(
-    () => [...(folderChildrenMap.root ?? [])].sort((left, right) => left.name.localeCompare(right.name)),
+    () =>
+      [...(folderChildrenMap.root ?? [])].sort((left, right) =>
+        left.name.localeCompare(right.name)
+      ),
     [folderChildrenMap]
   );
   const siblingFolders = useMemo(() => {
@@ -716,7 +793,9 @@ export function DocumentsListPage() {
   const folderDuplicateError = useMemo(() => {
     const normalized = sanitizeFolderName(folderDraft.name).toLowerCase();
     if (!normalized) return '';
-    return siblingFolders.includes(normalized) ? 'Ya existe una carpeta con este nombre en el mismo nivel.' : '';
+    return siblingFolders.includes(normalized)
+      ? 'Ya existe una carpeta con este nombre en el mismo nivel.'
+      : '';
   }, [folderDraft.name, siblingFolders]);
   const folderPathPreview = useMemo(() => {
     const parts = folderBreadcrumbs.map((item) => item.name);
@@ -729,59 +808,93 @@ export function DocumentsListPage() {
     () => [
       { label: 'Archivos visibles', value: filteredDocuments.length, icon: FilePlus2 },
       { label: 'Carpetas', value: folders.length, icon: Layers3 },
-      { label: 'Pendientes', value: documents.filter((item) => item.status === 'pending_approval').length, icon: Send },
-      { label: 'Renovables', value: documents.filter((item) => item.renewable).length, icon: Clock3 }
+      {
+        label: 'Pendientes',
+        value: documents.filter((item) => item.status === 'pending_approval').length,
+        icon: Send,
+      },
+      {
+        label: 'Renovables',
+        value: documents.filter((item) => item.renewable).length,
+        icon: Clock3,
+      },
     ],
     [documents, filteredDocuments.length, folders.length]
   );
 
-  const smartPresets: Array<{ id: DashboardExplorerPreset; label: string; hint: string; count: number }> = [
+  const smartPresets: Array<{
+    id: DashboardExplorerPreset;
+    label: string;
+    hint: string;
+    count: number;
+  }> = [
     { id: 'all', label: 'Todo', hint: 'Vista completa del proyecto', count: documents.length },
     {
       id: 'pending',
       label: 'Pendientes',
       hint: 'Documentos esperando aprobación',
-      count: documents.filter((item) => item.status === 'pending_approval').length
+      count: documents.filter((item) => item.status === 'pending_approval').length,
     },
     {
       id: 'inReview',
       label: 'En revisión',
       hint: 'Documentos en revisión o por aprobar',
-      count: documents.filter((item) => ['in_review', 'pending_approval'].includes(item.status)).length
+      count: documents.filter((item) => ['in_review', 'pending_approval'].includes(item.status))
+        .length,
     },
     {
       id: 'approved',
       label: 'Aprobados',
       hint: 'Listos o publicados',
-      count: documents.filter((item) => ['approved', 'published'].includes(item.status)).length
+      count: documents.filter((item) => ['approved', 'published'].includes(item.status)).length,
     },
-    { id: 'draft', label: 'Borradores', hint: 'Aún sin cerrar versión', count: documents.filter((item) => item.status === 'draft').length },
+    {
+      id: 'draft',
+      label: 'Borradores',
+      hint: 'Aún sin cerrar versión',
+      count: documents.filter((item) => item.status === 'draft').length,
+    },
     {
       id: 'expired',
       label: 'Vencidos',
       hint: 'Fuera de fecha objetivo',
-      count: documents.filter((item) => item.status === 'expired' || isPastOrToday(item.dueDate)).length
+      count: documents.filter((item) => item.status === 'expired' || isPastOrToday(item.dueDate))
+        .length,
     },
     {
       id: 'expiring',
       label: 'Próximos a vencer',
       hint: 'Vencen en los próximos 7 días',
-      count: documents.filter((item) => isWithinNextDays(item.dueDate, 7)).length
+      count: documents.filter((item) => isWithinNextDays(item.dueDate, 7)).length,
     },
-    { id: 'renewable', label: 'Renovables', hint: 'Archivos con ciclo de renovación', count: documents.filter((item) => item.renewable).length },
+    {
+      id: 'renewable',
+      label: 'Renovables',
+      hint: 'Archivos con ciclo de renovación',
+      count: documents.filter((item) => item.renewable).length,
+    },
     {
       id: 'recent',
       label: 'Recientes',
       hint: 'Cambios de los últimos 3 días',
-      count: documents.filter((item) => new Date(item.updatedAt).getTime() >= Date.now() - 1000 * 60 * 60 * 24 * 3).length
+      count: documents.filter(
+        (item) => new Date(item.updatedAt).getTime() >= Date.now() - 1000 * 60 * 60 * 24 * 3
+      ).length,
     },
-    { id: 'unfiled', label: 'Sin carpeta', hint: 'Pendientes por ordenar', count: documents.filter((item) => !item.folderId).length }
+    {
+      id: 'unfiled',
+      label: 'Sin carpeta',
+      hint: 'Pendientes por ordenar',
+      count: documents.filter((item) => !item.folderId).length,
+    },
   ];
 
   const filteredProjects = useMemo(() => {
     const normalized = projectSearch.trim().toLowerCase();
     if (!normalized) return projects;
-    return projects.filter((project) => `${project.code} ${project.name}`.toLowerCase().includes(normalized));
+    return projects.filter((project) =>
+      `${project.code} ${project.name}`.toLowerCase().includes(normalized)
+    );
   }, [projectSearch, projects]);
 
   function openDocument(documentId: string) {
@@ -805,12 +918,14 @@ export function DocumentsListPage() {
           projectId: selectedProjectId,
           parentId: selectedFolderId || undefined,
           disciplineId: folderDraft.disciplineId || undefined,
-          name: sanitizeFolderName(folderDraft.name)
+          name: sanitizeFolderName(folderDraft.name),
         },
         getToken() ?? undefined
       );
 
-      setFolders((current) => [...current, created].sort((left, right) => left.path.localeCompare(right.path)));
+      setFolders((current) =>
+        [...current, created].sort((left, right) => left.path.localeCompare(right.path))
+      );
       setSelectedFolderId(created.id);
       setFolderDraft(emptyFolderDraft);
       setShowCreateFolder(false);
@@ -826,8 +941,13 @@ export function DocumentsListPage() {
     <section className="projects-workspace">
       <div className="topbar">
         <div>
-          <h1>{selectedProject ? `Drive documental de ${selectedProject.name}` : 'Drive documental'}</h1>
-          <p className="muted">Explora por proyecto, navega carpetas, detecta pendientes y entra al archivo correcto sin perder contexto.</p>
+          <h1>
+            {selectedProject ? `Drive documental de ${selectedProject.name}` : 'Drive documental'}
+          </h1>
+          <p className="muted">
+            Explora por proyecto, navega carpetas, detecta pendientes y entra al archivo correcto
+            sin perder contexto.
+          </p>
         </div>
         <div className="projects-actions">
           {selectedProjectId ? (
@@ -836,12 +956,22 @@ export function DocumentsListPage() {
             </Link>
           ) : null}
           {canManageFolders ? (
-            <button className="button secondary" type="button" onClick={() => setShowCreateFolder((current) => !current)} disabled={!selectedProjectId}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => setShowCreateFolder((current) => !current)}
+              disabled={!selectedProjectId}
+            >
               <FolderPlus size={18} />
               Nueva carpeta
             </button>
           ) : null}
-          <Link className="button" href={selectedProjectId ? `/documents/new?projectId=${selectedProjectId}` : '/documents/new'}>
+          <Link
+            className="button"
+            href={
+              selectedProjectId ? `/documents/new?projectId=${selectedProjectId}` : '/documents/new'
+            }
+          >
             <Upload size={18} />
             Nuevo documento
           </Link>
@@ -859,7 +989,9 @@ export function DocumentsListPage() {
                 {selectedProject?.code ?? `${projectCount} proyectos`}
               </div>
               <div>
-                <strong>{selectedProject?.name ?? 'Selecciona un proyecto para entrar a su drive'}</strong>
+                <strong>
+                  {selectedProject?.name ?? 'Selecciona un proyecto para entrar a su drive'}
+                </strong>
                 <p className="muted">
                   {selectedProject
                     ? 'Carpetas, archivos y acciones viven dentro del proyecto. Cambiar de proyecto debe ser una búsqueda, no un dropdown eterno.'
@@ -868,7 +1000,11 @@ export function DocumentsListPage() {
               </div>
             </div>
             <div className="projects-actions">
-              <button className="button secondary" type="button" onClick={() => setShowProjectPicker(true)}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => setShowProjectPicker(true)}
+              >
                 <Search size={18} />
                 {selectedProject ? 'Cambiar proyecto' : 'Abrir proyecto'}
               </button>
@@ -878,12 +1014,24 @@ export function DocumentsListPage() {
                 </Link>
               ) : null}
               {canManageFolders ? (
-                <button className="button secondary" type="button" onClick={() => setShowCreateFolder((current) => !current)} disabled={!selectedProjectId}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => setShowCreateFolder((current) => !current)}
+                  disabled={!selectedProjectId}
+                >
                   <FolderPlus size={18} />
                   Nueva carpeta
                 </button>
               ) : null}
-              <Link className="button" href={selectedProjectId ? `/documents/new?projectId=${selectedProjectId}` : '/documents/new'}>
+              <Link
+                className="button"
+                href={
+                  selectedProjectId
+                    ? `/documents/new?projectId=${selectedProjectId}`
+                    : '/documents/new'
+                }
+              >
                 <Upload size={18} />
                 Nuevo documento
               </Link>
@@ -895,17 +1043,30 @@ export function DocumentsListPage() {
               <label>Buscar en el drive</label>
               <div className="search-input">
                 <Search size={16} />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, número, carpeta, disciplina o responsable" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Nombre, número, carpeta, disciplina o responsable"
+                />
               </div>
             </div>
           </div>
           <div className="document-drive-breadcrumbs">
-            <button className={`document-breadcrumb ${!selectedFolderId ? 'active' : ''}`} type="button" onClick={() => setSelectedFolderId('')}>
+            <button
+              className={`document-breadcrumb ${!selectedFolderId ? 'active' : ''}`}
+              type="button"
+              onClick={() => setSelectedFolderId('')}
+            >
               <Building2 size={14} />
               {selectedProject?.code ?? 'Proyecto'}
             </button>
             {folderBreadcrumbs.map((folder) => (
-              <button className={`document-breadcrumb ${folder.id === selectedFolderId ? 'active' : ''}`} key={folder.id} type="button" onClick={() => setSelectedFolderId(folder.id)}>
+              <button
+                className={`document-breadcrumb ${folder.id === selectedFolderId ? 'active' : ''}`}
+                key={folder.id}
+                type="button"
+                onClick={() => setSelectedFolderId(folder.id)}
+              >
                 <ArrowRight size={14} />
                 {folder.name}
               </button>
@@ -918,7 +1079,9 @@ export function DocumentsListPage() {
             <div className="document-drive-sidebar-section">
               <div className="panel-header">
                 <h2>Accesos rápidos</h2>
-                <span className="pill">{smartPresets.find((preset) => preset.id === selectedPreset)?.count ?? 0}</span>
+                <span className="pill">
+                  {smartPresets.find((preset) => preset.id === selectedPreset)?.count ?? 0}
+                </span>
               </div>
               <div className="document-preset-list">
                 {smartPresets.map((preset) => (
@@ -956,7 +1119,11 @@ export function DocumentsListPage() {
                 <span className="pill">{folders.length}</span>
               </div>
               <div className="folder-tree">
-                <button className={`folder-tree-node ${!selectedFolderId ? 'active' : ''}`} type="button" onClick={() => setSelectedFolderId('')}>
+                <button
+                  className={`folder-tree-node ${!selectedFolderId ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setSelectedFolderId('')}
+                >
                   <div>
                     <strong>Raíz del proyecto</strong>
                     <small>Todo lo que cuelga directamente del proyecto</small>
@@ -971,7 +1138,9 @@ export function DocumentsListPage() {
                     onSelect={setSelectedFolderId}
                   />
                 ))}
-                {!loading && !rootFolders.length ? <p className="muted">Todavía no hay carpetas creadas en este proyecto.</p> : null}
+                {!loading && !rootFolders.length ? (
+                  <p className="muted">Todavía no hay carpetas creadas en este proyecto.</p>
+                ) : null}
               </div>
             </div>
           </aside>
@@ -981,7 +1150,9 @@ export function DocumentsListPage() {
               <div className="document-folder-creator">
                 <div className="panel-header">
                   <h2>Crear carpeta</h2>
-                  <span className="pill">{selectedFolderId ? 'Dentro de carpeta actual' : 'Nivel raíz'}</span>
+                  <span className="pill">
+                    {selectedFolderId ? 'Dentro de carpeta actual' : 'Nivel raíz'}
+                  </span>
                 </div>
                 <div className="quick-filters-grid">
                   <TextField
@@ -993,8 +1164,13 @@ export function DocumentsListPage() {
                   <SelectField
                     label="Disciplina"
                     value={folderDraft.disciplineId}
-                    onChange={(value) => setFolderDraft((current) => ({ ...current, disciplineId: value }))}
-                    options={disciplines.map((discipline) => ({ value: discipline.id, label: `${discipline.code} · ${discipline.name}` }))}
+                    onChange={(value) =>
+                      setFolderDraft((current) => ({ ...current, disciplineId: value }))
+                    }
+                    options={disciplines.map((discipline) => ({
+                      value: discipline.id,
+                      label: `${discipline.code} · ${discipline.name}`,
+                    }))}
                     placeholder="Sin disciplina fija"
                   />
                 </div>
@@ -1011,16 +1187,27 @@ export function DocumentsListPage() {
                   </div>
                 </div>
                 {folderRuleError ? <p className="muted">{folderRuleError}</p> : null}
-                {!folderRuleError && folderDuplicateError ? <p className="muted">{folderDuplicateError}</p> : null}
+                {!folderRuleError && folderDuplicateError ? (
+                  <p className="muted">{folderDuplicateError}</p>
+                ) : null}
                 <div className="projects-actions">
-                  <button className="button secondary" type="button" onClick={() => setShowCreateFolder(false)}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setShowCreateFolder(false)}
+                  >
                     Cancelar
                   </button>
                   <button
                     className="button"
                     type="button"
                     onClick={() => void createFolder()}
-                    disabled={folderSaving || Boolean(folderRuleError) || Boolean(folderDuplicateError) || !selectedProjectId}
+                    disabled={
+                      folderSaving ||
+                      Boolean(folderRuleError) ||
+                      Boolean(folderDuplicateError) ||
+                      !selectedProjectId
+                    }
                   >
                     {folderSaving ? 'Creando...' : 'Guardar carpeta'}
                   </button>
@@ -1030,8 +1217,14 @@ export function DocumentsListPage() {
 
             <div className="document-file-grid">
               <div className="panel-header">
-                <h2>{selectedFolderId ? `Contenido de ${folderBreadcrumbs[folderBreadcrumbs.length - 1]?.name ?? 'carpeta'}` : 'Archivos del proyecto'}</h2>
-                <span className="pill">{loading ? 'Cargando' : `${filteredDocuments.length} visibles`}</span>
+                <h2>
+                  {selectedFolderId
+                    ? `Contenido de ${folderBreadcrumbs[folderBreadcrumbs.length - 1]?.name ?? 'carpeta'}`
+                    : 'Archivos del proyecto'}
+                </h2>
+                <span className="pill">
+                  {loading ? 'Cargando' : `${filteredDocuments.length} visibles`}
+                </span>
               </div>
               <div className="document-file-list">
                 {filteredDocuments.map((document) => (
@@ -1061,12 +1254,16 @@ export function DocumentsListPage() {
                       <span>{document.responsibleUser?.name ?? 'Sin responsable'}</span>
                       <span>{new Date(document.updatedAt).toLocaleDateString()}</span>
                     </div>
-                    <small className="document-file-card-hint">Click para previsualizar. Doble click para abrir.</small>
+                    <small className="document-file-card-hint">
+                      Click para previsualizar. Doble click para abrir.
+                    </small>
                   </button>
                 ))}
                 {!loading && !filteredDocuments.length ? (
                   <div className="preview-empty">
-                    <p className="muted">No hay archivos para esta combinación de proyecto, carpeta y filtro rápido.</p>
+                    <p className="muted">
+                      No hay archivos para esta combinación de proyecto, carpeta y filtro rápido.
+                    </p>
                   </div>
                 ) : null}
               </div>
@@ -1082,7 +1279,10 @@ export function DocumentsListPage() {
                     {selectedDocument.folder?.name ?? 'Sin carpeta'}
                   </div>
                   <h2>{selectedDocument.name}</h2>
-                  <p className="muted">{selectedDocument.documentNumber} · {selectedDocument.project?.code ?? selectedDocument.projectId}</p>
+                  <p className="muted">
+                    {selectedDocument.documentNumber} ·{' '}
+                    {selectedDocument.project?.code ?? selectedDocument.projectId}
+                  </p>
                 </div>
 
                 <div className="document-preview-summary">
@@ -1114,7 +1314,11 @@ export function DocumentsListPage() {
                 <div className="document-preview-insights">
                   <div className="simple-document-item">
                     <strong>Ubicación</strong>
-                    <small>{selectedDocument.folder?.name ? `${selectedDocument.project?.name ?? 'Proyecto'} / ${selectedDocument.folder.name}` : 'Aún no se asigna a una carpeta'}</small>
+                    <small>
+                      {selectedDocument.folder?.name
+                        ? `${selectedDocument.project?.name ?? 'Proyecto'} / ${selectedDocument.folder.name}`
+                        : 'Aún no se asigna a una carpeta'}
+                    </small>
                   </div>
                   <div className="simple-document-item">
                     <strong>Movimiento recomendado</strong>
@@ -1128,15 +1332,25 @@ export function DocumentsListPage() {
                   </div>
                   <div className="simple-document-item">
                     <strong>Lectura rápida</strong>
-                    <small>{selectedDocument.confidentialityLevel ? `Nivel ${normalizeLabel(selectedDocument.confidentialityLevel)}` : 'Sin clasificación'}</small>
-                    <small>{selectedDocument.dueDate ? `Vence el ${formatDate(selectedDocument.dueDate)}` : 'Sin fecha de vencimiento definida'}</small>
+                    <small>
+                      {selectedDocument.confidentialityLevel
+                        ? `Nivel ${normalizeLabel(selectedDocument.confidentialityLevel)}`
+                        : 'Sin clasificación'}
+                    </small>
+                    <small>
+                      {selectedDocument.dueDate
+                        ? `Vence el ${formatDate(selectedDocument.dueDate)}`
+                        : 'Sin fecha de vencimiento definida'}
+                    </small>
                   </div>
                   <div className="simple-document-item">
                     <strong>Acciones</strong>
                     <div className="document-inline-links">
                       <Link href={`/documents/${selectedDocument.id}/review`}>Revisar</Link>
                       <Link href={`/documents/${selectedDocument.id}/version`}>Nueva versión</Link>
-                      <Link href={`/documents/${selectedDocument.id}/approval`}>Solicitar aprobación</Link>
+                      <Link href={`/documents/${selectedDocument.id}/approval`}>
+                        Solicitar aprobación
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -1144,7 +1358,9 @@ export function DocumentsListPage() {
             ) : (
               <div className="preview-empty">
                 <Sparkles size={18} />
-                <p className="muted">Selecciona un archivo para ver su ficha rápida y abrirlo en el visor completo.</p>
+                <p className="muted">
+                  Selecciona un archivo para ver su ficha rápida y abrirlo en el visor completo.
+                </p>
               </div>
             )}
           </aside>
@@ -1156,7 +1372,11 @@ export function DocumentsListPage() {
           <div className="card document-project-picker-card">
             <div className="panel-header">
               <h2>Abrir proyecto</h2>
-              <button className="button secondary" type="button" onClick={() => setShowProjectPicker(false)}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => setShowProjectPicker(false)}
+              >
                 <X size={16} />
                 Cerrar
               </button>
@@ -1165,12 +1385,21 @@ export function DocumentsListPage() {
               <label>Buscar proyecto</label>
               <div className="search-input">
                 <Search size={16} />
-                <input value={projectSearch} onChange={(event) => setProjectSearch(event.target.value)} placeholder="Código o nombre del proyecto" />
+                <input
+                  value={projectSearch}
+                  onChange={(event) => setProjectSearch(event.target.value)}
+                  placeholder="Código o nombre del proyecto"
+                />
               </div>
             </div>
             <div className="document-project-picker-list">
               {filteredProjects.map((project) => (
-                <button className="document-project-picker-item" key={project.id} type="button" onClick={() => chooseProject(project.id)}>
+                <button
+                  className="document-project-picker-item"
+                  key={project.id}
+                  type="button"
+                  onClick={() => chooseProject(project.id)}
+                >
                   <div>
                     <strong>{project.name}</strong>
                     <small>{project.code}</small>
@@ -1178,7 +1407,9 @@ export function DocumentsListPage() {
                   <ArrowRight size={16} />
                 </button>
               ))}
-              {!filteredProjects.length ? <p className="muted">No encontramos proyectos con ese criterio.</p> : null}
+              {!filteredProjects.length ? (
+                <p className="muted">No encontramos proyectos con ese criterio.</p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1191,18 +1422,24 @@ function FolderTreeButton({
   folder,
   currentFolderId,
   onSelect,
-  childrenMap
+  childrenMap,
 }: {
   folder: FolderOption;
   currentFolderId: string;
   onSelect: (folderId: string) => void;
   childrenMap: Record<string, FolderOption[]>;
 }) {
-  const children = [...(childrenMap[folder.id] ?? [])].sort((left, right) => left.name.localeCompare(right.name));
+  const children = [...(childrenMap[folder.id] ?? [])].sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
 
   return (
     <div className="folder-tree-branch">
-      <button className={`folder-tree-node ${currentFolderId === folder.id ? 'active' : ''}`} type="button" onClick={() => onSelect(folder.id)}>
+      <button
+        className={`folder-tree-node ${currentFolderId === folder.id ? 'active' : ''}`}
+        type="button"
+        onClick={() => onSelect(folder.id)}
+      >
         <div>
           <strong>{folder.name}</strong>
           <small>{folder.path}</small>
@@ -1211,7 +1448,13 @@ function FolderTreeButton({
       {children.length ? (
         <div className="folder-tree-children">
           {children.map((child) => (
-            <FolderTreeButton childrenMap={childrenMap} currentFolderId={currentFolderId} folder={child} key={child.id} onSelect={onSelect} />
+            <FolderTreeButton
+              childrenMap={childrenMap}
+              currentFolderId={currentFolderId}
+              folder={child}
+              key={child.id}
+              onSelect={onSelect}
+            />
           ))}
         </div>
       ) : null}
@@ -1219,13 +1462,7 @@ function FolderTreeButton({
   );
 }
 
-function DocumentForm({
-  mode,
-  documentId
-}: {
-  mode: 'create' | 'version';
-  documentId?: string;
-}) {
+function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; documentId?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const presetProjectId = searchParams.get('projectId') ?? '';
@@ -1246,18 +1483,23 @@ function DocumentForm({
       try {
         const [projectsResponse, disciplinesResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<DisciplineOption[]>('/folders/disciplines', getToken() ?? undefined)
+          apiGet<DisciplineOption[]>('/folders/disciplines', getToken() ?? undefined),
         ]);
         if (!active) return;
         setProjects(projectsResponse);
         setDisciplines(disciplinesResponse);
         if (mode === 'create') {
           const initialProjectId =
-            (presetProjectId && projectsResponse.some((project) => project.id === presetProjectId) ? presetProjectId : '') ||
+            (presetProjectId && projectsResponse.some((project) => project.id === presetProjectId)
+              ? presetProjectId
+              : '') ||
             projectsResponse[0]?.id ||
             '';
           if (initialProjectId) {
-            setForm((current) => ({ ...current, projectId: current.projectId || initialProjectId }));
+            setForm((current) => ({
+              ...current,
+              projectId: current.projectId || initialProjectId,
+            }));
           }
         }
       } catch {
@@ -1278,7 +1520,10 @@ function DocumentForm({
 
     async function loadDetail() {
       try {
-        const response = await apiGet<DocumentDetail>(`/documents/${documentId}`, getToken() ?? undefined);
+        const response = await apiGet<DocumentDetail>(
+          `/documents/${documentId}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setDetail(response);
         setForm({
@@ -1294,8 +1539,10 @@ function DocumentForm({
           dueDate: response.dueDate ?? '',
           responsibleUserId: response.responsibleUserId ?? '',
           status: response.status,
-          revision: response.currentVersion?.revision ? `${response.currentVersion.revision}-1` : 'B',
-          notes: ''
+          revision: response.currentVersion?.revision
+            ? `${response.currentVersion.revision}-1`
+            : 'B',
+          notes: '',
         });
       } catch {
         if (!active) return;
@@ -1320,8 +1567,14 @@ function DocumentForm({
     async function loadProjectData() {
       try {
         const [folderResponse, membersResponse] = await Promise.all([
-          apiGet<FolderOption[]>(`/folders?projectId=${encodeURIComponent(form.projectId)}`, getToken() ?? undefined),
-          apiGet<ProjectMemberOption[]>(`/projects/${form.projectId}/users`, getToken() ?? undefined)
+          apiGet<FolderOption[]>(
+            `/folders?projectId=${encodeURIComponent(form.projectId)}`,
+            getToken() ?? undefined
+          ),
+          apiGet<ProjectMemberOption[]>(
+            `/projects/${form.projectId}/users`,
+            getToken() ?? undefined
+          ),
         ]);
         if (!active) return;
         setFolders(folderResponse);
@@ -1384,16 +1637,24 @@ function DocumentForm({
           fileName: file.fileName,
           mimeType: file.mimeType,
           base64Content: file.base64Content,
-          sizeBytes: file.sizeBytes
+          sizeBytes: file.sizeBytes,
         };
 
         let created: DocumentDetail;
         try {
           created = await apiPost<DocumentDetail>('/documents', payload, getToken() ?? undefined);
         } catch (error) {
-          if (error instanceof Error && error.message.includes('renewalFrequency should not exist')) {
-            const { renewalFrequency, ...legacyPayload } = payload;
-            created = await apiPost<DocumentDetail>('/documents', legacyPayload, getToken() ?? undefined);
+          if (
+            error instanceof Error &&
+            error.message.includes('renewalFrequency should not exist')
+          ) {
+            const legacyPayload = { ...payload };
+            delete legacyPayload.renewalFrequency;
+            created = await apiPost<DocumentDetail>(
+              '/documents',
+              legacyPayload,
+              getToken() ?? undefined
+            );
           } else {
             throw error;
           }
@@ -1414,7 +1675,7 @@ function DocumentForm({
           base64Content: file.base64Content,
           sizeBytes: file.sizeBytes,
           revision: form.revision,
-          notes: form.notes
+          notes: form.notes,
         },
         getToken() ?? undefined
       );
@@ -1424,7 +1685,9 @@ function DocumentForm({
       setError(
         getErrorMessage(
           error,
-          mode === 'create' ? 'No fue posible crear el documento.' : 'No fue posible subir la nueva versión.'
+          mode === 'create'
+            ? 'No fue posible crear el documento.'
+            : 'No fue posible subir la nueva versión.'
         )
       );
     } finally {
@@ -1434,7 +1697,9 @@ function DocumentForm({
 
   const visibleFolders = useMemo(() => {
     if (!form.disciplineId) return folders;
-    return folders.filter((folder) => !folder.disciplineId || folder.disciplineId === form.disciplineId);
+    return folders.filter(
+      (folder) => !folder.disciplineId || folder.disciplineId === form.disciplineId
+    );
   }, [folders, form.disciplineId]);
 
   return (
@@ -1449,7 +1714,16 @@ function DocumentForm({
           </p>
         </div>
         <div className="projects-actions">
-          <Link className="button secondary" href={mode === 'create' ? (form.projectId ? `/documents?projectId=${form.projectId}` : '/documents') : `/documents/${documentId}`}>
+          <Link
+            className="button secondary"
+            href={
+              mode === 'create'
+                ? form.projectId
+                  ? `/documents?projectId=${form.projectId}`
+                  : '/documents'
+                : `/documents/${documentId}`
+            }
+          >
             Volver
           </Link>
         </div>
@@ -1464,10 +1738,24 @@ function DocumentForm({
               <SelectField
                 label="Proyecto"
                 value={form.projectId}
-                onChange={(value) => setForm((current) => ({ ...current, projectId: value, folderId: '', responsibleUserId: '' }))}
-                options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+                onChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    projectId: value,
+                    folderId: '',
+                    responsibleUserId: '',
+                  }))
+                }
+                options={projects.map((project) => ({
+                  value: project.id,
+                  label: `${project.code} · ${project.name}`,
+                }))}
               />
-              <TextField label="Documento" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+              <TextField
+                label="Documento"
+                value={form.name}
+                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+              />
               <TextField
                 label="Número documental"
                 value={form.documentNumber}
@@ -1476,32 +1764,48 @@ function DocumentForm({
               <SelectField
                 label="Disciplina"
                 value={form.disciplineId}
-                onChange={(value) => setForm((current) => ({ ...current, disciplineId: value, folderId: '' }))}
-                options={disciplines.map((discipline) => ({ value: discipline.id, label: `${discipline.code} · ${discipline.name}` }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, disciplineId: value, folderId: '' }))
+                }
+                options={disciplines.map((discipline) => ({
+                  value: discipline.id,
+                  label: `${discipline.code} · ${discipline.name}`,
+                }))}
               />
               <SelectField
                 label="Carpeta"
                 value={form.folderId}
                 onChange={(value) => setForm((current) => ({ ...current, folderId: value }))}
                 options={visibleFolders.map((folder) => ({ value: folder.id, label: folder.path }))}
-                placeholder={visibleFolders.length ? 'Selecciona la carpeta del proyecto' : 'No hay carpetas disponibles'}
+                placeholder={
+                  visibleFolders.length
+                    ? 'Selecciona la carpeta del proyecto'
+                    : 'No hay carpetas disponibles'
+                }
               />
               <SelectField
                 label="Responsable"
                 value={form.responsibleUserId}
-                onChange={(value) => setForm((current) => ({ ...current, responsibleUserId: value }))}
-                options={users.map((user) => ({ value: user.id, label: `${user.name} · ${user.email}` }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, responsibleUserId: value }))
+                }
+                options={users.map((user) => ({
+                  value: user.id,
+                  label: `${user.name} · ${user.email}`,
+                }))}
                 placeholder={users.length ? 'Selecciona' : 'Sin usuarios disponibles'}
               />
               <SelectField
                 label="Confidencialidad"
                 value={form.confidentialityLevel}
-                onChange={(value) => setForm((current) => ({ ...current, confidentialityLevel: value }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, confidentialityLevel: value }))
+                }
                 options={[
                   { value: 'public', label: 'Público' },
                   { value: 'internal', label: 'Interno' },
                   { value: 'confidential', label: 'Confidencial' },
-                  { value: 'restricted', label: 'Restringido' }
+                  { value: 'restricted', label: 'Restringido' },
                 ]}
               />
               <SelectField
@@ -1512,7 +1816,7 @@ function DocumentForm({
                   { value: 'draft', label: 'Borrador' },
                   { value: 'in_review', label: 'En revisión' },
                   { value: 'pending_approval', label: 'Pendiente de aprobación' },
-                  { value: 'approved', label: 'Aprobado' }
+                  { value: 'approved', label: 'Aprobado' },
                 ]}
               />
               <TextField
@@ -1524,7 +1828,11 @@ function DocumentForm({
             </>
           ) : null}
 
-          <TextField label="Revisión" value={form.revision} onChange={(value) => setForm((current) => ({ ...current, revision: value }))} />
+          <TextField
+            label="Revisión"
+            value={form.revision}
+            onChange={(value) => setForm((current) => ({ ...current, revision: value }))}
+          />
           <div className="field">
             <label>Archivo</label>
             <input type="file" onChange={(event) => void handleFileChange(event.target.files)} />
@@ -1537,7 +1845,7 @@ function DocumentForm({
                 setForm((current) => ({
                   ...current,
                   renewable: event.target.value === 'yes',
-                  renewalFrequency: event.target.value === 'yes' ? current.renewalFrequency : ''
+                  renewalFrequency: event.target.value === 'yes' ? current.renewalFrequency : '',
                 }))
               }
             >
@@ -1549,21 +1857,35 @@ function DocumentForm({
             <SelectField
               label="Se renueva"
               value={form.renewalFrequency}
-              onChange={(value) => setForm((current) => ({ ...current, renewalFrequency: value as UploadForm['renewalFrequency'] }))}
+              onChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  renewalFrequency: value as UploadForm['renewalFrequency'],
+                }))
+              }
               options={[
                 { value: 'day', label: 'Cada día' },
                 { value: 'week', label: 'Cada semana' },
                 { value: 'month', label: 'Cada mes' },
-                { value: 'year', label: 'Cada año' }
+                { value: 'year', label: 'Cada año' },
               ]}
             />
           ) : null}
           <div className="field span-2">
             <label>Notas</label>
-            <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+            <textarea
+              value={form.notes}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, notes: event.target.value }))
+              }
+            />
           </div>
         </div>
-        {file ? <p className="muted">Archivo seleccionado: {file.fileName} · {formatSize(file.sizeBytes)}</p> : null}
+        {file ? (
+          <p className="muted">
+            Archivo seleccionado: {file.fileName} · {formatSize(file.sizeBytes)}
+          </p>
+        ) : null}
         <div className="projects-actions">
           <button className="button" type="button" onClick={() => void submit()} disabled={saving}>
             {saving ? 'Guardando...' : mode === 'create' ? 'Crear documento' : 'Subir versión'}
@@ -1603,7 +1925,10 @@ export function DocumentDetailPage() {
     async function load() {
       setLoading(true);
       try {
-        const response = await apiGet<DocumentDetail>(`/documents/${params.id}`, getToken() ?? undefined);
+        const response = await apiGet<DocumentDetail>(
+          `/documents/${params.id}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setDetail(response);
         setError('');
@@ -1624,7 +1949,10 @@ export function DocumentDetailPage() {
   useEffect(() => {
     let active = true;
 
-    apiGet<ApprovalRequest[]>(`/approvals/requests/history?documentId=${encodeURIComponent(params.id)}`, getToken() ?? undefined)
+    apiGet<ApprovalRequest[]>(
+      `/approvals/requests/history?documentId=${encodeURIComponent(params.id)}`,
+      getToken() ?? undefined
+    )
       .then((response) => {
         if (active) setApprovalHistory(response);
       })
@@ -1662,14 +1990,21 @@ export function DocumentDetailPage() {
   }, [detail?.id, detail?.preview.available]);
 
   async function refreshDetail() {
-    const response = await apiGet<DocumentDetail>(`/documents/${params.id}`, getToken() ?? undefined);
+    const response = await apiGet<DocumentDetail>(
+      `/documents/${params.id}`,
+      getToken() ?? undefined
+    );
     setDetail(response);
   }
 
   async function saveComment() {
     if (!comment.trim()) return;
     try {
-      const updated = await apiPost<DocumentDetail>(`/documents/${params.id}/comments`, { body: comment }, getToken() ?? undefined);
+      const updated = await apiPost<DocumentDetail>(
+        `/documents/${params.id}/comments`,
+        { body: comment },
+        getToken() ?? undefined
+      );
       setDetail(updated);
       setComment('');
       setError('');
@@ -1680,7 +2015,11 @@ export function DocumentDetailPage() {
 
   async function updateStatus(status: string) {
     try {
-      const updated = await apiPatch<DocumentDetail>(`/documents/${params.id}`, { status }, getToken() ?? undefined);
+      const updated = await apiPatch<DocumentDetail>(
+        `/documents/${params.id}`,
+        { status },
+        getToken() ?? undefined
+      );
       setDetail(updated);
       setError('');
     } catch {
@@ -1695,7 +2034,9 @@ export function DocumentDetailPage() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = detail.currentVersion?.fileName ?? `${detail.documentNumber}.${detail.fileExtension ?? 'bin'}`;
+      anchor.download =
+        detail.currentVersion?.fileName ??
+        `${detail.documentNumber}.${detail.fileExtension ?? 'bin'}`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -1752,7 +2093,11 @@ export function DocumentDetailPage() {
 
       <div className="grid">
         <QuickMetric icon={FolderTree} label="Proyecto" value={1} />
-        <QuickMetric icon={UserCircle2} label="Responsable" value={detail.responsibleUser ? 1 : 0} />
+        <QuickMetric
+          icon={UserCircle2}
+          label="Responsable"
+          value={detail.responsibleUser ? 1 : 0}
+        />
         <QuickMetric icon={Clock3} label="Versiones" value={detail.versions.length} />
         <QuickMetric icon={CheckCircle2} label="Solicitudes" value={approvalHistory.length} />
       </div>
@@ -1764,7 +2109,8 @@ export function DocumentDetailPage() {
             <StatusPill status={detail.status} />
           </div>
           <p className="muted">
-            {detail.project?.name ?? detail.projectId} · {detail.folder?.name ?? 'Sin carpeta'} · {detail.discipline?.name ?? 'Sin disciplina'}
+            {detail.project?.name ?? detail.projectId} · {detail.folder?.name ?? 'Sin carpeta'} ·{' '}
+            {detail.discipline?.name ?? 'Sin disciplina'}
           </p>
           {detail.preview.available && previewUrl ? (
             detail.preview.mimeType?.startsWith('image/') ? (
@@ -1775,24 +2121,37 @@ export function DocumentDetailPage() {
           ) : (
             <div className="preview-empty">
               <p className="muted">
-                {previewError || 'No hay vista previa para este formato. Puedes descargarlo o subir una nueva versión.'}
+                {previewError ||
+                  'No hay vista previa para este formato. Puedes descargarlo o subir una nueva versión.'}
               </p>
             </div>
           )}
           <div className="projects-actions" style={{ marginTop: 16 }}>
             {canDownload ? (
-              <button className="button secondary" type="button" onClick={() => void downloadCurrent()}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void downloadCurrent()}
+              >
                 <Download size={18} />
                 Descargar
               </button>
             ) : null}
             {canEdit ? (
-              <button className="button secondary" type="button" onClick={() => void updateStatus('in_review')}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void updateStatus('in_review')}
+              >
                 En revisión
               </button>
             ) : null}
             {canEdit ? (
-              <button className="button secondary" type="button" onClick={() => void updateStatus('published')}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void updateStatus('published')}
+              >
                 Publicar
               </button>
             ) : null}
@@ -1850,7 +2209,9 @@ export function DocumentDetailPage() {
               <div className="simple-document-item" key={version.id}>
                 <strong>Rev. {version.revision}</strong>
                 <span>{version.fileName}</span>
-                <small>{version.notes ?? 'Sin notas'} · {formatSize(version.sizeBytes)}</small>
+                <small>
+                  {version.notes ?? 'Sin notas'} · {formatSize(version.sizeBytes)}
+                </small>
               </div>
             ))}
           </div>
@@ -1863,7 +2224,11 @@ export function DocumentDetailPage() {
           </div>
           <div className="field">
             <label>Nuevo comentario</label>
-            <textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Anota observaciones o pendientes." />
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              placeholder="Anota observaciones o pendientes."
+            />
           </div>
           <button className="button" type="button" onClick={() => void saveComment()}>
             Guardar comentario
@@ -1893,7 +2258,10 @@ export function DocumentDetailPage() {
             {approvalHistory.map((item) => (
               <div className="simple-document-item" key={item.id}>
                 <strong>Solicitud {normalizeLabel(item.status)}</strong>
-                <small>{item.currentStep?.name ?? 'Sin paso actual'} · {new Date(item.requestedAt).toLocaleString()}</small>
+                <small>
+                  {item.currentStep?.name ?? 'Sin paso actual'} ·{' '}
+                  {new Date(item.requestedAt).toLocaleString()}
+                </small>
               </div>
             ))}
           </div>
@@ -1915,7 +2283,8 @@ export function DocumentReviewPage() {
   const [annotations, setAnnotations] = useState<ReviewAnnotation[]>([]);
   const [savedVersionId, setSavedVersionId] = useState<string | null>(null);
   const [savedAnnotationSignature, setSavedAnnotationSignature] = useState('[]');
-  const [activeTool, setActiveTool] = useState<(typeof reviewToolOptions)[number]['value']>('comment');
+  const [activeTool, setActiveTool] =
+    useState<(typeof reviewToolOptions)[number]['value']>('comment');
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [pageJumpValue, setPageJumpValue] = useState('1');
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -1926,7 +2295,12 @@ export function DocumentReviewPage() {
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [commentText, setCommentText] = useState('');
-  const [pendingCommentPlacement, setPendingCommentPlacement] = useState<{ kind: 'comment' | 'text'; pageIndex: number; x: number; y: number } | null>(null);
+  const [pendingCommentPlacement, setPendingCommentPlacement] = useState<{
+    kind: 'comment' | 'text';
+    pageIndex: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [stampText, setStampText] = useState('Requiere correccion');
   const [strokeColor, setStrokeColor] = useState('#b91c1c');
   const [loading, setLoading] = useState(true);
@@ -1935,7 +2309,14 @@ export function DocumentReviewPage() {
   const [error, setError] = useState('');
   const [interaction, setInteraction] = useState<
     | { kind: 'draw'; pageIndex: number; path: Array<{ x: number; y: number }> }
-    | { kind: 'highlight'; pageIndex: number; startX: number; startY: number; currentX: number; currentY: number }
+    | {
+        kind: 'highlight';
+        pageIndex: number;
+        startX: number;
+        startY: number;
+        currentX: number;
+        currentY: number;
+      }
     | null
   >(null);
   const previewUrlsRef = useRef<string[]>([]);
@@ -1947,10 +2328,15 @@ export function DocumentReviewPage() {
     async function load() {
       setLoading(true);
       try {
-        const response = await apiGet<DocumentDetail>(`/documents/${params.id}`, getToken() ?? undefined);
+        const response = await apiGet<DocumentDetail>(
+          `/documents/${params.id}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setDetail(response);
-        const saved = response.comments.map((item) => parseAnnotationComment(item.body)).find(Boolean);
+        const saved = response.comments
+          .map((item) => parseAnnotationComment(item.body))
+          .find(Boolean);
         const savedAnnotations = saved?.annotations ?? [];
         setAnnotations(savedAnnotations);
         setSavedAnnotationSignature(buildAnnotationSignature(savedAnnotations));
@@ -1979,10 +2365,16 @@ export function DocumentReviewPage() {
       if (pdfWindow.pdfjsLib) return pdfWindow.pdfjsLib;
 
       await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector('script[data-pdfjs="true"]') as HTMLScriptElement | null;
+        const existing = document.querySelector(
+          'script[data-pdfjs="true"]'
+        ) as HTMLScriptElement | null;
         if (existing) {
           existing.addEventListener('load', () => resolve(), { once: true });
-          existing.addEventListener('error', () => reject(new Error('No fue posible cargar PDF.js.')), { once: true });
+          existing.addEventListener(
+            'error',
+            () => reject(new Error('No fue posible cargar PDF.js.')),
+            { once: true }
+          );
           return;
         }
 
@@ -1995,7 +2387,8 @@ export function DocumentReviewPage() {
         document.head.appendChild(script);
       });
 
-      pdfWindow.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfWindow.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       return pdfWindow.pdfjsLib;
     }
 
@@ -2033,7 +2426,7 @@ export function DocumentReviewPage() {
               pageIndex,
               width: viewport.width,
               height: viewport.height,
-              imageUrl: canvas.toDataURL('image/png')
+              imageUrl: canvas.toDataURL('image/png'),
             });
           }
 
@@ -2055,8 +2448,8 @@ export function DocumentReviewPage() {
                 pageIndex: 0,
                 width: image.naturalWidth,
                 height: image.naturalHeight,
-                imageUrl
-              }
+                imageUrl,
+              },
             ]);
           }
         } else {
@@ -2068,7 +2461,11 @@ export function DocumentReviewPage() {
       } catch (renderError) {
         if (active) {
           setPages([]);
-          setError(renderError instanceof Error ? renderError.message : 'No fue posible preparar el documento para revisión.');
+          setError(
+            renderError instanceof Error
+              ? renderError.message
+              : 'No fue posible preparar el documento para revisión.'
+          );
         }
       } finally {
         if (active) setRendering(false);
@@ -2124,7 +2521,7 @@ export function DocumentReviewPage() {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
       x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
-      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
     };
   }
 
@@ -2139,7 +2536,7 @@ export function DocumentReviewPage() {
         kind: activeTool,
         pageIndex,
         x: point.x,
-        y: point.y
+        y: point.y,
       });
       setError('');
       return;
@@ -2155,9 +2552,9 @@ export function DocumentReviewPage() {
           y: point.y,
           stamp: stampText,
           color: strokeColor,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         },
-        ...current
+        ...current,
       ]);
       setError('');
       return;
@@ -2171,7 +2568,14 @@ export function DocumentReviewPage() {
 
     if (activeTool === 'highlight') {
       event.currentTarget.setPointerCapture(event.pointerId);
-      setInteraction({ kind: 'highlight', pageIndex, startX: point.x, startY: point.y, currentX: point.x, currentY: point.y });
+      setInteraction({
+        kind: 'highlight',
+        pageIndex,
+        startX: point.x,
+        startY: point.y,
+        currentX: point.x,
+        currentY: point.y,
+      });
     }
   }
 
@@ -2184,7 +2588,11 @@ export function DocumentReviewPage() {
       setInteraction((current) => {
         if (!current || current.kind !== 'draw' || current.pageIndex !== pageIndex) return current;
         const previous = current.path[current.path.length - 1];
-        if (previous && Math.abs(previous.x - point.x) < 0.0015 && Math.abs(previous.y - point.y) < 0.0015) {
+        if (
+          previous &&
+          Math.abs(previous.x - point.x) < 0.0015 &&
+          Math.abs(previous.y - point.y) < 0.0015
+        ) {
           return current;
         }
         return { ...current, path: [...current.path, point] };
@@ -2194,7 +2602,8 @@ export function DocumentReviewPage() {
 
     if (interaction.kind === 'highlight') {
       setInteraction((current) => {
-        if (!current || current.kind !== 'highlight' || current.pageIndex !== pageIndex) return current;
+        if (!current || current.kind !== 'highlight' || current.pageIndex !== pageIndex)
+          return current;
         return { ...current, currentX: point.x, currentY: point.y };
       });
     }
@@ -2217,9 +2626,9 @@ export function DocumentReviewPage() {
           y: interaction.path[0].y,
           path: interaction.path,
           color: strokeColor,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         },
-        ...current
+        ...current,
       ]);
     }
 
@@ -2237,9 +2646,9 @@ export function DocumentReviewPage() {
             width,
             height,
             color: '#facc15',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
           },
-          ...current
+          ...current,
         ]);
       }
     }
@@ -2253,9 +2662,13 @@ export function DocumentReviewPage() {
     try {
       const payload: SavedReviewPayload = {
         versionId: detail.currentVersion?.id ?? null,
-        annotations
+        annotations,
       };
-      const updated = await apiPost<DocumentDetail>(`/documents/${detail.id}/comments`, { body: buildAnnotationComment(payload) }, getToken() ?? undefined);
+      const updated = await apiPost<DocumentDetail>(
+        `/documents/${detail.id}/comments`,
+        { body: buildAnnotationComment(payload) },
+        getToken() ?? undefined
+      );
       setDetail(updated);
       setSavedAnnotationSignature(buildAnnotationSignature(annotations));
       setError('');
@@ -2267,7 +2680,9 @@ export function DocumentReviewPage() {
   }
 
   function renderPath(path: Array<{ x: number; y: number }>) {
-    return path.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x * 1000} ${point.y * 1000}`).join(' ');
+    return path
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x * 1000} ${point.y * 1000}`)
+      .join(' ');
   }
 
   function confirmPendingComment() {
@@ -2277,11 +2692,13 @@ export function DocumentReviewPage() {
         return;
       }
 
-      setAnnotations((current) => current.map((entry) => (
-        entry.id === editingAnnotationId
-          ? { ...entry, text: commentText.trim(), color: strokeColor }
-          : entry
-      )));
+      setAnnotations((current) =>
+        current.map((entry) =>
+          entry.id === editingAnnotationId
+            ? { ...entry, text: commentText.trim(), color: strokeColor }
+            : entry
+        )
+      );
       setCommentText('');
       setEditingAnnotationId(null);
       setSidebarTab('comments');
@@ -2309,9 +2726,9 @@ export function DocumentReviewPage() {
         text: commentText.trim(),
         color: strokeColor,
         replies: pendingCommentPlacement.kind === 'comment' ? [] : undefined,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       },
-      ...current
+      ...current,
     ]);
     setCommentText('');
     setPendingCommentPlacement(null);
@@ -2365,7 +2782,9 @@ export function DocumentReviewPage() {
   }
 
   function beginEditComment(annotationId: string) {
-    const target = annotations.find((entry) => entry.id === annotationId && entry.kind === 'comment');
+    const target = annotations.find(
+      (entry) => entry.id === annotationId && entry.kind === 'comment'
+    );
     if (!target) return;
     setEditingAnnotationId(annotationId);
     setCommentText(target.text ?? '');
@@ -2381,17 +2800,23 @@ export function DocumentReviewPage() {
 
   function saveReply(annotationId: string) {
     if (!replyText.trim()) return;
-    setAnnotations((current) => current.map((entry) => (
-      entry.id === annotationId && entry.kind === 'comment'
-        ? {
-            ...entry,
-            replies: [
-              ...(entry.replies ?? []),
-              { id: crypto.randomUUID(), text: replyText.trim(), createdAt: new Date().toISOString() }
-            ]
-          }
-        : entry
-    )));
+    setAnnotations((current) =>
+      current.map((entry) =>
+        entry.id === annotationId && entry.kind === 'comment'
+          ? {
+              ...entry,
+              replies: [
+                ...(entry.replies ?? []),
+                {
+                  id: crypto.randomUUID(),
+                  text: replyText.trim(),
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            }
+          : entry
+      )
+    );
     setReplyText('');
     setReplyingToId(null);
   }
@@ -2405,7 +2830,11 @@ export function DocumentReviewPage() {
       setPendingCommentPlacement(null);
       setCommentText('');
     }
-    if (annotations.some((entry) => entry.id === selectedAnnotationId && entry.pageIndex === activePageIndex)) {
+    if (
+      annotations.some(
+        (entry) => entry.id === selectedAnnotationId && entry.pageIndex === activePageIndex
+      )
+    ) {
       setSelectedAnnotationId(null);
     }
     setAnnotations((current) => current.filter((entry) => entry.pageIndex !== activePageIndex));
@@ -2421,9 +2850,18 @@ export function DocumentReviewPage() {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
-      const isTypingTarget = target ? ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) : false;
+      const isTypingTarget = target
+        ? ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+        : false;
 
-      if (!isTypingTarget && (activeTool === 'comment' || activeTool === 'text') && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (
+        !isTypingTarget &&
+        (activeTool === 'comment' || activeTool === 'text') &&
+        event.key.length === 1 &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
         commentTextareaRef.current?.focus();
         setCommentText((current) => current + event.key);
         event.preventDefault();
@@ -2479,24 +2917,33 @@ export function DocumentReviewPage() {
   }
 
   const currentVersionId = detail.currentVersion?.id ?? null;
-  const versionMismatch = Boolean(savedVersionId && currentVersionId && savedVersionId !== currentVersionId);
-  const activeToolMeta = reviewToolOptions.find((tool) => tool.value === activeTool) ?? reviewToolOptions[0];
+  const versionMismatch = Boolean(
+    savedVersionId && currentVersionId && savedVersionId !== currentVersionId
+  );
+  const activeToolMeta =
+    reviewToolOptions.find((tool) => tool.value === activeTool) ?? reviewToolOptions[0];
   const activePageAnnotations = annotations.filter((item) => item.pageIndex === activePageIndex);
   const activePage = pages.find((page) => page.pageIndex === activePageIndex) ?? pages[0] ?? null;
-  const visibleAnnotationItems = annotationScope === 'page'
-    ? annotations.filter((item) => item.pageIndex === activePageIndex)
-    : annotations;
+  const visibleAnnotationItems =
+    annotationScope === 'page'
+      ? annotations.filter((item) => item.pageIndex === activePageIndex)
+      : annotations;
   const commentAnnotationItems = annotations.filter((item) => item.kind === 'comment');
-  const visibleComments = detail.comments.filter((item) => !item.body.startsWith('[ANNOTATION_SET]'));
+  const visibleComments = detail.comments.filter(
+    (item) => !item.body.startsWith('[ANNOTATION_SET]')
+  );
   const reviewComments = visibleComments.map((item) => {
     const parsed = parseReviewComment(item.body);
     return {
       ...item,
       parsed,
-      excerpt: parsed?.note || item.body
+      excerpt: parsed?.note || item.body,
     };
   });
-  const hasUnsavedChanges = pendingCommentPlacement !== null || commentText.trim().length > 0 || buildAnnotationSignature(annotations) !== savedAnnotationSignature;
+  const hasUnsavedChanges =
+    pendingCommentPlacement !== null ||
+    commentText.trim().length > 0 ||
+    buildAnnotationSignature(annotations) !== savedAnnotationSignature;
 
   function goToPreviousPage() {
     if (!pages.length) return;
@@ -2529,21 +2976,37 @@ export function DocumentReviewPage() {
       <div className="topbar">
         <div>
           <h1>Revisión de documento</h1>
-          <p className="muted">{detail.documentNumber} · {detail.name}</p>
+          <p className="muted">
+            {detail.documentNumber} · {detail.name}
+          </p>
         </div>
         <div className="projects-actions">
-          {hasUnsavedChanges ? <span className="pill warning">Cambios sin guardar</span> : <span className="pill success">Guardado</span>}
+          {hasUnsavedChanges ? (
+            <span className="pill warning">Cambios sin guardar</span>
+          ) : (
+            <span className="pill success">Guardado</span>
+          )}
           <Link className="button secondary" href={`/documents/${detail.id}`}>
             Volver al documento
           </Link>
-          <button className="button" type="button" onClick={() => void saveAnnotations()} disabled={saving}>
+          <button
+            className="button"
+            type="button"
+            onClick={() => void saveAnnotations()}
+            disabled={saving}
+          >
             {saving ? 'Guardando...' : 'Guardar revisión'}
           </button>
         </div>
       </div>
 
       {error ? <div className="card muted">{error}</div> : null}
-      {versionMismatch ? <div className="card muted">Estas anotaciones vienen de otra versión del documento. Revisa si siguen vigentes antes de guardar.</div> : null}
+      {versionMismatch ? (
+        <div className="card muted">
+          Estas anotaciones vienen de otra versión del documento. Revisa si siguen vigentes antes de
+          guardar.
+        </div>
+      ) : null}
 
       <div className="review-workspace">
         <article className="card review-document-card">
@@ -2552,7 +3015,9 @@ export function DocumentReviewPage() {
               <FileCheck2 size={18} />
               <h2>Documento anotable</h2>
             </div>
-            <span className="pill">{rendering ? 'Preparando visor' : `${pages.length} página(s)`}</span>
+            <span className="pill">
+              {rendering ? 'Preparando visor' : `${pages.length} página(s)`}
+            </span>
           </div>
 
           <div className="review-toolbar-stack">
@@ -2590,7 +3055,12 @@ export function DocumentReviewPage() {
                 </div>
 
                 <div className="review-page-nav-actions">
-                  <button className="button secondary" type="button" onClick={goToPreviousPage} disabled={activePageIndex <= 0}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={goToPreviousPage}
+                    disabled={activePageIndex <= 0}
+                  >
                     Anterior
                   </button>
                   <div className="review-page-counter">
@@ -2614,7 +3084,12 @@ export function DocumentReviewPage() {
                       }}
                     />
                   </div>
-                  <button className="button secondary" type="button" onClick={goToNextPage} disabled={activePageIndex >= pages.length - 1}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={goToNextPage}
+                    disabled={activePageIndex >= pages.length - 1}
+                  >
                     Siguiente
                   </button>
                 </div>
@@ -2631,7 +3106,9 @@ export function DocumentReviewPage() {
                     onClick={() => setActiveTool(tool.value)}
                     title={tool.help}
                   >
-                    <span className="review-tool-icon small">{renderReviewToolIcon(tool.value)}</span>
+                    <span className="review-tool-icon small">
+                      {renderReviewToolIcon(tool.value)}
+                    </span>
                     <strong>{tool.label}</strong>
                   </button>
                 ))}
@@ -2639,7 +3116,9 @@ export function DocumentReviewPage() {
 
               <div className="review-toolbar-strip review-toolbar-strip-compact">
                 <div className="field review-color-field">
-                  <label><Palette size={14} /> Color</label>
+                  <label>
+                    <Palette size={14} /> Color
+                  </label>
                   <div className="review-color-swatches">
                     {reviewColorOptions.map((option) => (
                       <button
@@ -2675,26 +3154,56 @@ export function DocumentReviewPage() {
                 </div>
 
                 <div className="review-action-row review-action-row-toolbar">
-                  <button className="button secondary" type="button" onClick={zoomOut} disabled={zoomLevel <= 0.6}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={zoomOut}
+                    disabled={zoomLevel <= 0.6}
+                  >
                     <ZoomOut size={15} />
                     Alejar
                   </button>
-                  <button className="button secondary" type="button" onClick={() => setZoomLevel(1)} disabled={zoomLevel === 1}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setZoomLevel(1)}
+                    disabled={zoomLevel === 1}
+                  >
                     100%
                   </button>
-                  <button className="button secondary" type="button" onClick={zoomIn} disabled={zoomLevel >= 2.4}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={zoomIn}
+                    disabled={zoomLevel >= 2.4}
+                  >
                     <ZoomIn size={15} />
                     Acercar
                   </button>
-                  <button className="button secondary" type="button" onClick={undoLastAnnotation} disabled={!annotations.length}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={undoLastAnnotation}
+                    disabled={!annotations.length}
+                  >
                     <Undo2 size={15} />
                     Deshacer
                   </button>
-                  <button className="button secondary" type="button" onClick={clearCurrentPage} disabled={!activePageAnnotations.length}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={clearCurrentPage}
+                    disabled={!activePageAnnotations.length}
+                  >
                     <Trash2 size={15} />
                     Página
                   </button>
-                  <button className="button secondary" type="button" onClick={clearAllAnnotations} disabled={!annotations.length}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={clearAllAnnotations}
+                    disabled={!annotations.length}
+                  >
                     <Trash2 size={15} />
                     Todo
                   </button>
@@ -2704,152 +3213,206 @@ export function DocumentReviewPage() {
           </div>
 
           <div className="review-canvas-stack">
-            {activePage ? (() => {
-              const page = activePage;
-              const pageAnnotations = annotations.filter((item) => item.pageIndex === page.pageIndex);
-              const liveHighlight =
-                interaction?.kind === 'highlight' && interaction.pageIndex === page.pageIndex
-                  ? {
-                      x: Math.min(interaction.startX, interaction.currentX),
-                      y: Math.min(interaction.startY, interaction.currentY),
-                      width: Math.abs(interaction.currentX - interaction.startX),
-                      height: Math.abs(interaction.currentY - interaction.startY)
-                    }
-                  : null;
+            {activePage
+              ? (() => {
+                  const page = activePage;
+                  const pageAnnotations = annotations.filter(
+                    (item) => item.pageIndex === page.pageIndex
+                  );
+                  const liveHighlight =
+                    interaction?.kind === 'highlight' && interaction.pageIndex === page.pageIndex
+                      ? {
+                          x: Math.min(interaction.startX, interaction.currentX),
+                          y: Math.min(interaction.startY, interaction.currentY),
+                          width: Math.abs(interaction.currentX - interaction.startX),
+                          height: Math.abs(interaction.currentY - interaction.startY),
+                        }
+                      : null;
 
-              return (
-                <div className="review-page-shell" key={page.pageIndex}>
-                  <div className="review-page-label">Página {page.pageIndex + 1}</div>
-                  <div className="review-page-viewport">
-                    <div
-                      className={`review-page-stage ${activeTool === 'draw' ? 'is-drawing' : ''} ${activeTool === 'highlight' ? 'is-highlighting' : ''} ${page.pageIndex === activePageIndex ? 'is-active' : ''}`}
-                      onPointerDown={(event) => beginInteraction(page.pageIndex, event)}
-                      onPointerMove={(event) => moveInteraction(page.pageIndex, event)}
-                      onPointerUp={(event) => endInteraction(page.pageIndex, event)}
-                      onPointerCancel={(event) => endInteraction(page.pageIndex, event)}
-                      onPointerEnter={() => setActivePageIndex(page.pageIndex)}
-                      style={{ width: `${page.width * zoomLevel}px` }}
-                    >
-                      <img alt={`Página ${page.pageIndex + 1}`} className="review-page-image" src={page.imageUrl} />
-                      <svg className="review-page-svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-                        {pageAnnotations.filter((item) => item.kind === 'highlight').map((item) => (
-                          <rect
-                            fill="rgba(250, 204, 21, 0.28)"
-                            height={(item.height ?? 0) * 1000}
-                            key={item.id}
-                            stroke="rgba(202, 138, 4, 0.8)"
-                            strokeWidth="2"
-                            width={(item.width ?? 0) * 1000}
-                            x={item.x * 1000}
-                            y={item.y * 1000}
+                  return (
+                    <div className="review-page-shell" key={page.pageIndex}>
+                      <div className="review-page-label">Página {page.pageIndex + 1}</div>
+                      <div className="review-page-viewport">
+                        <div
+                          className={`review-page-stage ${activeTool === 'draw' ? 'is-drawing' : ''} ${activeTool === 'highlight' ? 'is-highlighting' : ''} ${page.pageIndex === activePageIndex ? 'is-active' : ''}`}
+                          onPointerDown={(event) => beginInteraction(page.pageIndex, event)}
+                          onPointerMove={(event) => moveInteraction(page.pageIndex, event)}
+                          onPointerUp={(event) => endInteraction(page.pageIndex, event)}
+                          onPointerCancel={(event) => endInteraction(page.pageIndex, event)}
+                          onPointerEnter={() => setActivePageIndex(page.pageIndex)}
+                          style={{ width: `${page.width * zoomLevel}px` }}
+                        >
+                          <img
+                            alt={`Página ${page.pageIndex + 1}`}
+                            className="review-page-image"
+                            src={page.imageUrl}
                           />
-                        ))}
-                        {liveHighlight ? (
-                          <rect
-                            fill="rgba(250, 204, 21, 0.22)"
-                            height={liveHighlight.height * 1000}
-                            stroke="rgba(202, 138, 4, 0.8)"
-                            strokeDasharray="8 6"
-                            strokeWidth="2"
-                            width={liveHighlight.width * 1000}
-                            x={liveHighlight.x * 1000}
-                            y={liveHighlight.y * 1000}
-                          />
-                        ) : null}
-
-                        {pageAnnotations.filter((item) => item.kind === 'draw' && item.path?.length).map((item) => (
-                          item.path && item.path.length === 1 ? (
-                            <circle
-                              cx={item.path[0].x * 1000}
-                              cy={item.path[0].y * 1000}
-                              fill={item.color ?? '#b91c1c'}
-                              key={item.id}
-                              r="5"
-                            />
-                          ) : (
-                            <path
-                              d={renderPath(item.path ?? [])}
-                              fill="none"
-                              key={item.id}
-                              stroke={item.color ?? '#b91c1c'}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="4"
-                            />
-                          )
-                        ))}
-                        {interaction?.kind === 'draw' && interaction.pageIndex === page.pageIndex ? (
-                          interaction.path.length === 1 ? (
-                            <circle
-                              cx={interaction.path[0].x * 1000}
-                              cy={interaction.path[0].y * 1000}
-                              fill={strokeColor}
-                              r="5"
-                            />
-                          ) : (
-                            <path
-                              d={renderPath(interaction.path)}
-                              fill="none"
-                              stroke={strokeColor}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="4"
-                            />
-                          )
-                        ) : null}
-                      </svg>
-
-                      {pageAnnotations.filter((item) => item.kind === 'text').map((item) => (
-                        <div className="review-inline-text" key={item.id} style={{ color: item.color ?? '#0369a1', left: `${item.x * 100}%`, top: `${item.y * 100}%` }}>
-                          {item.text}
-                        </div>
-                      ))}
-
-                      {pageAnnotations.filter((item) => item.kind === 'comment' || item.kind === 'stamp').map((item) => (
-                        <div className={`review-pin ${item.kind}`} key={item.id} style={{ left: `${item.x * 100}%`, top: `${item.y * 100}%` }}>
-                          <strong>{item.kind === 'stamp' ? item.stamp : 'Comentario'}</strong>
-                          <span>{item.kind === 'stamp' ? '' : item.text}</span>
-                        </div>
-                      ))}
-                      {pendingCommentPlacement?.pageIndex === page.pageIndex ? (
-                        pendingCommentPlacement.kind === 'text' ? (
-                          <div
-                            className="review-inline-text pending"
-                            style={{ color: strokeColor, left: `${pendingCommentPlacement.x * 100}%`, top: `${pendingCommentPlacement.y * 100}%` }}
+                          <svg
+                            className="review-page-svg"
+                            viewBox="0 0 1000 1000"
+                            preserveAspectRatio="none"
                           >
-                            {commentText.trim() || 'Nuevo texto'}
-                          </div>
-                        ) : (
-                          <div
-                            className="review-pin pending review-pin-editor"
-                            style={{ left: `${pendingCommentPlacement.x * 100}%`, top: `${pendingCommentPlacement.y * 100}%` }}
-                            onPointerDown={(event) => event.stopPropagation()}
-                          >
-                            <strong>Nuevo comentario</strong>
-                            <textarea
-                              className="review-pin-textarea"
-                              value={commentText}
-                              onChange={(event) => setCommentText(event.target.value)}
-                              placeholder="Escribe el comentario aquí."
-                            />
-                            <div className="review-pin-actions">
-                              <button className="button" type="button" onClick={confirmPendingComment}>
-                                Guardar
-                              </button>
-                              <button className="button secondary" type="button" onClick={cancelPendingComment}>
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      ) : null}
+                            {pageAnnotations
+                              .filter((item) => item.kind === 'highlight')
+                              .map((item) => (
+                                <rect
+                                  fill="rgba(250, 204, 21, 0.28)"
+                                  height={(item.height ?? 0) * 1000}
+                                  key={item.id}
+                                  stroke="rgba(202, 138, 4, 0.8)"
+                                  strokeWidth="2"
+                                  width={(item.width ?? 0) * 1000}
+                                  x={item.x * 1000}
+                                  y={item.y * 1000}
+                                />
+                              ))}
+                            {liveHighlight ? (
+                              <rect
+                                fill="rgba(250, 204, 21, 0.22)"
+                                height={liveHighlight.height * 1000}
+                                stroke="rgba(202, 138, 4, 0.8)"
+                                strokeDasharray="8 6"
+                                strokeWidth="2"
+                                width={liveHighlight.width * 1000}
+                                x={liveHighlight.x * 1000}
+                                y={liveHighlight.y * 1000}
+                              />
+                            ) : null}
+
+                            {pageAnnotations
+                              .filter((item) => item.kind === 'draw' && item.path?.length)
+                              .map((item) =>
+                                item.path && item.path.length === 1 ? (
+                                  <circle
+                                    cx={item.path[0].x * 1000}
+                                    cy={item.path[0].y * 1000}
+                                    fill={item.color ?? '#b91c1c'}
+                                    key={item.id}
+                                    r="5"
+                                  />
+                                ) : (
+                                  <path
+                                    d={renderPath(item.path ?? [])}
+                                    fill="none"
+                                    key={item.id}
+                                    stroke={item.color ?? '#b91c1c'}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="4"
+                                  />
+                                )
+                              )}
+                            {interaction?.kind === 'draw' &&
+                            interaction.pageIndex === page.pageIndex ? (
+                              interaction.path.length === 1 ? (
+                                <circle
+                                  cx={interaction.path[0].x * 1000}
+                                  cy={interaction.path[0].y * 1000}
+                                  fill={strokeColor}
+                                  r="5"
+                                />
+                              ) : (
+                                <path
+                                  d={renderPath(interaction.path)}
+                                  fill="none"
+                                  stroke={strokeColor}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="4"
+                                />
+                              )
+                            ) : null}
+                          </svg>
+
+                          {pageAnnotations
+                            .filter((item) => item.kind === 'text')
+                            .map((item) => (
+                              <div
+                                className="review-inline-text"
+                                key={item.id}
+                                style={{
+                                  color: item.color ?? '#0369a1',
+                                  left: `${item.x * 100}%`,
+                                  top: `${item.y * 100}%`,
+                                }}
+                              >
+                                {item.text}
+                              </div>
+                            ))}
+
+                          {pageAnnotations
+                            .filter((item) => item.kind === 'comment' || item.kind === 'stamp')
+                            .map((item) => (
+                              <div
+                                className={`review-pin ${item.kind}`}
+                                key={item.id}
+                                style={{ left: `${item.x * 100}%`, top: `${item.y * 100}%` }}
+                              >
+                                <strong>{item.kind === 'stamp' ? item.stamp : 'Comentario'}</strong>
+                                <span>{item.kind === 'stamp' ? '' : item.text}</span>
+                              </div>
+                            ))}
+                          {pendingCommentPlacement?.pageIndex === page.pageIndex ? (
+                            pendingCommentPlacement.kind === 'text' ? (
+                              <div
+                                className="review-inline-text pending"
+                                style={{
+                                  color: strokeColor,
+                                  left: `${pendingCommentPlacement.x * 100}%`,
+                                  top: `${pendingCommentPlacement.y * 100}%`,
+                                }}
+                              >
+                                {commentText.trim() || 'Nuevo texto'}
+                              </div>
+                            ) : (
+                              <div
+                                className="review-pin pending review-pin-editor"
+                                style={{
+                                  left: `${pendingCommentPlacement.x * 100}%`,
+                                  top: `${pendingCommentPlacement.y * 100}%`,
+                                }}
+                                onPointerDown={(event) => event.stopPropagation()}
+                              >
+                                <strong>Nuevo comentario</strong>
+                                <textarea
+                                  className="review-pin-textarea"
+                                  value={commentText}
+                                  onChange={(event) => setCommentText(event.target.value)}
+                                  placeholder="Escribe el comentario aquí."
+                                />
+                                <div className="review-pin-actions">
+                                  <button
+                                    className="button"
+                                    type="button"
+                                    onClick={confirmPendingComment}
+                                  >
+                                    Guardar
+                                  </button>
+                                  <button
+                                    className="button secondary"
+                                    type="button"
+                                    onClick={cancelPendingComment}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })() : null}
+                  );
+                })()
+              : null}
 
-            {!rendering && !pages.length ? <div className="preview-empty"><p className="muted">Este documento aún no puede abrirse en el visor de revisión.</p></div> : null}
+            {!rendering && !pages.length ? (
+              <div className="preview-empty">
+                <p className="muted">
+                  Este documento aún no puede abrirse en el visor de revisión.
+                </p>
+              </div>
+            ) : null}
           </div>
         </article>
 
@@ -2863,15 +3426,27 @@ export function DocumentReviewPage() {
           </div>
 
           <div className="review-sidebar-tabs">
-            <button className={`review-sidebar-tab ${sidebarTab === 'compose' ? 'active' : ''}`} type="button" onClick={() => setSidebarTab('compose')}>
+            <button
+              className={`review-sidebar-tab ${sidebarTab === 'compose' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setSidebarTab('compose')}
+            >
               <MessageSquareMore size={15} />
               Redactar
             </button>
-            <button className={`review-sidebar-tab ${sidebarTab === 'annotations' ? 'active' : ''}`} type="button" onClick={() => setSidebarTab('annotations')}>
+            <button
+              className={`review-sidebar-tab ${sidebarTab === 'annotations' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setSidebarTab('annotations')}
+            >
               <Paintbrush size={15} />
               Marcas
             </button>
-            <button className={`review-sidebar-tab ${sidebarTab === 'comments' ? 'active' : ''}`} type="button" onClick={() => setSidebarTab('comments')}>
+            <button
+              className={`review-sidebar-tab ${sidebarTab === 'comments' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setSidebarTab('comments')}
+            >
               <History size={15} />
               Historial
             </button>
@@ -2879,192 +3454,301 @@ export function DocumentReviewPage() {
 
           {sidebarTab === 'compose' ? (
             <>
-            <div className="review-side-section">
-              <div className="review-side-section-title">
-                {activeTool === 'text' ? <Type size={16} /> : <MessageSquareMore size={16} />}
-                <strong>
-                  {editingAnnotationId
-                    ? 'Editar comentario'
-                    : activeTool === 'text' || pendingCommentPlacement?.kind === 'text'
-                      ? 'Texto dentro del documento'
-                      : 'Comentario puntual'}
-                </strong>
+              <div className="review-side-section">
+                <div className="review-side-section-title">
+                  {activeTool === 'text' ? <Type size={16} /> : <MessageSquareMore size={16} />}
+                  <strong>
+                    {editingAnnotationId
+                      ? 'Editar comentario'
+                      : activeTool === 'text' || pendingCommentPlacement?.kind === 'text'
+                        ? 'Texto dentro del documento'
+                        : 'Comentario puntual'}
+                  </strong>
+                </div>
+                <div className="field review-comment-field">
+                  <textarea
+                    ref={commentTextareaRef}
+                    value={commentText}
+                    onChange={(event) => setCommentText(event.target.value)}
+                    placeholder={
+                      pendingCommentPlacement?.kind === 'text'
+                        ? 'Escribe el texto que quieres ver dentro del documento.'
+                        : pendingCommentPlacement
+                          ? 'Escribe la observacion para el punto marcado.'
+                          : activeTool === 'text'
+                            ? 'Puedes empezar a escribir aqui y luego marcar el punto.'
+                            : 'Puedes empezar a escribir aqui o marcar primero el punto.'
+                    }
+                  />
+                </div>
+                <small className="muted">
+                  {pendingCommentPlacement
+                    ? `Punto seleccionado en la página ${pendingCommentPlacement.pageIndex + 1}.`
+                    : activeTool === 'text'
+                      ? 'Escribe el texto y luego haz click en el documento para colocarlo.'
+                      : 'Puedes escribir primero o marcar primero el lugar exacto en el archivo.'}
+                </small>
+                <div className="review-action-row">
+                  <button className="button" type="button" onClick={confirmPendingComment}>
+                    <Send size={15} />
+                    {editingAnnotationId
+                      ? 'Guardar cambios'
+                      : activeTool === 'text' || pendingCommentPlacement?.kind === 'text'
+                        ? 'Guardar texto'
+                        : 'Guardar comentario'}
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={cancelPendingComment}
+                    disabled={!pendingCommentPlacement && !commentText.trim()}
+                  >
+                    <X size={15} />
+                    Cancelar
+                  </button>
+                </div>
               </div>
-              <div className="field review-comment-field">
-                <textarea
-                  ref={commentTextareaRef}
-                  value={commentText}
-                  onChange={(event) => setCommentText(event.target.value)}
-                  placeholder={
-                    pendingCommentPlacement?.kind === 'text'
-                      ? 'Escribe el texto que quieres ver dentro del documento.'
-                      : pendingCommentPlacement
-                        ? 'Escribe la observacion para el punto marcado.'
-                        : activeTool === 'text'
-                          ? 'Puedes empezar a escribir aqui y luego marcar el punto.'
-                          : 'Puedes empezar a escribir aqui o marcar primero el punto.'
-                  }
-                />
-              </div>
-              <small className="muted">
-                {pendingCommentPlacement
-                  ? `Punto seleccionado en la página ${pendingCommentPlacement.pageIndex + 1}.`
-                  : activeTool === 'text'
-                    ? 'Escribe el texto y luego haz click en el documento para colocarlo.'
-                    : 'Puedes escribir primero o marcar primero el lugar exacto en el archivo.'}
-              </small>
-              <div className="review-action-row">
-                <button className="button" type="button" onClick={confirmPendingComment}>
-                  <Send size={15} />
-                  {editingAnnotationId ? 'Guardar cambios' : activeTool === 'text' || pendingCommentPlacement?.kind === 'text' ? 'Guardar texto' : 'Guardar comentario'}
-                </button>
-                <button className="button secondary" type="button" onClick={cancelPendingComment} disabled={!pendingCommentPlacement && !commentText.trim()}>
-                  <X size={15} />
-                  Cancelar
-                </button>
-              </div>
-            </div>
 
-          <div className="review-side-section">
-            <div className="review-side-section-title">
-              <Sparkles size={16} />
-              <strong>Flujo recomendado</strong>
-            </div>
-            <div className="review-checklist">
-              <div className="review-checklist-item"><span>1</span><small>Elige herramienta arriba.</small></div>
-              <div className="review-checklist-item"><span>2</span><small>Marca el punto o zona en el archivo.</small></div>
-              <div className="review-checklist-item"><span>3</span><small>Escribe el comentario en esta columna y guarda.</small></div>
-            </div>
-          </div>
+              <div className="review-side-section">
+                <div className="review-side-section-title">
+                  <Sparkles size={16} />
+                  <strong>Flujo recomendado</strong>
+                </div>
+                <div className="review-checklist">
+                  <div className="review-checklist-item">
+                    <span>1</span>
+                    <small>Elige herramienta arriba.</small>
+                  </div>
+                  <div className="review-checklist-item">
+                    <span>2</span>
+                    <small>Marca el punto o zona en el archivo.</small>
+                  </div>
+                  <div className="review-checklist-item">
+                    <span>3</span>
+                    <small>Escribe el comentario en esta columna y guarda.</small>
+                  </div>
+                </div>
+              </div>
             </>
           ) : null}
 
           {sidebarTab === 'annotations' ? (
             <>
-          <div className="panel-header review-subheader">
-            <div className="review-panel-title">
-              <Paintbrush size={16} />
-              <h2>Anotaciones</h2>
-            </div>
-            <span className="pill">{visibleAnnotationItems.length}</span>
-          </div>
-          <div className="review-scope-switch">
-            <button className={`review-scope-button ${annotationScope === 'page' ? 'active' : ''}`} type="button" onClick={() => setAnnotationScope('page')}>
-              Página actual
-            </button>
-            <button className={`review-scope-button ${annotationScope === 'all' ? 'active' : ''}`} type="button" onClick={() => setAnnotationScope('all')}>
-              Todas
-            </button>
-          </div>
-          <div className="simple-document-list review-annotation-list">
-            {visibleAnnotationItems.map((item) => (
-              <div className={`simple-document-item review-note-item ${item.pageIndex === activePageIndex ? 'review-annotation-active' : ''} ${selectedAnnotationId === item.id ? 'review-note-selected' : ''}`} key={item.id}>
-                <button className="review-note-button" type="button" onClick={() => focusAnnotation(item.id)}>
-                  <div className="review-note-head">
-                    <span className="review-tool-icon small">{renderReviewToolIcon(item.kind)}</span>
-                    <strong>{item.kind === 'stamp' ? item.stamp : item.kind === 'text' ? 'Texto' : normalizeLabel(item.kind)}</strong>
-                  </div>
-                  <small>Página {item.pageIndex + 1}</small>
-                  <small>{item.text ?? (item.kind === 'draw' ? 'Trazo libre' : item.kind === 'highlight' ? 'Área resaltada' : '')}</small>
-                </button>
-                <div className="review-inline-actions">
-                  <button className="button secondary" type="button" onClick={() => focusAnnotation(item.id)}>
-                    Ir
-                  </button>
-                  <button className="button secondary" type="button" onClick={() => removeAnnotation(item.id)}>
-                    <Trash2 size={14} />
-                    Quitar
-                  </button>
+              <div className="panel-header review-subheader">
+                <div className="review-panel-title">
+                  <Paintbrush size={16} />
+                  <h2>Anotaciones</h2>
                 </div>
+                <span className="pill">{visibleAnnotationItems.length}</span>
               </div>
-            ))}
-            {!visibleAnnotationItems.length ? <p className="muted">No hay marcas en este alcance.</p> : null}
-          </div>
+              <div className="review-scope-switch">
+                <button
+                  className={`review-scope-button ${annotationScope === 'page' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setAnnotationScope('page')}
+                >
+                  Página actual
+                </button>
+                <button
+                  className={`review-scope-button ${annotationScope === 'all' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setAnnotationScope('all')}
+                >
+                  Todas
+                </button>
+              </div>
+              <div className="simple-document-list review-annotation-list">
+                {visibleAnnotationItems.map((item) => (
+                  <div
+                    className={`simple-document-item review-note-item ${item.pageIndex === activePageIndex ? 'review-annotation-active' : ''} ${selectedAnnotationId === item.id ? 'review-note-selected' : ''}`}
+                    key={item.id}
+                  >
+                    <button
+                      className="review-note-button"
+                      type="button"
+                      onClick={() => focusAnnotation(item.id)}
+                    >
+                      <div className="review-note-head">
+                        <span className="review-tool-icon small">
+                          {renderReviewToolIcon(item.kind)}
+                        </span>
+                        <strong>
+                          {item.kind === 'stamp'
+                            ? item.stamp
+                            : item.kind === 'text'
+                              ? 'Texto'
+                              : normalizeLabel(item.kind)}
+                        </strong>
+                      </div>
+                      <small>Página {item.pageIndex + 1}</small>
+                      <small>
+                        {item.text ??
+                          (item.kind === 'draw'
+                            ? 'Trazo libre'
+                            : item.kind === 'highlight'
+                              ? 'Área resaltada'
+                              : '')}
+                      </small>
+                    </button>
+                    <div className="review-inline-actions">
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => focusAnnotation(item.id)}
+                      >
+                        Ir
+                      </button>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => removeAnnotation(item.id)}
+                      >
+                        <Trash2 size={14} />
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {!visibleAnnotationItems.length ? (
+                  <p className="muted">No hay marcas en este alcance.</p>
+                ) : null}
+              </div>
             </>
           ) : null}
 
           {sidebarTab === 'comments' ? (
             <>
-          <div className="panel-header review-subheader">
-            <div className="review-panel-title">
-              <MessageSquareMore size={16} />
-              <h2>Comentarios</h2>
-            </div>
-            <span className="pill">{commentAnnotationItems.length}</span>
-          </div>
-          <div className="simple-document-list review-comments-list">
-            {commentAnnotationItems.map((item) => (
-              <div className={`simple-document-item review-note-item ${selectedAnnotationId === item.id ? 'review-note-selected' : ''}`} key={item.id}>
-                <button className="review-note-button" type="button" onClick={() => focusAnnotation(item.id)}>
-                  <strong>Comentario</strong>
-                  <small>Página {item.pageIndex + 1} · {new Date(item.createdAt).toLocaleString()}</small>
-                  <span>{item.text}</span>
-                </button>
-                {(item.replies ?? []).length ? (
-                  <div className="review-replies">
-                    {(item.replies ?? []).map((reply) => (
-                      <div className="review-reply-item" key={reply.id}>
-                        <strong>Respuesta</strong>
-                        <small>{new Date(reply.createdAt).toLocaleString()}</small>
-                        <span>{reply.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="review-inline-actions">
-                  <button className="button secondary" type="button" onClick={() => focusAnnotation(item.id)}>
-                    Ir
-                  </button>
-                  <button className="button secondary" type="button" onClick={() => beginEditComment(item.id)}>
-                    Editar
-                  </button>
-                  <button className="button secondary" type="button" onClick={() => setReplyingToId((current) => current === item.id ? null : item.id)}>
-                    Responder
-                  </button>
-                  <button className="button secondary" type="button" onClick={() => removeAnnotation(item.id)}>
-                    <Trash2 size={14} />
-                    Eliminar
-                  </button>
+              <div className="panel-header review-subheader">
+                <div className="review-panel-title">
+                  <MessageSquareMore size={16} />
+                  <h2>Comentarios</h2>
                 </div>
-                {replyingToId === item.id ? (
-                  <div className="review-reply-composer">
-                    <textarea
-                      value={replyText}
-                      onChange={(event) => setReplyText(event.target.value)}
-                      placeholder="Escribe una respuesta para este comentario."
-                    />
+                <span className="pill">{commentAnnotationItems.length}</span>
+              </div>
+              <div className="simple-document-list review-comments-list">
+                {commentAnnotationItems.map((item) => (
+                  <div
+                    className={`simple-document-item review-note-item ${selectedAnnotationId === item.id ? 'review-note-selected' : ''}`}
+                    key={item.id}
+                  >
+                    <button
+                      className="review-note-button"
+                      type="button"
+                      onClick={() => focusAnnotation(item.id)}
+                    >
+                      <strong>Comentario</strong>
+                      <small>
+                        Página {item.pageIndex + 1} · {new Date(item.createdAt).toLocaleString()}
+                      </small>
+                      <span>{item.text}</span>
+                    </button>
+                    {(item.replies ?? []).length ? (
+                      <div className="review-replies">
+                        {(item.replies ?? []).map((reply) => (
+                          <div className="review-reply-item" key={reply.id}>
+                            <strong>Respuesta</strong>
+                            <small>{new Date(reply.createdAt).toLocaleString()}</small>
+                            <span>{reply.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                     <div className="review-inline-actions">
-                      <button className="button" type="button" onClick={() => saveReply(item.id)}>
-                        Guardar respuesta
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => focusAnnotation(item.id)}
+                      >
+                        Ir
                       </button>
-                      <button className="button secondary" type="button" onClick={() => { setReplyingToId(null); setReplyText(''); }}>
-                        Cancelar
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => beginEditComment(item.id)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() =>
+                          setReplyingToId((current) => (current === item.id ? null : item.id))
+                        }
+                      >
+                        Responder
+                      </button>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => removeAnnotation(item.id)}
+                      >
+                        <Trash2 size={14} />
+                        Eliminar
                       </button>
                     </div>
+                    {replyingToId === item.id ? (
+                      <div className="review-reply-composer">
+                        <textarea
+                          value={replyText}
+                          onChange={(event) => setReplyText(event.target.value)}
+                          placeholder="Escribe una respuesta para este comentario."
+                        />
+                        <div className="review-inline-actions">
+                          <button
+                            className="button"
+                            type="button"
+                            onClick={() => saveReply(item.id)}
+                          >
+                            Guardar respuesta
+                          </button>
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => {
+                              setReplyingToId(null);
+                              setReplyText('');
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
+                ))}
+                {!commentAnnotationItems.length ? (
+                  <p className="muted">Todavía no hay comentarios de revisión en esta sesión.</p>
                 ) : null}
               </div>
-            ))}
-            {!commentAnnotationItems.length ? <p className="muted">Todavía no hay comentarios de revisión en esta sesión.</p> : null}
-          </div>
 
-          <div className="panel-header review-subheader">
-            <div className="review-panel-title">
-              <History size={16} />
-              <h2>Historial guardado</h2>
-            </div>
-            <span className="pill">{reviewComments.length}</span>
-          </div>
-          <div className="simple-document-list review-comments-list">
-            {reviewComments.map((item) => (
-              <button className="simple-document-item review-note-item review-note-button" key={item.id} type="button" onClick={() => focusComment(item.parsed?.page)}>
-                <strong>{item.parsed?.stamp || item.author?.name || 'Comentario'}</strong>
-                <small>{item.parsed?.page ? `Página ${item.parsed.page}` : new Date(item.createdAt).toLocaleString()}</small>
-                <span>{item.excerpt}</span>
-              </button>
-            ))}
-            {!reviewComments.length ? <p className="muted">Todavía no hay historial guardado para esta revisión.</p> : null}
-          </div>
+              <div className="panel-header review-subheader">
+                <div className="review-panel-title">
+                  <History size={16} />
+                  <h2>Historial guardado</h2>
+                </div>
+                <span className="pill">{reviewComments.length}</span>
+              </div>
+              <div className="simple-document-list review-comments-list">
+                {reviewComments.map((item) => (
+                  <button
+                    className="simple-document-item review-note-item review-note-button"
+                    key={item.id}
+                    type="button"
+                    onClick={() => focusComment(item.parsed?.page)}
+                  >
+                    <strong>{item.parsed?.stamp || item.author?.name || 'Comentario'}</strong>
+                    <small>
+                      {item.parsed?.page
+                        ? `Página ${item.parsed.page}`
+                        : new Date(item.createdAt).toLocaleString()}
+                    </small>
+                    <span>{item.excerpt}</span>
+                  </button>
+                ))}
+                {!reviewComments.length ? (
+                  <p className="muted">Todavía no hay historial guardado para esta revisión.</p>
+                ) : null}
+              </div>
             </>
           ) : null}
         </aside>
@@ -3088,14 +3772,24 @@ export function DocumentApprovalPage() {
 
     async function load() {
       try {
-        const response = await apiGet<DocumentDetail>(`/documents/${params.id}`, getToken() ?? undefined);
+        const response = await apiGet<DocumentDetail>(
+          `/documents/${params.id}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setDetail(response);
 
-        apiGet<Workflow[]>(`/approvals/flows?projectId=${encodeURIComponent(response.projectId)}`, getToken() ?? undefined)
+        apiGet<Workflow[]>(
+          `/approvals/flows?projectId=${encodeURIComponent(response.projectId)}`,
+          getToken() ?? undefined
+        )
           .then((items) => {
             if (!active) return;
-            setFlows(items.filter((item) => item.scopeType === 'global' || item.scopeType === 'document_specific'));
+            setFlows(
+              items.filter(
+                (item) => item.scopeType === 'global' || item.scopeType === 'document_specific'
+              )
+            );
           })
           .catch(() => {
             if (active) setFlows([]);
@@ -3120,14 +3814,16 @@ export function DocumentApprovalPage() {
         {
           documentId: params.id,
           workflowId: workflowId || undefined,
-          comment: comment || undefined
+          comment: comment || undefined,
         },
         getToken() ?? undefined
       );
       router.push(`/documents/${params.id}`);
       router.refresh();
     } catch {
-      setError('No fue posible solicitar la aprobación. Verifica que exista un flujo aplicable para este documento.');
+      setError(
+        'No fue posible solicitar la aprobación. Verifica que exista un flujo aplicable para este documento.'
+      );
     } finally {
       setSaving(false);
     }
@@ -3138,10 +3834,15 @@ export function DocumentApprovalPage() {
       <div className="topbar">
         <div>
           <h1>Solicitar aprobación</h1>
-          <p className="muted">{detail ? `${detail.documentNumber} · ${detail.name}` : 'Cargando documento...'}</p>
+          <p className="muted">
+            {detail ? `${detail.documentNumber} · ${detail.name}` : 'Cargando documento...'}
+          </p>
         </div>
         <div className="projects-actions">
-          <Link className="button secondary" href={detail ? `/documents/${detail.id}` : '/documents'}>
+          <Link
+            className="button secondary"
+            href={detail ? `/documents/${detail.id}` : '/documents'}
+          >
             Volver
           </Link>
         </div>
@@ -3151,30 +3852,48 @@ export function DocumentApprovalPage() {
 
       <article className="card">
         <div className="quick-filters-grid">
-          <TextField label="Proyecto" value={detail?.project?.name ?? ''} onChange={() => undefined} />
-          <TextField label="Disciplina" value={detail?.discipline?.name ?? ''} onChange={() => undefined} />
+          <TextField
+            label="Proyecto"
+            value={detail?.project?.name ?? ''}
+            onChange={() => undefined}
+          />
+          <TextField
+            label="Disciplina"
+            value={detail?.discipline?.name ?? ''}
+            onChange={() => undefined}
+          />
           <SelectField
             label="Workflow"
             value={workflowId}
             onChange={setWorkflowId}
             options={flows.map((flow) => ({
               value: flow.id,
-              label: `${flow.name}${flow.requireForPublication ? ' · obligatorio para publicar' : ''}`
+              label: `${flow.name}${flow.requireForPublication ? ' · obligatorio para publicar' : ''}`,
             }))}
             placeholder="Automático según configuración"
           />
           <div className="field span-2">
             <label>Comentario inicial</label>
-            <textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Indica alcance, observaciones o prioridad." />
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              placeholder="Indica alcance, observaciones o prioridad."
+            />
           </div>
         </div>
         {!flows.length ? (
           <p className="muted">
-            Si no eliges un workflow, el sistema intentará usar el flujo global o específico del proyecto. Si todavía no existe, configúralo en la página de aprobaciones.
+            Si no eliges un workflow, el sistema intentará usar el flujo global o específico del
+            proyecto. Si todavía no existe, configúralo en la página de aprobaciones.
           </p>
         ) : null}
         <div className="projects-actions">
-          <button className="button" type="button" onClick={() => void submit()} disabled={saving || !detail}>
+          <button
+            className="button"
+            type="button"
+            onClick={() => void submit()}
+            disabled={saving || !detail}
+          >
             {saving ? 'Solicitando...' : 'Enviar a aprobación'}
           </button>
           <Link className="button secondary" href="/approvals">

@@ -1,3 +1,3 @@
 export declare class CloseContractDto {
-    closeReason?: string;
+  closeReason?: string;
 }

@@ -43,7 +43,11 @@ export class RfisController {
   }
 
   @Post(':id/comments')
-  comment(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: CreateRfiCommentDto) {
+  comment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateRfiCommentDto
+  ) {
     return this.rfis.addComment(user, id, dto);
   }
 
@@ -53,7 +57,11 @@ export class RfisController {
   }
 
   @Patch(':id/status')
-  updateStatus(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateRfiStatusDto) {
+  updateStatus(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateRfiStatusDto
+  ) {
     return this.rfis.updateStatus(user, id, dto);
   }
 

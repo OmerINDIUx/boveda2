@@ -32,7 +32,11 @@ export class SmtpMailService {
     const socket = await this.connect(host, port, secure);
     try {
       await this.expect(socket, 220);
-      await this.command(socket, `EHLO ${this.config.get<string>('SMTP_HELO') ?? 'holocron.local'}`, 250);
+      await this.command(
+        socket,
+        `EHLO ${this.config.get<string>('SMTP_HELO') ?? 'holocron.local'}`,
+        250
+      );
 
       if (username && password) {
         await this.command(socket, 'AUTH LOGIN', 334);
@@ -54,7 +58,9 @@ export class SmtpMailService {
 
   private connect(host: string, port: number, secure: boolean): Promise<Socket | TLSSocket> {
     return new Promise((resolve, reject) => {
-      const socket = secure ? connectTls({ host, port, servername: host }) : connect({ host, port });
+      const socket = secure
+        ? connectTls({ host, port, servername: host })
+        : connect({ host, port });
       socket.once('error', reject);
       socket.once('connect', () => resolve(socket));
     });
@@ -68,7 +74,7 @@ export class SmtpMailService {
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=UTF-8',
       '',
-      payload.html ?? `<pre>${this.escapeHtml(payload.text)}</pre>`
+      payload.html ?? `<pre>${this.escapeHtml(payload.text)}</pre>`,
     ];
     return `${lines.join('\r\n')}\r\n.\r\n`;
   }

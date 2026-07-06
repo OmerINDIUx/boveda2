@@ -42,13 +42,20 @@ export class ProjectsController {
 
   @Post('catalog-options')
   @Permissions(PermissionKey.ProjectsManage)
-  createCatalogOption(@Body() dto: CreateProjectCatalogOptionDto, @CurrentUser() user: RequestUser) {
+  createCatalogOption(
+    @Body() dto: CreateProjectCatalogOptionDto,
+    @CurrentUser() user: RequestUser
+  ) {
     return this.projects.createCatalogOption(user.id, dto);
   }
 
   @Patch('catalog-options/:id')
   @Permissions(PermissionKey.ProjectsManage)
-  updateCatalogOption(@Param('id') id: string, @Body() dto: UpdateProjectCatalogOptionDto, @CurrentUser() user: RequestUser) {
+  updateCatalogOption(
+    @Param('id') id: string,
+    @Body() dto: UpdateProjectCatalogOptionDto,
+    @CurrentUser() user: RequestUser
+  ) {
     return this.projects.updateCatalogOption(user.id, id, dto);
   }
 
@@ -100,7 +107,11 @@ export class ProjectsController {
 
   @Post(':id/users')
   @Permissions(PermissionKey.ProjectsManage)
-  assignUser(@Param('id') id: string, @Body() dto: AssignProjectUserDto, @CurrentUser() user: RequestUser) {
+  assignUser(
+    @Param('id') id: string,
+    @Body() dto: AssignProjectUserDto,
+    @CurrentUser() user: RequestUser
+  ) {
     return this.projects.assignUser(user.id, id, dto);
   }
 }

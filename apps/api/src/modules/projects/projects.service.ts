@@ -23,7 +23,7 @@ const ROOT_FOLDER_DEFINITIONS = [
   { key: 'admin', name: '01_Administrativo' },
   { key: 'technical', name: '02_Tecnico' },
   { key: 'construction', name: '03_Obra' },
-  { key: 'closing', name: '04_Cierre' }
+  { key: 'closing', name: '04_Cierre' },
 ] as const;
 
 @Injectable()
@@ -37,7 +37,8 @@ export class ProjectsService {
     @InjectRepository(Discipline) private readonly disciplines: Repository<Discipline>,
     @InjectRepository(Folder) private readonly folders: Repository<Folder>,
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
-    @InjectRepository(ProjectCatalogOption) private readonly catalogOptions: Repository<ProjectCatalogOption>,
+    @InjectRepository(ProjectCatalogOption)
+    private readonly catalogOptions: Repository<ProjectCatalogOption>,
     private readonly scope: AccessScopeService,
     private readonly audit: AuditService
   ) {}
@@ -46,7 +47,7 @@ export class ProjectsService {
     const [usersResult, disciplinesResult, catalogOptionsResult] = await Promise.allSettled([
       this.users.find({ where: { active: true }, order: { name: 'ASC' } }),
       this.disciplines.find({ order: { code: 'ASC', name: 'ASC' } }),
-      this.listCatalogOptions()
+      this.listCatalogOptions(),
     ]);
 
     if (usersResult.status !== 'fulfilled') {
@@ -56,7 +57,9 @@ export class ProjectsService {
     if (disciplinesResult.status !== 'fulfilled') {
       this.logger.warn(
         `No fue posible cargar disciplinas para form-options del usuario ${userId}: ${
-          disciplinesResult.reason instanceof Error ? disciplinesResult.reason.message : String(disciplinesResult.reason)
+          disciplinesResult.reason instanceof Error
+            ? disciplinesResult.reason.message
+            : String(disciplinesResult.reason)
         }`
       );
     }
@@ -64,14 +67,17 @@ export class ProjectsService {
     if (catalogOptionsResult.status !== 'fulfilled') {
       this.logger.warn(
         `No fue posible cargar catalogos para form-options del usuario ${userId}: ${
-          catalogOptionsResult.reason instanceof Error ? catalogOptionsResult.reason.message : String(catalogOptionsResult.reason)
+          catalogOptionsResult.reason instanceof Error
+            ? catalogOptionsResult.reason.message
+            : String(catalogOptionsResult.reason)
         }`
       );
     }
 
     const users = usersResult.value;
     const disciplines = disciplinesResult.status === 'fulfilled' ? disciplinesResult.value : [];
-    const catalogOptions = catalogOptionsResult.status === 'fulfilled' ? catalogOptionsResult.value : [];
+    const catalogOptions =
+      catalogOptionsResult.status === 'fulfilled' ? catalogOptionsResult.value : [];
 
     return {
       users: users.map((user) => ({ id: user.id, name: user.name, email: user.email })),
@@ -79,16 +85,16 @@ export class ProjectsService {
         id: discipline.id,
         code: discipline.code,
         name: discipline.name,
-        description: discipline.description
+        description: discipline.description,
       })),
-      catalogs: this.groupCatalogOptions(catalogOptions)
+      catalogs: this.groupCatalogOptions(catalogOptions),
     };
   }
 
   async listCatalogOptions() {
     return this.catalogOptions.find({
       where: { isActive: true },
-      order: { category: 'ASC', sortOrder: 'ASC', label: 'ASC' }
+      order: { category: 'ASC', sortOrder: 'ASC', label: 'ASC' },
     });
   }
 
@@ -99,7 +105,7 @@ export class ProjectsService {
         value: dto.value.trim(),
         label: dto.label.trim(),
         sortOrder: dto.sortOrder ?? 0,
-        isActive: true
+        isActive: true,
       })
     );
     await this.audit.record({
@@ -107,7 +113,7 @@ export class ProjectsService {
       action: 'project.catalog_option.create',
       entityType: 'project_catalog_option',
       entityId: created.id,
-      metadata: { category: created.category, value: created.value }
+      metadata: { category: created.category, value: created.value },
     });
     return created;
   }
@@ -121,7 +127,7 @@ export class ProjectsService {
     Object.assign(option, {
       ...dto,
       value: dto.value?.trim() ?? option.value,
-      label: dto.label?.trim() ?? option.label
+      label: dto.label?.trim() ?? option.label,
     });
 
     const saved = await this.catalogOptions.save(option);
@@ -130,7 +136,7 @@ export class ProjectsService {
       action: 'project.catalog_option.update',
       entityType: 'project_catalog_option',
       entityId: id,
-      metadata: { ...dto }
+      metadata: { ...dto },
     });
     return saved;
   }
@@ -148,7 +154,7 @@ export class ProjectsService {
       actorId: userId,
       action: 'project.catalog_option.deactivate',
       entityType: 'project_catalog_option',
-      entityId: id
+      entityId: id,
     });
     return { ok: true, id };
   }
@@ -163,22 +169,24 @@ export class ProjectsService {
       this.projects.find({
         where: { id: In(projectIds) },
         relations: ['responsibleUser'],
-        order: { updatedAt: 'DESC' }
+        order: { updatedAt: 'DESC' },
       }),
       this.members.find({
         where: { projectId: In(projectIds) },
-        relations: ['user']
+        relations: ['user'],
       }),
       this.documents.find({
         where: { projectId: In(projectIds) },
-        relations: ['responsibleUser']
+        relations: ['responsibleUser'],
       }),
-      this.disciplines.find()
+      this.disciplines.find(),
     ]);
 
     const membersByProject = new Map<string, ProjectMember[]>();
     const documentsByProject = new Map<string, DocumentRecord[]>();
-    const disciplineMap = new Map(disciplineCatalog.map((discipline) => [discipline.id, discipline]));
+    const disciplineMap = new Map(
+      disciplineCatalog.map((discipline) => [discipline.id, discipline])
+    );
 
     for (const member of members) {
       const bucket = membersByProject.get(member.projectId) ?? [];
@@ -207,7 +215,7 @@ export class ProjectsService {
 
     const project = await this.projects.findOne({
       where: { id: projectId },
-      relations: ['responsibleUser']
+      relations: ['responsibleUser'],
     });
     if (!project) {
       throw new NotFoundException('Proyecto no encontrado');
@@ -218,12 +226,14 @@ export class ProjectsService {
       this.folders.find({
         where: { projectId },
         relations: ['discipline'],
-        order: { path: 'ASC', name: 'ASC' }
+        order: { path: 'ASC', name: 'ASC' },
       }),
-      this.disciplines.find()
+      this.disciplines.find(),
     ]);
 
-    const disciplineMap = new Map(disciplineCatalog.map((discipline) => [discipline.id, discipline]));
+    const disciplineMap = new Map(
+      disciplineCatalog.map((discipline) => [discipline.id, discipline])
+    );
     const documents = await this.queryProjectDocuments(projectId, {});
 
     return {
@@ -232,7 +242,7 @@ export class ProjectsService {
       recentDocuments: this.getRecentDocuments(documents),
       criticalDocuments: this.getCriticalDocuments(documents),
       documentsSummary: this.buildDocumentsSummary(documents),
-      availableDisciplines: disciplineCatalog
+      availableDisciplines: disciplineCatalog,
     };
   }
 
@@ -243,7 +253,7 @@ export class ProjectsService {
       items: documents,
       summary: this.buildDocumentsSummary(documents),
       recent: this.getRecentDocuments(documents),
-      critical: this.getCriticalDocuments(documents)
+      critical: this.getCriticalDocuments(documents),
     };
   }
 
@@ -256,7 +266,7 @@ export class ProjectsService {
         priority: dto.priority ?? 'media',
         status: dto.status ?? 'planificacion',
         isActive: true,
-        disciplineIds: dto.disciplineIds ?? []
+        disciplineIds: dto.disciplineIds ?? [],
       })
     );
 
@@ -266,7 +276,7 @@ export class ProjectsService {
         userId: ownerId,
         role: 'owner',
         canManageDocuments: true,
-        canManageContracts: true
+        canManageContracts: true,
       })
     );
 
@@ -277,7 +287,7 @@ export class ProjectsService {
       action: 'project.create',
       entityType: 'project',
       entityId: project.id,
-      metadata: { name: project.name, code: project.code }
+      metadata: { name: project.name, code: project.code },
     });
 
     return this.getDetail(ownerId, project.id);
@@ -295,12 +305,12 @@ export class ProjectsService {
       code: project.code,
       priority: project.priority,
       status: project.status,
-      responsibleUserId: project.responsibleUserId
+      responsibleUserId: project.responsibleUserId,
     };
     Object.assign(project, {
       ...dto,
       disciplineIds: dto.disciplineIds ?? project.disciplineIds,
-      responsibleUserId: dto.responsibleUserId ?? project.responsibleUserId
+      responsibleUserId: dto.responsibleUserId ?? project.responsibleUserId,
     });
 
     await this.projects.save(project);
@@ -318,7 +328,7 @@ export class ProjectsService {
       action: 'project.update',
       entityType: 'project',
       entityId: projectId,
-      metadata: { before, after: dto }
+      metadata: { before, after: dto },
     });
 
     return this.getDetail(requesterId, projectId);
@@ -337,7 +347,7 @@ export class ProjectsService {
       actorId: requesterId,
       action: 'project.deactivate',
       entityType: 'project',
-      entityId: projectId
+      entityId: projectId,
     });
     return { ok: true, projectId, isActive: false };
   }
@@ -347,15 +357,17 @@ export class ProjectsService {
     const current = await this.members.findOne({ where: { projectId, userId: dto.userId } });
     const membership = current ?? this.members.create({ projectId, userId: dto.userId });
     membership.role = dto.role;
-    membership.canManageDocuments = dto.canManageDocuments ?? membership.canManageDocuments ?? false;
-    membership.canManageContracts = dto.canManageContracts ?? membership.canManageContracts ?? false;
+    membership.canManageDocuments =
+      dto.canManageDocuments ?? membership.canManageDocuments ?? false;
+    membership.canManageContracts =
+      dto.canManageContracts ?? membership.canManageContracts ?? false;
     const saved = await this.members.save(membership);
     await this.audit.record({
       actorId: requesterId,
       action: 'project.assign_user',
       entityType: 'project',
       entityId: projectId,
-      metadata: { userId: dto.userId, role: dto.role }
+      metadata: { userId: dto.userId, role: dto.role },
     });
     return saved;
   }
@@ -388,16 +400,22 @@ export class ProjectsService {
             userId,
             role: 'viewer',
             canManageDocuments: false,
-            canManageContracts: false
+            canManageContracts: false,
           })
         );
       }
     }
   }
 
-  private async ensureProjectFolderStructure(projectId: string, userId: string, disciplineIds: string[]) {
+  private async ensureProjectFolderStructure(
+    projectId: string,
+    userId: string,
+    disciplineIds: string[]
+  ) {
     const existingFolders = await this.folders.find({ where: { projectId } });
-    const rootsByName = new Map(existingFolders.filter((folder) => !folder.parentId).map((folder) => [folder.name, folder]));
+    const rootsByName = new Map(
+      existingFolders.filter((folder) => !folder.parentId).map((folder) => [folder.name, folder])
+    );
 
     for (const definition of ROOT_FOLDER_DEFINITIONS) {
       if (!rootsByName.has(definition.name)) {
@@ -406,7 +424,7 @@ export class ProjectsService {
             projectId,
             name: definition.name,
             path: definition.name,
-            createdById: userId
+            createdById: userId,
           })
         );
         rootsByName.set(definition.name, root);
@@ -434,7 +452,7 @@ export class ProjectsService {
             disciplineId: discipline.id,
             name: `${discipline.code}_${discipline.name}`,
             path: `${technicalRoot.path}/${discipline.code}_${discipline.name}`,
-            createdById: userId
+            createdById: userId,
           })
         );
       }
@@ -451,7 +469,9 @@ export class ProjectsService {
       .orderBy('document.updatedAt', 'DESC');
 
     if (filters.disciplineId) {
-      query.andWhere('document.disciplineId = :disciplineId', { disciplineId: filters.disciplineId });
+      query.andWhere('document.disciplineId = :disciplineId', {
+        disciplineId: filters.disciplineId,
+      });
     }
 
     if (filters.folderId) {
@@ -463,7 +483,9 @@ export class ProjectsService {
     }
 
     if (filters.responsibleId) {
-      query.andWhere('document.responsibleUserId = :responsibleId', { responsibleId: filters.responsibleId });
+      query.andWhere('document.responsibleUserId = :responsibleId', {
+        responsibleId: filters.responsibleId,
+      });
     }
 
     if (filters.dateFrom) {
@@ -496,7 +518,7 @@ export class ProjectsService {
         id: member.user.id,
         name: member.user.name,
         email: member.user.email,
-        role: member.role
+        role: member.role,
       }));
 
     const overdueCount = documents.filter((document) => this.isCriticalDocument(document)).length;
@@ -507,7 +529,7 @@ export class ProjectsService {
       .map((discipline) => ({
         id: discipline!.id,
         code: discipline!.code,
-        name: discipline!.name
+        name: discipline!.name,
       }));
 
     return {
@@ -525,7 +547,7 @@ export class ProjectsService {
         ? {
             id: project.responsibleUser.id,
             name: project.responsibleUser.name,
-            email: project.responsibleUser.email
+            email: project.responsibleUser.email,
           }
         : null,
       assignedUsers,
@@ -534,10 +556,10 @@ export class ProjectsService {
         documents: documents.length,
         approved: approvedCount,
         critical: overdueCount,
-        progress: documents.length ? Math.round((approvedCount / documents.length) * 100) : 0
+        progress: documents.length ? Math.round((approvedCount / documents.length) * 100) : 0,
       },
       updatedAt: project.updatedAt,
-      createdAt: project.createdAt
+      createdAt: project.createdAt,
     };
   }
 
@@ -577,7 +599,7 @@ export class ProjectsService {
       approved: documents.filter((document) => document.status === 'approved').length,
       inReview: documents.filter((document) => document.status === 'in_review').length,
       overdue: documents.filter((document) => this.isOverdue(document)).length,
-      critical: documents.filter((document) => this.isCriticalDocument(document)).length
+      critical: documents.filter((document) => this.isCriticalDocument(document)).length,
     };
   }
 
@@ -611,7 +633,7 @@ export class ProjectsService {
       workType: [],
       currentStage: [],
       priority: [],
-      status: []
+      status: [],
     };
 
     for (const option of options) {

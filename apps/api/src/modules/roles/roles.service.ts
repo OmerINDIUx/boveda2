@@ -28,14 +28,16 @@ export class RolesService {
       key: dto.key,
       name: dto.name,
       description: dto.description,
-      permissions: dto.permissionIds?.length ? await this.permissions.findBy({ id: In(dto.permissionIds) }) : []
+      permissions: dto.permissionIds?.length
+        ? await this.permissions.findBy({ id: In(dto.permissionIds) })
+        : [],
     });
     const saved = await this.roles.save(role);
     await this.audit.record({
       action: 'role.create',
       entityType: 'role',
       entityId: saved.id,
-      metadata: { key: saved.key, permissionIds: dto.permissionIds ?? [] }
+      metadata: { key: saved.key, permissionIds: dto.permissionIds ?? [] },
     });
     return saved;
   }
@@ -50,12 +52,13 @@ export class RolesService {
       id: role.id,
       key: role.key,
       name: role.name,
-      permissionIds: role.permissions?.map((permission) => permission.id) ?? []
+      permissionIds: role.permissions?.map((permission) => permission.id) ?? [],
     };
     if (dto.key !== undefined) role.key = dto.key;
     if (dto.name !== undefined) role.name = dto.name;
     if (dto.description !== undefined) role.description = dto.description;
-    if (dto.permissionIds) role.permissions = await this.permissions.findBy({ id: In(dto.permissionIds) });
+    if (dto.permissionIds)
+      role.permissions = await this.permissions.findBy({ id: In(dto.permissionIds) });
     const saved = await this.roles.save(role);
     await this.audit.record({
       action: 'role.update',
@@ -67,9 +70,9 @@ export class RolesService {
           id: saved.id,
           key: saved.key,
           name: saved.name,
-          permissionIds: saved.permissions?.map((permission) => permission.id) ?? []
-        }
-      }
+          permissionIds: saved.permissions?.map((permission) => permission.id) ?? [],
+        },
+      },
     });
     return saved;
   }

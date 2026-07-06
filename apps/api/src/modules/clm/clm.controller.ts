@@ -48,25 +48,41 @@ export class ClmController {
 
   @Patch(':id')
   @Permissions(PermissionKey.ContractsManage)
-  update(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateContractDto) {
+  update(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateContractDto
+  ) {
     return this.clm.update(user.id, id, dto);
   }
 
   @Post(':id/versions')
   @Permissions(PermissionKey.ContractsManage)
-  createVersion(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: CreateContractVersionDto) {
+  createVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateContractVersionDto
+  ) {
     return this.clm.createVersion(user.id, id, dto);
   }
 
   @Post(':id/attachments')
   @Permissions(PermissionKey.ContractsManage)
-  addAttachment(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: CreateContractAttachmentDto) {
+  addAttachment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateContractAttachmentDto
+  ) {
     return this.clm.addAttachment(user.id, id, dto);
   }
 
   @Post(':id/obligations')
   @Permissions(PermissionKey.ContractsManage)
-  addObligation(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: CreateContractObligationDto) {
+  addObligation(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateContractObligationDto
+  ) {
     return this.clm.addObligation(user.id, id, dto);
   }
 
@@ -83,7 +99,11 @@ export class ClmController {
 
   @Post(':id/milestones')
   @Permissions(PermissionKey.ContractsManage)
-  addMilestone(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: CreateContractMilestoneDto) {
+  addMilestone(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateContractMilestoneDto
+  ) {
     return this.clm.addMilestone(user.id, id, dto);
   }
 
@@ -100,7 +120,11 @@ export class ClmController {
 
   @Post(':id/comments')
   @Permissions(PermissionKey.ContractsManage)
-  addComment(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: CreateContractCommentDto) {
+  addComment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateContractCommentDto
+  ) {
     return this.clm.addComment(user.id, id, dto);
   }
 

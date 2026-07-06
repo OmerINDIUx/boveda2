@@ -1,2 +1,1 @@
-export declare class ClmModule {
-}
+export declare class ClmModule {}

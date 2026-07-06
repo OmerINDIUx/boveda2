@@ -11,9 +11,13 @@ export class NotificationsScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly notifications: NotificationsService) {}
 
   onModuleInit() {
-    this.runIfNeeded().catch((error) => this.logger.error(error instanceof Error ? error.message : String(error)));
+    this.runIfNeeded().catch((error) =>
+      this.logger.error(error instanceof Error ? error.message : String(error))
+    );
     this.timer = setInterval(() => {
-      this.runIfNeeded().catch((error) => this.logger.error(error instanceof Error ? error.message : String(error)));
+      this.runIfNeeded().catch((error) =>
+        this.logger.error(error instanceof Error ? error.message : String(error))
+      );
     }, HOUR_MS);
   }
 
@@ -36,7 +40,9 @@ export class NotificationsScheduler implements OnModuleInit, OnModuleDestroy {
   private shouldRunToday() {
     const now = new Date();
     const key = now.toISOString().slice(0, 10);
-    const globalState = globalThis as typeof globalThis & { __holocronNotificationRunDate?: string };
+    const globalState = globalThis as typeof globalThis & {
+      __holocronNotificationRunDate?: string;
+    };
     if (globalState.__holocronNotificationRunDate === key) {
       return false;
     }

@@ -1,4 +1,14 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Discipline } from '../folders/discipline.entity';
 import { Folder } from '../folders/folder.entity';
 import { Project } from '../projects/project.entity';
@@ -41,7 +51,15 @@ export class DocumentRecord {
   documentNumber!: string;
 
   @Column({ default: 'draft' })
-  status!: 'draft' | 'pending_approval' | 'in_review' | 'approved' | 'published' | 'expired' | 'superseded' | 'archived';
+  status!:
+    | 'draft'
+    | 'pending_approval'
+    | 'in_review'
+    | 'approved'
+    | 'published'
+    | 'expired'
+    | 'superseded'
+    | 'archived';
 
   @Column({ name: 'confidentiality_level', default: 'internal' })
   confidentialityLevel!: 'public' | 'internal' | 'confidential' | 'restricted';

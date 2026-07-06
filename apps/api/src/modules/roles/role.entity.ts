@@ -1,4 +1,13 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { User } from '../users/user.entity';
 import { Permission } from './permission.entity';
 
@@ -20,7 +29,7 @@ export class Role {
   @JoinTable({
     name: 'role_permissions',
     joinColumn: { name: 'role_id' },
-    inverseJoinColumn: { name: 'permission_id' }
+    inverseJoinColumn: { name: 'permission_id' },
   })
   permissions!: Permission[];
 

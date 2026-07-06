@@ -15,9 +15,9 @@ import { RfisService } from './rfis.service';
     ProjectsModule,
     NotificationsModule,
     StorageModule,
-    TypeOrmModule.forFeature([Rfi, RfiComment, RfiAttachment, RfiHistory])
+    TypeOrmModule.forFeature([Rfi, RfiComment, RfiAttachment, RfiHistory]),
   ],
   controllers: [RfisController],
-  providers: [RfisService]
+  providers: [RfisService],
 })
 export class RfisModule {}

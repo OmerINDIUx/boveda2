@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, Clock3, FilePlus2, MessageSquare, Plus, Search, Send } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  FilePlus2,
+  MessageSquare,
+  Plus,
+  Search,
+  Send,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 
@@ -95,7 +104,7 @@ const emptyFilters: Filters = {
   status: '',
   priority: '',
   assignedToId: '',
-  search: ''
+  search: '',
 };
 
 const emptyCreateForm: CreateRfiForm = {
@@ -105,14 +114,14 @@ const emptyCreateForm: CreateRfiForm = {
   description: '',
   assignedToId: '',
   priority: 'normal',
-  dueDate: ''
+  dueDate: '',
 };
 
 const priorityOptions = [
   { value: 'low', label: 'Baja' },
   { value: 'normal', label: 'Normal' },
   { value: 'high', label: 'Alta' },
-  { value: 'urgent', label: 'Urgente' }
+  { value: 'urgent', label: 'Urgente' },
 ] as const;
 
 const statusOptions = [
@@ -120,7 +129,7 @@ const statusOptions = [
   { value: 'in_progress', label: 'En atención' },
   { value: 'answered', label: 'Respondido' },
   { value: 'closed', label: 'Cerrado' },
-  { value: 'overdue', label: 'Vencido' }
+  { value: 'overdue', label: 'Vencido' },
 ] as const;
 
 function getToken() {
@@ -140,7 +149,9 @@ function formatDate(value?: string) {
 
 function formatDateTime(value?: string) {
   if (!value) return 'Sin fecha';
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(
+    new Date(value)
+  );
 }
 
 function formatSize(size: number) {
@@ -166,7 +177,7 @@ async function fileToPayload(file: File): Promise<FilePayload> {
   return {
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
-    base64Content
+    base64Content,
   };
 }
 
@@ -180,13 +191,15 @@ function buildQuery(filters: Filters) {
   return params.toString();
 }
 
-function buildFiltersFromSearchParams(searchParams: { get: (key: string) => string | null }): Filters {
+function buildFiltersFromSearchParams(searchParams: {
+  get: (key: string) => string | null;
+}): Filters {
   return {
     projectId: searchParams.get('projectId') ?? '',
     status: searchParams.get('status') ?? '',
     priority: searchParams.get('priority') ?? '',
     assignedToId: searchParams.get('assignedToId') ?? '',
-    search: searchParams.get('search') ?? ''
+    search: searchParams.get('search') ?? '',
   };
 }
 
@@ -210,7 +223,9 @@ function RfiSummaryCard({ detail }: { detail: RfiDetail }) {
           <p className="muted">{detail.description}</p>
         </div>
         <div className="projects-actions">
-          <span className={`pill ${getRfiTone(detail.status)}`}>{normalizeLabel(detail.status)}</span>
+          <span className={`pill ${getRfiTone(detail.status)}`}>
+            {normalizeLabel(detail.status)}
+          </span>
         </div>
       </div>
 
@@ -236,7 +251,11 @@ function RfiSummaryCard({ detail }: { detail: RfiDetail }) {
       <div className="grid" style={{ marginTop: 16 }}>
         <div className="card span-6 status-card neutral">
           <span>Documento relacionado</span>
-          <strong>{detail.document ? `${detail.document.documentNumber} · ${detail.document.name}` : 'Sin documento relacionado'}</strong>
+          <strong>
+            {detail.document
+              ? `${detail.document.documentNumber} · ${detail.document.name}`
+              : 'Sin documento relacionado'}
+          </strong>
         </div>
         <div className="card span-6 status-card warning">
           <span>Respuesta actual</span>
@@ -252,7 +271,7 @@ function RfiFormFields({
   projects,
   projectMembers,
   documents,
-  onChange
+  onChange,
 }: {
   form: CreateRfiForm;
   projects: ProjectOption[];
@@ -266,19 +285,28 @@ function RfiFormFields({
         label="Proyecto"
         value={form.projectId}
         onChange={(value) => onChange('projectId', value)}
-        options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+        options={projects.map((project) => ({
+          value: project.id,
+          label: `${project.code} · ${project.name}`,
+        }))}
       />
       <SelectField
         label="Documento relacionado"
         value={form.documentId}
         onChange={(value) => onChange('documentId', value)}
-        options={documents.map((document) => ({ value: document.id, label: `${document.documentNumber} · ${document.name}` }))}
+        options={documents.map((document) => ({
+          value: document.id,
+          label: `${document.documentNumber} · ${document.name}`,
+        }))}
       />
       <SelectField
         label="Responsable de respuesta"
         value={form.assignedToId}
         onChange={(value) => onChange('assignedToId', value)}
-        options={projectMembers.map((member) => ({ value: member.id, label: `${member.name} · ${member.role}` }))}
+        options={projectMembers.map((member) => ({
+          value: member.id,
+          label: `${member.name} · ${member.role}`,
+        }))}
       />
       <SelectField
         label="Prioridad"
@@ -287,10 +315,18 @@ function RfiFormFields({
         options={priorityOptions.map((option) => ({ value: option.value, label: option.label }))}
       />
       <TextField label="Título" value={form.title} onChange={(value) => onChange('title', value)} />
-      <TextField label="Fecha límite" type="date" value={form.dueDate} onChange={(value) => onChange('dueDate', value)} />
+      <TextField
+        label="Fecha límite"
+        type="date"
+        value={form.dueDate}
+        onChange={(value) => onChange('dueDate', value)}
+      />
       <div className="field span-2">
         <label>Descripción</label>
-        <textarea value={form.description} onChange={(event) => onChange('description', event.target.value)} />
+        <textarea
+          value={form.description}
+          onChange={(event) => onChange('description', event.target.value)}
+        />
       </div>
     </div>
   );
@@ -351,7 +387,10 @@ export function RfisWorkspace() {
       setError('');
       try {
         const query = buildQuery(filters);
-        const response = await apiGet<RfiListItem[]>(`/rfis${query ? `?${query}` : ''}`, getToken());
+        const response = await apiGet<RfiListItem[]>(
+          `/rfis${query ? `?${query}` : ''}`,
+          getToken()
+        );
         if (!active) return;
         setRfis(response);
       } catch {
@@ -378,7 +417,7 @@ export function RfisWorkspace() {
       { label: 'Abiertos', value: open, icon: MessageSquare, tone: 'info' },
       { label: 'En atención', value: inProgress, icon: Clock3, tone: 'warn' },
       { label: 'Vencidos', value: overdue, icon: AlertTriangle, tone: 'danger' },
-      { label: 'Respondidos', value: answered, icon: CheckCircle2, tone: 'ok' }
+      { label: 'Respondidos', value: answered, icon: CheckCircle2, tone: 'ok' },
     ];
   }, [rfis]);
 
@@ -397,7 +436,9 @@ export function RfisWorkspace() {
       <div className="topbar">
         <div>
           <h1>RFIs y consultas formales</h1>
-          <p className="muted">Listado ejecutivo con accesos directos a detalle, respuesta, comentarios y cierre.</p>
+          <p className="muted">
+            Listado ejecutivo con accesos directos a detalle, respuesta, comentarios y cierre.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button" href="/rfis/new">
@@ -425,7 +466,11 @@ export function RfisWorkspace() {
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <h2>Filtros</h2>
-          <button className="button secondary" type="button" onClick={() => setFilters(emptyFilters)}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => setFilters(emptyFilters)}
+          >
             Limpiar
           </button>
         </div>
@@ -434,7 +479,10 @@ export function RfisWorkspace() {
             label="Proyecto"
             value={filters.projectId}
             onChange={(value) => setFilters((current) => ({ ...current, projectId: value }))}
-            options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+            options={projects.map((project) => ({
+              value: project.id,
+              label: `${project.code} · ${project.name}`,
+            }))}
           />
           <SelectField
             label="Estado"
@@ -446,7 +494,10 @@ export function RfisWorkspace() {
             label="Prioridad"
             value={filters.priority}
             onChange={(value) => setFilters((current) => ({ ...current, priority: value }))}
-            options={priorityOptions.map((option) => ({ value: option.value, label: option.label }))}
+            options={priorityOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
           />
           <SelectField
             label="Responsable"
@@ -460,7 +511,9 @@ export function RfisWorkspace() {
               <Search size={16} />
               <input
                 value={filters.search}
-                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, search: event.target.value }))
+                }
                 placeholder="Título, descripción, proyecto o documento"
               />
             </div>
@@ -479,7 +532,9 @@ export function RfisWorkspace() {
               <div className="project-list-item" key={rfi.id}>
                 <div className="project-list-head">
                   <strong>{rfi.title}</strong>
-                  <span className={`pill ${getRfiTone(rfi.status)}`}>{normalizeLabel(rfi.status)}</span>
+                  <span className={`pill ${getRfiTone(rfi.status)}`}>
+                    {normalizeLabel(rfi.status)}
+                  </span>
                 </div>
                 <span className="muted">{rfi.project?.code ?? rfi.projectId}</span>
                 <p>{rfi.assignedTo?.name ?? 'Sin responsable'}</p>
@@ -500,7 +555,9 @@ export function RfisWorkspace() {
                 </div>
               </div>
             ))}
-            {!rfis.length ? <div className="simple-document-item">No hay RFIs con esos filtros.</div> : null}
+            {!rfis.length ? (
+              <div className="simple-document-item">No hay RFIs con esos filtros.</div>
+            ) : null}
           </div>
         </article>
 
@@ -512,15 +569,24 @@ export function RfisWorkspace() {
           <div className="simple-document-list">
             <div className="simple-document-item">
               <strong>Alta dedicada</strong>
-              <span>La creación de RFIs ya vive en una pantalla independiente para capturar mejor el contexto.</span>
+              <span>
+                La creación de RFIs ya vive en una pantalla independiente para capturar mejor el
+                contexto.
+              </span>
             </div>
             <div className="simple-document-item">
               <strong>Expediente por RFI</strong>
-              <span>Cada consulta tiene su propia vista con historial, respuesta, comentarios y adjuntos.</span>
+              <span>
+                Cada consulta tiene su propia vista con historial, respuesta, comentarios y
+                adjuntos.
+              </span>
             </div>
             <div className="simple-document-item">
               <strong>Acciones aisladas</strong>
-              <span>Comentar y responder ahora se hacen desde pantallas enfocadas, sin mezclar estados en el tablero.</span>
+              <span>
+                Comentar y responder ahora se hacen desde pantallas enfocadas, sin mezclar estados
+                en el tablero.
+              </span>
             </div>
           </div>
         </article>
@@ -532,7 +598,11 @@ export function RfisWorkspace() {
 export function RfiCreatePage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [formOptions, setFormOptions] = useState<FormOptionsResponse>({ projects: [], projectMembers: [], documents: [] });
+  const [formOptions, setFormOptions] = useState<FormOptionsResponse>({
+    projects: [],
+    projectMembers: [],
+    documents: [],
+  });
   const [form, setForm] = useState<CreateRfiForm>(emptyCreateForm);
   const [files, setFiles] = useState<FilePayload[]>([]);
   const [saving, setSaving] = useState(false);
@@ -568,7 +638,10 @@ export function RfiCreatePage() {
 
     async function loadProjectOptions() {
       try {
-        const response = await apiGet<FormOptionsResponse>(`/rfis/form-options?projectId=${form.projectId}`, getToken());
+        const response = await apiGet<FormOptionsResponse>(
+          `/rfis/form-options?projectId=${form.projectId}`,
+          getToken()
+        );
         if (!active) return;
         setFormOptions(response);
       } catch {
@@ -599,7 +672,7 @@ export function RfiCreatePage() {
           documentId: form.documentId || undefined,
           assignedToId: form.assignedToId || undefined,
           dueDate: form.dueDate || undefined,
-          attachments: files
+          attachments: files,
         },
         getToken()
       );
@@ -617,7 +690,10 @@ export function RfiCreatePage() {
       <div className="topbar">
         <div>
           <h1>Nuevo RFI</h1>
-          <p className="muted">Pantalla dedicada para registrar consultas formales por proyecto, documento y responsable.</p>
+          <p className="muted">
+            Pantalla dedicada para registrar consultas formales por proyecto, documento y
+            responsable.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href="/rfis">
@@ -649,9 +725,15 @@ export function RfiCreatePage() {
         />
         <div className="field">
           <label>Adjuntos</label>
-          <input type="file" multiple onChange={(event) => void handleFiles(event.target.files, setFiles)} />
+          <input
+            type="file"
+            multiple
+            onChange={(event) => void handleFiles(event.target.files, setFiles)}
+          />
         </div>
-        {files.length ? <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p> : null}
+        {files.length ? (
+          <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p>
+        ) : null}
         <div className="projects-actions" style={{ marginTop: 16 }}>
           <button className="button" type="button" onClick={submit} disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar RFI'}
@@ -701,7 +783,9 @@ export function RfiDetailPage() {
       const path = status === 'closed' ? `/rfis/${detail.id}/close` : `/rfis/${detail.id}/status`;
       const updated = await apiPatch<RfiDetail>(
         path,
-        status === 'closed' ? { note: 'RFI cerrado desde el expediente.' } : { status, note: `Estado actualizado a ${status}.` },
+        status === 'closed'
+          ? { note: 'RFI cerrado desde el expediente.' }
+          : { status, note: `Estado actualizado a ${status}.` },
         getToken()
       );
       setDetail(updated);
@@ -736,7 +820,9 @@ export function RfiDetailPage() {
       <div className="topbar">
         <div>
           <h1>{detail.title}</h1>
-          <p className="muted">Expediente del RFI con trazabilidad completa, acciones y seguimiento operativo.</p>
+          <p className="muted">
+            Expediente del RFI con trazabilidad completa, acciones y seguimiento operativo.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href="/rfis">
@@ -748,13 +834,25 @@ export function RfiDetailPage() {
           <Link className="button secondary" href={`/rfis/${detail.id}/respond`}>
             Responder
           </Link>
-          <button className="button secondary" type="button" onClick={() => updateStatus('in_progress')}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => updateStatus('in_progress')}
+          >
             En atención
           </button>
-          <button className="button secondary" type="button" onClick={() => updateStatus('answered')}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => updateStatus('answered')}
+          >
             Marcar respondido
           </button>
-          <button className="button danger-button" type="button" onClick={() => updateStatus('closed')}>
+          <button
+            className="button danger-button"
+            type="button"
+            onClick={() => updateStatus('closed')}
+          >
             Cerrar RFI
           </button>
         </div>
@@ -773,15 +871,24 @@ export function RfiDetailPage() {
           <div className="simple-document-list">
             {detail.comments.map((comment) => (
               <div className="simple-document-item" key={comment.id}>
-                <strong>{comment.author?.name ?? 'Usuario'} · {normalizeLabel(comment.type)}</strong>
+                <strong>
+                  {comment.author?.name ?? 'Usuario'} · {normalizeLabel(comment.type)}
+                </strong>
                 <span>{comment.body}</span>
                 <small>{formatDateTime(comment.createdAt)}</small>
                 {comment.attachments.length ? (
-                  <small>Adjuntos: {comment.attachments.map((item) => `${item.fileName} (${formatSize(item.sizeBytes)})`).join(', ')}</small>
+                  <small>
+                    Adjuntos:{' '}
+                    {comment.attachments
+                      .map((item) => `${item.fileName} (${formatSize(item.sizeBytes)})`)
+                      .join(', ')}
+                  </small>
                 ) : null}
               </div>
             ))}
-            {!detail.comments.length ? <div className="simple-document-item">Aún no hay comentarios ni respuestas.</div> : null}
+            {!detail.comments.length ? (
+              <div className="simple-document-item">Aún no hay comentarios ni respuestas.</div>
+            ) : null}
           </div>
         </article>
 
@@ -795,7 +902,9 @@ export function RfiDetailPage() {
               <strong>Adjuntos del RFI</strong>
               <small>
                 {detail.attachments.length
-                  ? detail.attachments.map((item) => `${item.fileName} (${formatSize(item.sizeBytes)})`).join(', ')
+                  ? detail.attachments
+                      .map((item) => `${item.fileName} (${formatSize(item.sizeBytes)})`)
+                      .join(', ')
                   : 'Sin adjuntos iniciales'}
               </small>
             </div>
@@ -892,7 +1001,9 @@ export function RfiCommentCreatePage() {
       <div className="topbar">
         <div>
           <h1>Nuevo comentario</h1>
-          <p className="muted">Pantalla dedicada para registrar aclaraciones, seguimiento y evidencia del RFI.</p>
+          <p className="muted">
+            Pantalla dedicada para registrar aclaraciones, seguimiento y evidencia del RFI.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href={rfiId ? `/rfis/${rfiId}` : '/rfis'}>
@@ -914,13 +1025,23 @@ export function RfiCommentCreatePage() {
           <>
             <div className="field">
               <label>Comentario</label>
-              <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Agrega un comentario o aclaración." />
+              <textarea
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                placeholder="Agrega un comentario o aclaración."
+              />
             </div>
             <div className="field">
               <label>Adjuntos del comentario</label>
-              <input type="file" multiple onChange={(event) => void handleFiles(event.target.files, setFiles)} />
+              <input
+                type="file"
+                multiple
+                onChange={(event) => void handleFiles(event.target.files, setFiles)}
+              />
             </div>
-            {files.length ? <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p> : null}
+            {files.length ? (
+              <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p>
+            ) : null}
             <div className="projects-actions">
               <button className="button" type="button" onClick={submit} disabled={saving}>
                 {saving ? 'Guardando...' : 'Guardar comentario'}
@@ -977,7 +1098,11 @@ export function RfiRespondPage() {
     setSaving(true);
     setError('');
     try {
-      await apiPost<RfiDetail>(`/rfis/${rfiId}/respond`, { answer, attachments: files }, getToken());
+      await apiPost<RfiDetail>(
+        `/rfis/${rfiId}/respond`,
+        { answer, attachments: files },
+        getToken()
+      );
       router.push(`/rfis/${rfiId}`);
       router.refresh();
     } catch {
@@ -992,7 +1117,9 @@ export function RfiRespondPage() {
       <div className="topbar">
         <div>
           <h1>Responder RFI</h1>
-          <p className="muted">Pantalla dedicada para registrar la respuesta oficial y su evidencia adjunta.</p>
+          <p className="muted">
+            Pantalla dedicada para registrar la respuesta oficial y su evidencia adjunta.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href={rfiId ? `/rfis/${rfiId}` : '/rfis'}>
@@ -1014,13 +1141,23 @@ export function RfiRespondPage() {
           <>
             <div className="field">
               <label>Respuesta formal</label>
-              <textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Registra la respuesta oficial del responsable." />
+              <textarea
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                placeholder="Registra la respuesta oficial del responsable."
+              />
             </div>
             <div className="field">
               <label>Adjuntos de respuesta</label>
-              <input type="file" multiple onChange={(event) => void handleFiles(event.target.files, setFiles)} />
+              <input
+                type="file"
+                multiple
+                onChange={(event) => void handleFiles(event.target.files, setFiles)}
+              />
             </div>
-            {files.length ? <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p> : null}
+            {files.length ? (
+              <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p>
+            ) : null}
             <div className="projects-actions">
               <button className="button" type="button" onClick={submit} disabled={saving}>
                 {saving ? 'Enviando...' : 'Enviar respuesta'}
@@ -1037,7 +1174,7 @@ function TextField({
   label,
   value,
   onChange,
-  type = 'text'
+  type = 'text',
 }: {
   label: string;
   value: string;
@@ -1056,7 +1193,7 @@ function SelectField({
   label,
   value,
   onChange,
-  options
+  options,
 }: {
   label: string;
   value: string;

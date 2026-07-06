@@ -1,2 +1,1 @@
-export declare class VersionsModule {
-}
+export declare class VersionsModule {}

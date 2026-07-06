@@ -13,7 +13,6 @@ import { RequestUser } from '../../common/interfaces/request-user.interface';
 
 const DOCUMENT_SOON_DAYS = 7;
 const RENEWAL_SOON_DAYS = 30;
-const RFI_SOON_DAYS = 7;
 const OBLIGATION_SOON_DAYS = 14;
 
 type MetricSet = {
@@ -73,21 +72,23 @@ export class DashboardService {
         documents: 0,
         pendingApprovals: 0,
         openRfis: 0,
-        expiringContracts: 0
+        expiringContracts: 0,
       };
     }
     const projects = await this.projects.find({
-      where: { id: In(visibleProjectIds) }
+      where: { id: In(visibleProjectIds) },
     });
     const documents = projects.length
-      ? await this.documents.find({ where: { projectId: In(projects.map((project) => project.id)) } })
+      ? await this.documents.find({
+          where: { projectId: In(projects.map((project) => project.id)) },
+        })
       : [];
     return {
       projects: projects.length,
       documents: documents.length,
       pendingApprovals: 0,
       openRfis: 0,
-      expiringContracts: 0
+      expiringContracts: 0,
     };
   }
 
@@ -104,47 +105,47 @@ export class DashboardService {
           documentsByDiscipline: [],
           upcomingRenewals: [],
           rfisByStatus: [],
-          contractsByStatus: []
+          contractsByStatus: [],
         },
-        signals: []
+        signals: [],
       };
     }
 
     const [projects, documents, flows, rfis, contracts] = await Promise.all([
       this.projects.find({
         where: { id: In(visibleProjectIds) },
-        order: { name: 'ASC' }
+        order: { name: 'ASC' },
       }),
       this.hasPermission(user.permissions, PermissionKey.DocumentsView)
         ? this.documents.find({
             where: { projectId: In(visibleProjectIds) },
             relations: ['discipline'],
-            order: { updatedAt: 'DESC' }
+            order: { updatedAt: 'DESC' },
           })
         : Promise.resolve([]),
       this.hasPermission(user.permissions, PermissionKey.DocumentsApprove)
         ? this.approvalRequests.find({
             where: { projectId: In(visibleProjectIds) },
-            order: { updatedAt: 'DESC' }
+            order: { updatedAt: 'DESC' },
           })
         : Promise.resolve([]),
       this.rfis.find({
         where: { projectId: In(visibleProjectIds) },
-        order: { createdAt: 'DESC' }
+        order: { createdAt: 'DESC' },
       }),
       this.hasPermission(user.permissions, PermissionKey.ContractsManage)
         ? this.contracts.find({
             where: { projectId: In(visibleProjectIds) },
-            order: { updatedAt: 'DESC' }
+            order: { updatedAt: 'DESC' },
           })
-        : Promise.resolve([])
+        : Promise.resolve([]),
     ]);
 
     const obligations =
       this.hasPermission(user.permissions, PermissionKey.ContractsManage) && contracts.length
         ? await this.obligations.find({
             where: { contractId: In(contracts.map((contract) => contract.id)) },
-            relations: ['contract']
+            relations: ['contract'],
           })
         : [];
 
@@ -225,7 +226,11 @@ export class DashboardService {
       for (const contract of contracts) {
         const metrics = metricsByProject.get(contract.projectId);
         if (!metrics) continue;
-        if (contract.status === 'active' || contract.status === 'approved' || contract.status === 'expiring_soon') {
+        if (
+          contract.status === 'active' ||
+          contract.status === 'approved' ||
+          contract.status === 'expiring_soon'
+        ) {
           metrics.activeContracts = (metrics.activeContracts ?? 0) + 1;
         }
         if (this.isContractExpiringSoon(contract)) {
@@ -247,7 +252,10 @@ export class DashboardService {
     for (const obligation of relevantObligations) {
       const projectId = obligation.contract?.projectId;
       if (!projectId) continue;
-      obligationsByProject.set(projectId, (obligationsByProject.get(projectId) ?? 0) + (this.isPendingObligation(obligation) ? 1 : 0));
+      obligationsByProject.set(
+        projectId,
+        (obligationsByProject.get(projectId) ?? 0) + (this.isPendingObligation(obligation) ? 1 : 0)
+      );
     }
 
     for (const project of projects) {
@@ -258,7 +266,7 @@ export class DashboardService {
         metrics.stoppedFlows,
         this.countExpiredRfis(rfis.filter((rfi) => rfi.projectId === project.id)),
         metrics.contractsExpiringSoon,
-        obligationsByProject.get(project.id) ?? 0
+        obligationsByProject.get(project.id) ?? 0,
       ].reduce<number>((sum, value) => sum + (value ?? 0), 0);
       metrics.earlyAlerts = earlyAlerts;
     }
@@ -271,14 +279,20 @@ export class DashboardService {
         documentsInReview: this.mergeNullable(acc.documentsInReview, item.documentsInReview),
         draftDocuments: this.mergeNullable(acc.draftDocuments, item.draftDocuments),
         expiredDocuments: this.mergeNullable(acc.expiredDocuments, item.expiredDocuments),
-        documentsExpiringSoon: this.mergeNullable(acc.documentsExpiringSoon, item.documentsExpiringSoon),
+        documentsExpiringSoon: this.mergeNullable(
+          acc.documentsExpiringSoon,
+          item.documentsExpiringSoon
+        ),
         activeFlows: this.mergeNullable(acc.activeFlows, item.activeFlows),
         stoppedFlows: this.mergeNullable(acc.stoppedFlows, item.stoppedFlows),
         openRfis: (acc.openRfis ?? 0) + (item.openRfis ?? 0),
         activeContracts: this.mergeNullable(acc.activeContracts, item.activeContracts),
-        contractsExpiringSoon: this.mergeNullable(acc.contractsExpiringSoon, item.contractsExpiringSoon),
+        contractsExpiringSoon: this.mergeNullable(
+          acc.contractsExpiringSoon,
+          item.contractsExpiringSoon
+        ),
         expiredContracts: this.mergeNullable(acc.expiredContracts, item.expiredContracts),
-        earlyAlerts: this.mergeNullable(acc.earlyAlerts, item.earlyAlerts)
+        earlyAlerts: this.mergeNullable(acc.earlyAlerts, item.earlyAlerts),
       }),
       this.emptyMetrics(0)
     );
@@ -296,7 +310,7 @@ export class DashboardService {
         code: project.code,
         status: project.status,
         isActive: project.isActive,
-        metrics: metricsByProject.get(project.id) ?? this.emptyMetrics(project.isActive ? 1 : 0)
+        metrics: metricsByProject.get(project.id) ?? this.emptyMetrics(project.isActive ? 1 : 0),
       })),
       charts: {
         documentStatusDistribution: documents.length
@@ -305,9 +319,9 @@ export class DashboardService {
         documentsByDiscipline: documents.length ? this.buildDocumentsByDiscipline(documents) : [],
         upcomingRenewals,
         rfisByStatus: this.buildRfisByStatus(rfis),
-        contractsByStatus: contracts.length ? this.buildContractsByStatus(contracts) : []
+        contractsByStatus: contracts.length ? this.buildContractsByStatus(contracts) : [],
       },
-      signals: this.buildSignals(global, rfis, relevantObligations, totalUpcomingRenewals)
+      signals: this.buildSignals(global, rfis, relevantObligations, totalUpcomingRenewals),
     };
   }
 
@@ -320,10 +334,13 @@ export class DashboardService {
       published: 'Publicado',
       expired: 'Vencido',
       superseded: 'Sustituido',
-      archived: 'Archivado'
+      archived: 'Archivado',
     };
 
-    return this.countByLabel(documents.map((document) => document.status), labels);
+    return this.countByLabel(
+      documents.map((document) => document.status),
+      labels
+    );
   }
 
   private buildDocumentsByDiscipline(documents: DocumentRecord[]): ChartPoint[] {
@@ -343,7 +360,11 @@ export class DashboardService {
       .slice(0, 8);
   }
 
-  private buildUpcomingRenewals(projects: Project[], documents: DocumentRecord[], contracts: Contract[]): ChartPoint[] {
+  private buildUpcomingRenewals(
+    projects: Project[],
+    documents: DocumentRecord[],
+    contracts: Contract[]
+  ): ChartPoint[] {
     const counts = new Map<string, number>();
     const projectMap = new Map(projects.map((project) => [project.id, project]));
 
@@ -363,7 +384,7 @@ export class DashboardService {
       .map(([projectId, value]) => ({
         key: projectId,
         label: projectMap.get(projectId)?.name ?? 'Proyecto',
-        value
+        value,
       }))
       .sort((a, b) => b.value - a.value);
   }
@@ -372,10 +393,13 @@ export class DashboardService {
     const labels: Record<string, string> = {
       open: 'Abierto',
       answered: 'Respondido',
-      closed: 'Cerrado'
+      closed: 'Cerrado',
     };
 
-    return this.countByLabel(rfis.map((rfi) => rfi.status), labels);
+    return this.countByLabel(
+      rfis.map((rfi) => rfi.status),
+      labels
+    );
   }
 
   private buildContractsByStatus(contracts: Contract[]): ChartPoint[] {
@@ -387,15 +411,25 @@ export class DashboardService {
       expiring_soon: 'Proximo a vencer',
       expired: 'Vencido',
       renewed: 'Renovado',
-      closed: 'Cerrado'
+      closed: 'Cerrado',
     };
 
-    return this.countByLabel(contracts.map((contract) => contract.status), labels);
+    return this.countByLabel(
+      contracts.map((contract) => contract.status),
+      labels
+    );
   }
 
-  private buildSignals(global: MetricSet, rfis: Rfi[], obligations: ContractObligation[], upcomingRenewals: number): ExecutiveSignal[] {
+  private buildSignals(
+    global: MetricSet,
+    rfis: Rfi[],
+    obligations: ContractObligation[],
+    upcomingRenewals: number
+  ): ExecutiveSignal[] {
     const expiredRfis = this.countExpiredRfis(rfis);
-    const pendingObligations = obligations.filter((obligation) => this.isPendingObligation(obligation)).length;
+    const pendingObligations = obligations.filter((obligation) =>
+      this.isPendingObligation(obligation)
+    ).length;
 
     const signals: ExecutiveSignal[] = [
       {
@@ -403,43 +437,43 @@ export class DashboardService {
         label: 'Documentos vencidos',
         priority: 'critical',
         count: global.expiredDocuments ?? 0,
-        description: 'Documentos fuera de fecha objetivo y aun no cerrados.'
+        description: 'Documentos fuera de fecha objetivo y aun no cerrados.',
       },
       {
         key: 'upcomingRenewals',
         label: 'Renovaciones proximas',
         priority: 'high',
         count: upcomingRenewals,
-        description: 'Documentos y contratos renovables con ventana de renovacion cercana.'
+        description: 'Documentos y contratos renovables con ventana de renovacion cercana.',
       },
       {
         key: 'stoppedFlows',
         label: 'Flujos detenidos',
         priority: 'critical',
         count: global.stoppedFlows ?? 0,
-        description: 'Solicitudes de aprobacion detenidas por cambios o inactividad.'
+        description: 'Solicitudes de aprobacion detenidas por cambios o inactividad.',
       },
       {
         key: 'expiredRfis',
         label: 'RFIs vencidos',
         priority: 'critical',
         count: expiredRfis,
-        description: 'RFIs abiertos cuya fecha compromiso ya se vencio.'
+        description: 'RFIs abiertos cuya fecha compromiso ya se vencio.',
       },
       {
         key: 'contractsExpiringSoon',
         label: 'Contratos proximos a vencer',
         priority: 'high',
         count: global.contractsExpiringSoon ?? 0,
-        description: 'Contratos vigentes o en renovacion con vencimiento cercano.'
+        description: 'Contratos vigentes o en renovacion con vencimiento cercano.',
       },
       {
         key: 'pendingObligations',
         label: 'Obligaciones contractuales pendientes',
         priority: 'medium',
         count: pendingObligations,
-        description: 'Obligaciones en curso, vencidas o cercanas al vencimiento.'
-      }
+        description: 'Obligaciones en curso, vencidas o cercanas al vencimiento.',
+      },
     ];
 
     return signals.sort((a, b) => b.count - a.count);
@@ -455,7 +489,7 @@ export class DashboardService {
       .map(([key, value]) => ({
         key,
         label: labels[key] ?? this.toLabel(key),
-        value
+        value,
       }))
       .sort((a, b) => b.value - a.value);
   }
@@ -475,7 +509,7 @@ export class DashboardService {
       activeContracts: 0,
       contractsExpiringSoon: 0,
       expiredContracts: 0,
-      earlyAlerts: 0
+      earlyAlerts: 0,
     };
   }
 
@@ -484,7 +518,7 @@ export class DashboardService {
       documents: this.hasPermission(permissions, PermissionKey.DocumentsView),
       approvals: this.hasPermission(permissions, PermissionKey.DocumentsApprove),
       contracts: this.hasPermission(permissions, PermissionKey.ContractsManage),
-      projects: this.hasPermission(permissions, PermissionKey.ProjectsView)
+      projects: this.hasPermission(permissions, PermissionKey.ProjectsView),
     };
   }
 
@@ -518,11 +552,15 @@ export class DashboardService {
     if (obligation.status === 'completed' || obligation.status === 'waived') {
       return false;
     }
-    return obligation.status === 'overdue' || this.isWithinDays(obligation.commitmentDate, OBLIGATION_SOON_DAYS, false);
+    return (
+      obligation.status === 'overdue' ||
+      this.isWithinDays(obligation.commitmentDate, OBLIGATION_SOON_DAYS, false)
+    );
   }
 
   private countExpiredRfis(rfis: Rfi[]) {
-    return rfis.filter((rfi) => rfi.status === 'open' && this.isWithinDays(rfi.dueDate, 0, true)).length;
+    return rfis.filter((rfi) => rfi.status === 'open' && this.isWithinDays(rfi.dueDate, 0, true))
+      .length;
   }
 
   private isWithinDays(dateValue: string | undefined, limitDays: number, overdue: boolean) {
@@ -546,9 +584,7 @@ export class DashboardService {
   }
 
   private toLabel(value: string) {
-    return value
-      .replaceAll('_', ' ')
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
   private mergeNullable(current: number | null, next: number | null) {

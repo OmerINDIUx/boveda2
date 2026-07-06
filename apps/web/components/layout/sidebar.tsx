@@ -11,7 +11,7 @@ import {
   Landmark,
   LockKeyhole,
   Settings2,
-  ShieldCheck
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -22,19 +22,59 @@ import { NotificationsBell } from './notifications-bell';
 
 const items = [
   { href: '/dashboard', label: 'Dashboard', icon: Gauge, permission: PermissionKey.ProjectsView },
-  { href: '/projects', label: 'Proyectos', icon: FolderKanban, permission: PermissionKey.ProjectsView },
-  { href: '/documents', label: 'Documentos por proyecto', icon: FileText, permission: PermissionKey.DocumentsView },
+  {
+    href: '/projects',
+    label: 'Proyectos',
+    icon: FolderKanban,
+    permission: PermissionKey.ProjectsView,
+  },
+  {
+    href: '/documents',
+    label: 'Documentos por proyecto',
+    icon: FileText,
+    permission: PermissionKey.DocumentsView,
+  },
   { href: '/rfis', label: 'RFIs', icon: FileQuestion, permission: PermissionKey.RfisManage },
-  { href: '/approvals', label: 'Aprobaciones', icon: ClipboardCheck, permission: PermissionKey.DocumentsApprove },
-  { href: '/approvals/flows', label: 'Flujos aprobación', icon: ClipboardCheck, permission: PermissionKey.ApprovalsManage },
+  {
+    href: '/approvals',
+    label: 'Aprobaciones',
+    icon: ClipboardCheck,
+    permission: PermissionKey.DocumentsApprove,
+  },
+  {
+    href: '/approvals/flows',
+    label: 'Flujos aprobación',
+    icon: ClipboardCheck,
+    permission: PermissionKey.ApprovalsManage,
+  },
   { href: '/notifications', label: 'Notificaciones', icon: Bell, permission: null },
   { href: '/ai-query', label: 'Consulta IA', icon: Bot, permission: PermissionKey.AiQuery },
   { href: '/clm', label: 'CLM', icon: Landmark, permission: PermissionKey.ContractsManage },
-  { href: '/admin/project-catalogs', label: 'Catálogos proyecto', icon: Settings2, permission: PermissionKey.ProjectsManage },
-  { href: '/admin/project-disciplines', label: 'Disciplinas', icon: Settings2, permission: PermissionKey.ProjectsManage },
-  { href: '/admin/project-users', label: 'Usuarios proyecto', icon: Settings2, permission: PermissionKey.ProjectsManage },
-  { href: '/admin/users', label: 'Usuarios', icon: ShieldCheck, permission: PermissionKey.UsersRead },
-  { href: '/admin/roles', label: 'Roles', icon: ShieldCheck, permission: PermissionKey.RolesRead }
+  {
+    href: '/admin/project-catalogs',
+    label: 'Catálogos proyecto',
+    icon: Settings2,
+    permission: PermissionKey.ProjectsManage,
+  },
+  {
+    href: '/admin/project-disciplines',
+    label: 'Disciplinas',
+    icon: Settings2,
+    permission: PermissionKey.ProjectsManage,
+  },
+  {
+    href: '/admin/project-users',
+    label: 'Usuarios proyecto',
+    icon: Settings2,
+    permission: PermissionKey.ProjectsManage,
+  },
+  {
+    href: '/admin/users',
+    label: 'Usuarios',
+    icon: ShieldCheck,
+    permission: PermissionKey.UsersRead,
+  },
+  { href: '/admin/roles', label: 'Roles', icon: ShieldCheck, permission: PermissionKey.RolesRead },
 ];
 
 export function Sidebar() {
@@ -44,7 +84,9 @@ export function Sidebar() {
     setMounted(true);
   }, []);
 
-  const visibleItems = mounted ? items.filter((item) => (item.permission ? hasPermission(item.permission) : true)) : items;
+  const visibleItems = mounted
+    ? items.filter((item) => (item.permission ? hasPermission(item.permission) : true))
+    : items;
 
   return (
     <aside className="sidebar">

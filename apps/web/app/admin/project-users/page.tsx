@@ -32,7 +32,7 @@ const emptyForm: AssignmentForm = {
   userId: '',
   role: 'viewer',
   canManageDocuments: false,
-  canManageContracts: false
+  canManageContracts: false,
 };
 
 function getToken() {
@@ -56,7 +56,7 @@ function ProjectUsersWorkspace() {
       try {
         const [projectsResponse, formOptionsResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined)
+          apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined),
         ]);
 
         if (!active) return;
@@ -65,7 +65,7 @@ function ProjectUsersWorkspace() {
         setForm((current) => ({
           ...current,
           projectId: current.projectId || projectsResponse[0]?.id || '',
-          userId: current.userId || formOptionsResponse.users[0]?.id || ''
+          userId: current.userId || formOptionsResponse.users[0]?.id || '',
         }));
       } catch {
         if (!active) return;
@@ -85,7 +85,10 @@ function ProjectUsersWorkspace() {
 
     async function loadMembers() {
       try {
-        const response = await apiGet<ProjectMember[]>(`/projects/${form.projectId}/users`, getToken() ?? undefined);
+        const response = await apiGet<ProjectMember[]>(
+          `/projects/${form.projectId}/users`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setMembers(response);
       } catch {
@@ -122,15 +125,20 @@ function ProjectUsersWorkspace() {
           userId: form.userId,
           role: form.role,
           canManageDocuments: form.canManageDocuments,
-          canManageContracts: form.canManageContracts
+          canManageContracts: form.canManageContracts,
         },
         getToken() ?? undefined
       );
 
-      const nextMembers = await apiGet<ProjectMember[]>(`/projects/${form.projectId}/users`, getToken() ?? undefined);
+      const nextMembers = await apiGet<ProjectMember[]>(
+        `/projects/${form.projectId}/users`,
+        getToken() ?? undefined
+      );
       setMembers(nextMembers);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'No fue posible asignar el usuario.');
+      setError(
+        nextError instanceof Error ? nextError.message : 'No fue posible asignar el usuario.'
+      );
     } finally {
       setSaving(false);
     }
@@ -141,7 +149,9 @@ function ProjectUsersWorkspace() {
       <div className="topbar">
         <div>
           <h1>Usuarios por proyecto</h1>
-          <p className="muted">Asignación separada del alta del proyecto para evitar errores durante la creación.</p>
+          <p className="muted">
+            Asignación separada del alta del proyecto para evitar errores durante la creación.
+          </p>
         </div>
       </div>
 
@@ -151,7 +161,12 @@ function ProjectUsersWorkspace() {
         <article className="card span-4">
           <div className="field">
             <label>Proyecto</label>
-            <select value={form.projectId} onChange={(event) => setForm((current) => ({ ...current, projectId: event.target.value }))}>
+            <select
+              value={form.projectId}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, projectId: event.target.value }))
+              }
+            >
               <option value="">Selecciona un proyecto</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
@@ -162,11 +177,20 @@ function ProjectUsersWorkspace() {
           </div>
           <div className="field">
             <label>Buscar usuario</label>
-            <input placeholder="Nombre o correo" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input
+              placeholder="Nombre o correo"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
           </div>
           <div className="field">
             <label>Usuario</label>
-            <select value={form.userId} onChange={(event) => setForm((current) => ({ ...current, userId: event.target.value }))}>
+            <select
+              value={form.userId}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, userId: event.target.value }))
+              }
+            >
               <option value="">Selecciona un usuario</option>
               {filteredUsers.map((user) => (
                 <option key={user.id} value={user.id}>
@@ -177,7 +201,15 @@ function ProjectUsersWorkspace() {
           </div>
           <div className="field">
             <label>Rol en proyecto</label>
-            <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as AssignmentForm['role'] }))}>
+            <select
+              value={form.role}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  role: event.target.value as AssignmentForm['role'],
+                }))
+              }
+            >
               <option value="viewer">viewer</option>
               <option value="contributor">contributor</option>
               <option value="manager">manager</option>
@@ -188,7 +220,9 @@ function ProjectUsersWorkspace() {
             <input
               type="checkbox"
               checked={form.canManageDocuments}
-              onChange={(event) => setForm((current) => ({ ...current, canManageDocuments: event.target.checked }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, canManageDocuments: event.target.checked }))
+              }
             />
             Puede gestionar documentos
           </label>
@@ -196,7 +230,9 @@ function ProjectUsersWorkspace() {
             <input
               type="checkbox"
               checked={form.canManageContracts}
-              onChange={(event) => setForm((current) => ({ ...current, canManageContracts: event.target.checked }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, canManageContracts: event.target.checked }))
+              }
             />
             Puede gestionar contratos
           </label>

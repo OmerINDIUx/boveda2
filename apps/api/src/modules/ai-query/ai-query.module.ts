@@ -31,10 +31,10 @@ import { OllamaChatService } from './ollama-chat.service';
       DocumentPermission,
       DocumentQueryHistory,
       User,
-      ProjectMember
-    ])
+      ProjectMember,
+    ]),
   ],
   controllers: [AiQueryController],
-  providers: [AiQueryService, DocumentIndexingService, OllamaChatService]
+  providers: [AiQueryService, DocumentIndexingService, OllamaChatService],
 })
 export class AiQueryModule {}

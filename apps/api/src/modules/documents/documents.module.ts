@@ -37,11 +37,11 @@ import { DocumentsService } from './documents.service';
       DocumentEmbedding,
       User,
       ProjectMember,
-      Folder
-    ])
+      Folder,
+    ]),
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],
-  exports: [DocumentsService]
+  exports: [DocumentsService],
 })
 export class DocumentsModule {}

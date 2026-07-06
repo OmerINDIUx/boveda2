@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Holocron',
-  description: 'Boveda documental empresarial'
+  description: 'Boveda documental empresarial',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -23,14 +23,16 @@ export class AuthService {
     }
 
     const roles = user.roles?.map((role) => role.key) ?? [];
-    const permissions = user.roles?.flatMap((role) => role.permissions?.map((permission) => permission.key) ?? []) ?? [];
+    const permissions =
+      user.roles?.flatMap((role) => role.permissions?.map((permission) => permission.key) ?? []) ??
+      [];
     const accessToken = await this.jwt.signAsync({
       id: user.id,
       name: user.name,
       email: user.email,
       active: user.active,
       roles,
-      permissions
+      permissions,
     });
 
     await this.audit.record({
@@ -38,12 +40,12 @@ export class AuthService {
       action: 'auth.login',
       entityType: 'user',
       entityId: user.id,
-      metadata: { email: user.email }
+      metadata: { email: user.email },
     });
 
     return {
       accessToken,
-      user: { id: user.id, name: user.name, email: user.email, roles, permissions }
+      user: { id: user.id, name: user.name, email: user.email, roles, permissions },
     };
   }
 
@@ -53,7 +55,7 @@ export class AuthService {
         actorId: userId,
         action: 'auth.logout',
         entityType: 'user',
-        entityId: userId
+        entityId: userId,
       });
     }
     return { ok: true };

@@ -45,7 +45,11 @@ export class FoldersController {
 
   @Patch('disciplines/:id')
   @Permissions(PermissionKey.ProjectsManage)
-  updateDiscipline(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateDisciplineDto) {
+  updateDiscipline(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateDisciplineDto
+  ) {
     return this.folders.updateDiscipline(user.id, id, dto);
   }
 

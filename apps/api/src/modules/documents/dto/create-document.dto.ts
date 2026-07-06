@@ -69,5 +69,9 @@ export class CreateDocumentDto {
 
   @IsOptional()
   @IsArray()
-  metadata?: Array<{ key: string; value: string; type?: 'string' | 'number' | 'date' | 'boolean' | 'json' }>;
+  metadata?: Array<{
+    key: string;
+    value: string;
+    type?: 'string' | 'number' | 'date' | 'boolean' | 'json';
+  }>;
 }

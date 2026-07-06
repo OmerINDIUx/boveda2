@@ -4,7 +4,13 @@ import { ShieldAlert } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { hasPermission } from '../../lib/auth';
 
-export function RequirePermission({ permission, children }: { permission: string; children: ReactNode }) {
+export function RequirePermission({
+  permission,
+  children,
+}: {
+  permission: string;
+  children: ReactNode;
+}) {
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {

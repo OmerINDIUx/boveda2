@@ -13,9 +13,20 @@ import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
 
 @Module({
-  imports: [AuditModule, TypeOrmModule.forFeature([Project, ProjectMember, User, Discipline, Folder, DocumentRecord, ProjectCatalogOption])],
+  imports: [
+    AuditModule,
+    TypeOrmModule.forFeature([
+      Project,
+      ProjectMember,
+      User,
+      Discipline,
+      Folder,
+      DocumentRecord,
+      ProjectCatalogOption,
+    ]),
+  ],
   controllers: [ProjectsController],
   providers: [ProjectsService, AccessScopeService],
-  exports: [ProjectsService, AccessScopeService, TypeOrmModule]
+  exports: [ProjectsService, AccessScopeService, TypeOrmModule],
 })
 export class ProjectsModule {}

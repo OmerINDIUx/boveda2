@@ -1,6 +1,6 @@
 export declare class CreateRoleDto {
-    key: string;
-    name: string;
-    description?: string;
-    permissionIds?: string[];
+  key: string;
+  name: string;
+  description?: string;
+  permissionIds?: string[];
 }

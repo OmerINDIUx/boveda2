@@ -2,12 +2,31 @@
 
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowDown, ArrowUp, CheckCircle2, Clock3, Download, FileCheck2, FileText, MessageSquareMore, Plus, ShieldAlert, Trash2, XCircle } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
+  Clock3,
+  Download,
+  FileCheck2,
+  FileText,
+  MessageSquareMore,
+  Plus,
+  ShieldAlert,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 
 type ProjectOption = { id: string; name: string; code: string };
-type DocumentOption = { id: string; documentNumber: string; name: string; projectId: string; status: string };
+type DocumentOption = {
+  id: string;
+  documentNumber: string;
+  name: string;
+  projectId: string;
+  status: string;
+};
 type UserOption = { id: string; name: string; email: string };
 
 type WorkflowStep = {
@@ -91,7 +110,12 @@ type ApprovalDocumentDetail = {
   } | null;
   preview: { available: boolean; mimeType: string | null; url: string | null };
   metadata: Array<{ id: string; metaKey: string; metaValue?: string; valueType: string }>;
-  comments: Array<{ id: string; body: string; createdAt: string; author: { id: string; name: string; email: string } | null }>;
+  comments: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: { id: string; name: string; email: string } | null;
+  }>;
 };
 
 type ReviewAnnotation = {
@@ -127,7 +151,7 @@ const emptyFlowForm: FlowForm = {
   name: '',
   scopeType: 'global',
   targetDocumentId: '',
-  requireForPublication: true
+  requireForPublication: true,
 };
 
 function getToken() {
@@ -175,9 +199,12 @@ function describeAnnotationKind(kind: ReviewAnnotation['kind']) {
 }
 
 async function fetchProtectedBlob(path: string) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`, {
-    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}
-  });
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`,
+    {
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    }
+  );
 
   if (!response.ok) {
     throw new Error('No fue posible descargar el archivo');
@@ -217,7 +244,10 @@ export function ApprovalsInboxPage() {
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<ApprovalRequest[]>('/approvals/requests/pending', getToken() ?? undefined);
+        const response = await apiGet<ApprovalRequest[]>(
+          '/approvals/requests/pending',
+          getToken() ?? undefined
+        );
         if (!active) return;
         setPending(response);
       } catch (nextError) {
@@ -252,8 +282,16 @@ export function ApprovalsInboxPage() {
   const metrics = useMemo(
     () => [
       { label: 'Solicitudes visibles', value: filteredPending.length, icon: Clock3 },
-      { label: 'En proceso', value: filteredPending.filter((item) => item.status === 'in_process').length, icon: FileCheck2 },
-      { label: 'Detenidas', value: filteredPending.filter((item) => item.status === 'stopped').length, icon: ShieldAlert }
+      {
+        label: 'En proceso',
+        value: filteredPending.filter((item) => item.status === 'in_process').length,
+        icon: FileCheck2,
+      },
+      {
+        label: 'Detenidas',
+        value: filteredPending.filter((item) => item.status === 'stopped').length,
+        icon: ShieldAlert,
+      },
     ],
     [filteredPending]
   );
@@ -293,14 +331,18 @@ export function ApprovalsInboxPage() {
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <h2>Solicitudes activas</h2>
-          <span className="pill">{loading ? 'Cargando' : `${filteredPending.length} registros`}</span>
+          <span className="pill">
+            {loading ? 'Cargando' : `${filteredPending.length} registros`}
+          </span>
         </div>
         <div className="simple-document-list">
           {filteredPending.map((item) => (
             <div className="simple-document-item" key={item.id}>
               <strong>{item.document?.documentNumber ?? 'Documento'}</strong>
               <span>{item.document?.name ?? 'Sin documento'}</span>
-              <small>{item.currentStep?.name ?? 'Sin paso actual'} · {normalizeLabel(item.status)}</small>
+              <small>
+                {item.currentStep?.name ?? 'Sin paso actual'} · {normalizeLabel(item.status)}
+              </small>
               <div className="projects-actions" style={{ marginTop: 8 }}>
                 <Link className="button secondary" href={`/approvals/requests/${item.id}`}>
                   Abrir solicitud
@@ -308,7 +350,9 @@ export function ApprovalsInboxPage() {
               </div>
             </div>
           ))}
-          {!loading && !filteredPending.length ? <p className="muted">No hay solicitudes pendientes con este enfoque.</p> : null}
+          {!loading && !filteredPending.length ? (
+            <p className="muted">No hay solicitudes pendientes con este enfoque.</p>
+          ) : null}
         </div>
       </article>
     </section>
@@ -347,7 +391,10 @@ export function ApprovalFlowsListPage() {
     async function loadFlows() {
       setLoading(true);
       try {
-        const response = await apiGet<Workflow[]>(`/approvals/flows?projectId=${encodeURIComponent(selectedProjectId)}`, getToken() ?? undefined);
+        const response = await apiGet<Workflow[]>(
+          `/approvals/flows?projectId=${encodeURIComponent(selectedProjectId)}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setFlows(response);
       } catch (nextError) {
@@ -395,7 +442,10 @@ export function ApprovalFlowsListPage() {
             label="Proyecto"
             value={selectedProjectId}
             onChange={setSelectedProjectId}
-            options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+            options={projects.map((project) => ({
+              value: project.id,
+              label: `${project.code} · ${project.name}`,
+            }))}
           />
         </div>
       </article>
@@ -406,10 +456,16 @@ export function ApprovalFlowsListPage() {
               <h2>{flow.name}</h2>
               <span className="pill">{flow.steps.length} pasos</span>
             </div>
-            <p className="muted">{normalizeLabel(flow.scopeType)} · {flow.requireForPublication ? 'Requerido para publicar' : 'No bloquea publicación'}</p>
+            <p className="muted">
+              {normalizeLabel(flow.scopeType)} ·{' '}
+              {flow.requireForPublication ? 'Requerido para publicar' : 'No bloquea publicación'}
+            </p>
             <div className="simple-document-list">
               {flow.steps.map((step) => (
-                <div className="simple-document-item" key={step.id ?? `${flow.id}-${step.stepOrder}`}>
+                <div
+                  className="simple-document-item"
+                  key={step.id ?? `${flow.id}-${step.stepOrder}`}
+                >
                   <strong>Paso {step.stepOrder}</strong>
                   <span>{step.name}</span>
                 </div>
@@ -419,13 +475,21 @@ export function ApprovalFlowsListPage() {
               <Link className="button secondary" href={`/approvals/flows/${flow.id}/edit`}>
                 Editar
               </Link>
-              <button className="button danger-button" type="button" onClick={() => void deactivateFlow(flow.id)}>
+              <button
+                className="button danger-button"
+                type="button"
+                onClick={() => void deactivateFlow(flow.id)}
+              >
                 Desactivar
               </button>
             </div>
           </article>
         ))}
-        {!loading && !flows.length ? <article className="card span-12"><p className="muted">No hay flujos para este proyecto.</p></article> : null}
+        {!loading && !flows.length ? (
+          <article className="card span-12">
+            <p className="muted">No hay flujos para este proyecto.</p>
+          </article>
+        ) : null}
       </div>
     </section>
   );
@@ -441,7 +505,8 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [form, setForm] = useState<FlowForm>(emptyFlowForm);
   const [steps, setSteps] = useState<WorkflowStep[]>([buildEmptyStep(1)]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [projectAssignmentMode, setProjectAssignmentMode] = useState<ProjectAssignmentMode>('all_projects');
+  const [projectAssignmentMode, setProjectAssignmentMode] =
+    useState<ProjectAssignmentMode>('all_projects');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
   const [loading, setLoading] = useState(mode === 'edit');
@@ -455,14 +520,19 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
         const [projectsResponse, documentsResponse, formOptionsResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
           apiGet<DocumentOption[]>('/documents', getToken() ?? undefined),
-          apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined)
+          apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined),
         ]);
         if (!active) return;
         setProjects(projectsResponse);
         setDocuments(documentsResponse);
         setUsers(formOptionsResponse.users);
-        setSelectedProjectIds((current) => (current.length ? current : projectsResponse[0] ? [projectsResponse[0].id] : []));
-        setForm((current) => ({ ...current, projectId: current.projectId || projectsResponse[0]?.id || '' }));
+        setSelectedProjectIds((current) =>
+          current.length ? current : projectsResponse[0] ? [projectsResponse[0].id] : []
+        );
+        setForm((current) => ({
+          ...current,
+          projectId: current.projectId || projectsResponse[0]?.id || '',
+        }));
       } catch (nextError) {
         if (!active) return;
         setError(getErrorMessage(nextError, 'No fue posible cargar datos para el flujo.'));
@@ -480,18 +550,25 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
     async function loadFlow() {
       setLoading(true);
       try {
-        const response = await apiGet<Workflow>(`/approvals/flows/${flowId}`, getToken() ?? undefined);
+        const response = await apiGet<Workflow>(
+          `/approvals/flows/${flowId}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setForm({
           projectId: response.projectId,
           name: response.name,
           scopeType: response.scopeType,
           targetDocumentId: response.targetDocumentId ?? '',
-          requireForPublication: response.requireForPublication
+          requireForPublication: response.requireForPublication,
         });
         setProjectAssignmentMode('selected_projects');
         setSelectedProjectIds([response.projectId]);
-        setSteps(response.steps.length ? response.steps.sort((a, b) => a.stepOrder - b.stepOrder) : [buildEmptyStep(1)]);
+        setSteps(
+          response.steps.length
+            ? response.steps.sort((a, b) => a.stepOrder - b.stepOrder)
+            : [buildEmptyStep(1)]
+        );
       } catch (nextError) {
         if (!active) return;
         setError(getErrorMessage(nextError, 'No fue posible cargar el flujo.'));
@@ -510,7 +587,9 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
   }
 
   function setStep(index: number, patch: Partial<WorkflowStep>) {
-    setSteps((current) => current.map((step, stepIndex) => (stepIndex === index ? { ...step, ...patch } : step)));
+    setSteps((current) =>
+      current.map((step, stepIndex) => (stepIndex === index ? { ...step, ...patch } : step))
+    );
   }
 
   function addStep() {
@@ -533,11 +612,13 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const filteredProjects = useMemo(() => {
     const normalized = projectSearch.trim().toLowerCase();
     if (!normalized) return projects;
-    return projects.filter((project) => `${project.code} ${project.name}`.toLowerCase().includes(normalized));
+    return projects.filter((project) =>
+      `${project.code} ${project.name}`.toLowerCase().includes(normalized)
+    );
   }, [projectSearch, projects]);
 
   const canUseDocumentSpecificScope = mode === 'edit' || selectedProjectIds.length === 1;
-  const activeProjectId = mode === 'edit' ? form.projectId : selectedProjectIds[0] ?? '';
+  const activeProjectId = mode === 'edit' ? form.projectId : (selectedProjectIds[0] ?? '');
   const filteredDocuments = useMemo(
     () => documents.filter((document) => document.projectId === activeProjectId),
     [activeProjectId, documents]
@@ -561,7 +642,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
         ...current,
         projectId: nextProjectIds[0] ?? '',
         scopeType: 'global',
-        targetDocumentId: ''
+        targetDocumentId: '',
       }));
       return;
     }
@@ -602,7 +683,9 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return;
     }
     if (form.scopeType === 'document_specific' && !canUseDocumentSpecificScope) {
-      setError('El alcance por documento solo está disponible cuando seleccionas un solo proyecto.');
+      setError(
+        'El alcance por documento solo está disponible cuando seleccionas un solo proyecto.'
+      );
       return;
     }
     if (form.scopeType === 'document_specific' && !form.targetDocumentId) {
@@ -619,7 +702,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
       entityType: 'document',
       scopeType: form.scopeType,
       requireForPublication: form.requireForPublication,
-      steps: syncStepOrders(steps)
+      steps: syncStepOrders(steps),
     };
 
     try {
@@ -632,7 +715,9 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 ...payloadBase,
                 projectId,
                 targetDocumentId:
-                  form.scopeType === 'document_specific' && projectId === targetProjectIds[0] ? form.targetDocumentId || undefined : undefined
+                  form.scopeType === 'document_specific' && projectId === targetProjectIds[0]
+                    ? form.targetDocumentId || undefined
+                    : undefined,
               },
               getToken() ?? undefined
             )
@@ -644,7 +729,10 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
           {
             ...payloadBase,
             projectId: form.projectId,
-            targetDocumentId: form.scopeType === 'document_specific' ? form.targetDocumentId || undefined : undefined
+            targetDocumentId:
+              form.scopeType === 'document_specific'
+                ? form.targetDocumentId || undefined
+                : undefined,
           },
           getToken() ?? undefined
         );
@@ -663,7 +751,9 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
       <div className="topbar">
         <div>
           <h1>{mode === 'create' ? 'Nuevo flujo de aprobación' : 'Editar flujo de aprobación'}</h1>
-          <p className="muted">Pasos dinámicos, aprobadores variables y reordenamiento sin rigidez.</p>
+          <p className="muted">
+            Pasos dinámicos, aprobadores variables y reordenamiento sin rigidez.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href="/approvals/flows">
@@ -685,7 +775,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   onChange={(value) => setProjectAssignmentMode(value as ProjectAssignmentMode)}
                   options={[
                     { value: 'all_projects', label: 'Todos los proyectos' },
-                    { value: 'selected_projects', label: 'Seleccionar proyectos' }
+                    { value: 'selected_projects', label: 'Seleccionar proyectos' },
                   ]}
                 />
               ) : (
@@ -693,17 +783,26 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   label="Proyecto"
                   value={form.projectId}
                   onChange={(value) => setForm((current) => ({ ...current, projectId: value }))}
-                  options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+                  options={projects.map((project) => ({
+                    value: project.id,
+                    label: `${project.code} · ${project.name}`,
+                  }))}
                 />
               )}
-              <TextField label="Nombre del flujo" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+              <TextField
+                label="Nombre del flujo"
+                value={form.name}
+                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+              />
               <SelectField
                 label="Aplica a"
                 value={form.scopeType}
-                onChange={(value) => setForm((current) => ({ ...current, scopeType: value as FlowForm['scopeType'] }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, scopeType: value as FlowForm['scopeType'] }))
+                }
                 options={[
                   { value: 'global', label: 'Todo el proyecto' },
-                  { value: 'document_specific', label: 'Documento específico' }
+                  { value: 'document_specific', label: 'Documento específico' },
                 ]}
                 disabled={!canUseDocumentSpecificScope}
               />
@@ -711,17 +810,24 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 <SelectField
                   label="Documento objetivo"
                   value={form.targetDocumentId}
-                  onChange={(value) => setForm((current) => ({ ...current, targetDocumentId: value }))}
-                  options={filteredDocuments.map((document) => ({ value: document.id, label: `${document.documentNumber} · ${document.name}` }))}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, targetDocumentId: value }))
+                  }
+                  options={filteredDocuments.map((document) => ({
+                    value: document.id,
+                    label: `${document.documentNumber} · ${document.name}`,
+                  }))}
                 />
               ) : null}
               <SelectField
                 label="Requiere aprobación para publicar"
                 value={form.requireForPublication ? 'yes' : 'no'}
-                onChange={(value) => setForm((current) => ({ ...current, requireForPublication: value === 'yes' }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, requireForPublication: value === 'yes' }))
+                }
                 options={[
                   { value: 'yes', label: 'Sí' },
-                  { value: 'no', label: 'No' }
+                  { value: 'no', label: 'No' },
                 ]}
               />
             </div>
@@ -732,7 +838,9 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 {projectAssignmentMode === 'all_projects' ? (
                   <div className="selection-summary-card">
                     <strong>{projects.length} proyectos seleccionados</strong>
-                    <span className="muted">El flujo se creará en todos los proyectos visibles para tu usuario.</span>
+                    <span className="muted">
+                      El flujo se creará en todos los proyectos visibles para tu usuario.
+                    </span>
                   </div>
                 ) : (
                   <div className="project-picker-card">
@@ -747,23 +855,32 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                         const checked = selectedProjectIds.includes(project.id);
                         return (
                           <label className="project-picker-item" key={project.id}>
-                            <input type="checkbox" checked={checked} onChange={() => toggleProjectSelection(project.id)} />
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleProjectSelection(project.id)}
+                            />
                             <span>
                               <strong>{project.code}</strong> · {project.name}
                             </span>
                           </label>
                         );
                       })}
-                      {!filteredProjects.length ? <p className="muted">No hay proyectos que coincidan con la búsqueda.</p> : null}
+                      {!filteredProjects.length ? (
+                        <p className="muted">No hay proyectos que coincidan con la búsqueda.</p>
+                      ) : null}
                     </div>
                     <span className="muted">
-                      {selectedProjectIds.length} proyecto{selectedProjectIds.length === 1 ? '' : 's'} seleccionado
+                      {selectedProjectIds.length} proyecto
+                      {selectedProjectIds.length === 1 ? '' : 's'} seleccionado
                       {selectedProjectIds.length === 1 ? '' : 's'}.
                     </span>
                   </div>
                 )}
                 {!canUseDocumentSpecificScope ? (
-                  <span className="muted">Si eliges varios proyectos, el flujo solo puede aplicarse a todo el proyecto.</span>
+                  <span className="muted">
+                    Si eliges varios proyectos, el flujo solo puede aplicarse a todo el proyecto.
+                  </span>
                 ) : null}
               </div>
             ) : null}
@@ -792,12 +909,19 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 >
                   <strong>Paso {index + 1}</strong>
                   <div className="quick-filters-grid">
-                    <TextField label="Nombre del paso" value={step.name} onChange={(value) => setStep(index, { name: value })} />
+                    <TextField
+                      label="Nombre del paso"
+                      value={step.name}
+                      onChange={(value) => setStep(index, { name: value })}
+                    />
                     <SelectField
                       label="Aprobador"
                       value={step.approverUserId ?? ''}
                       onChange={(value) => setStep(index, { approverUserId: value })}
-                      options={users.map((user) => ({ value: user.id, label: `${user.name} · ${user.email}` }))}
+                      options={users.map((user) => ({
+                        value: user.id,
+                        label: `${user.name} · ${user.email}`,
+                      }))}
                     />
                     <SelectField
                       label="Requerido"
@@ -805,20 +929,35 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                       onChange={(value) => setStep(index, { required: value === 'yes' })}
                       options={[
                         { value: 'yes', label: 'Sí' },
-                        { value: 'no', label: 'No' }
+                        { value: 'no', label: 'No' },
                       ]}
                     />
                   </div>
                   <div className="projects-actions" style={{ marginTop: 8 }}>
-                    <button className="button secondary" type="button" onClick={() => index > 0 && moveStep(index, index - 1)} disabled={index === 0}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => index > 0 && moveStep(index, index - 1)}
+                      disabled={index === 0}
+                    >
                       <ArrowUp size={16} />
                       Subir
                     </button>
-                    <button className="button secondary" type="button" onClick={() => index < steps.length - 1 && moveStep(index, index + 1)} disabled={index === steps.length - 1}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => index < steps.length - 1 && moveStep(index, index + 1)}
+                      disabled={index === steps.length - 1}
+                    >
                       <ArrowDown size={16} />
                       Bajar
                     </button>
-                    <button className="button danger-button" type="button" onClick={() => removeStep(index)} disabled={steps.length === 1}>
+                    <button
+                      className="button danger-button"
+                      type="button"
+                      onClick={() => removeStep(index)}
+                      disabled={steps.length === 1}
+                    >
                       <Trash2 size={16} />
                       Quitar
                     </button>
@@ -857,7 +996,7 @@ export function ApprovalRequestCreatePage() {
       try {
         const [projectsResponse, documentsResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<DocumentOption[]>('/documents', getToken() ?? undefined)
+          apiGet<DocumentOption[]>('/documents', getToken() ?? undefined),
         ]);
         if (!active) return;
         setProjects(projectsResponse);
@@ -865,7 +1004,9 @@ export function ApprovalRequestCreatePage() {
         setProjectId((current) => current || projectsResponse[0]?.id || '');
       } catch (nextError) {
         if (!active) return;
-        setError(getErrorMessage(nextError, 'No fue posible cargar los documentos para aprobación.'));
+        setError(
+          getErrorMessage(nextError, 'No fue posible cargar los documentos para aprobación.')
+        );
       }
     }
     void loadBase();
@@ -879,7 +1020,10 @@ export function ApprovalRequestCreatePage() {
     let active = true;
     async function loadFlows() {
       try {
-        const response = await apiGet<Workflow[]>(`/approvals/flows?projectId=${encodeURIComponent(projectId)}`, getToken() ?? undefined);
+        const response = await apiGet<Workflow[]>(
+          `/approvals/flows?projectId=${encodeURIComponent(projectId)}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setFlows(response);
       } catch (nextError) {
@@ -893,7 +1037,10 @@ export function ApprovalRequestCreatePage() {
     };
   }, [projectId]);
 
-  const filteredDocuments = useMemo(() => documents.filter((document) => document.projectId === projectId), [documents, projectId]);
+  const filteredDocuments = useMemo(
+    () => documents.filter((document) => document.projectId === projectId),
+    [documents, projectId]
+  );
 
   async function submit() {
     if (!documentId) {
@@ -938,19 +1085,28 @@ export function ApprovalRequestCreatePage() {
             label="Proyecto"
             value={projectId}
             onChange={setProjectId}
-            options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+            options={projects.map((project) => ({
+              value: project.id,
+              label: `${project.code} · ${project.name}`,
+            }))}
           />
           <SelectField
             label="Documento"
             value={documentId}
             onChange={setDocumentId}
-            options={filteredDocuments.map((document) => ({ value: document.id, label: `${document.documentNumber} · ${document.name}` }))}
+            options={filteredDocuments.map((document) => ({
+              value: document.id,
+              label: `${document.documentNumber} · ${document.name}`,
+            }))}
           />
           <SelectField
             label="Flujo"
             value={workflowId}
             onChange={setWorkflowId}
-            options={flows.map((flow) => ({ value: flow.id, label: `${flow.name} · ${flow.steps.length} pasos` }))}
+            options={flows.map((flow) => ({
+              value: flow.id,
+              label: `${flow.name} · ${flow.steps.length} pasos`,
+            }))}
           />
           <div className="field span-2">
             <label>Comentario inicial</label>
@@ -983,7 +1139,9 @@ export function ApprovalRequestDetailPage() {
   const documentComments = useMemo(() => {
     const comments = documentDetail?.comments ?? [];
     const plain: ApprovalDocumentDetail['comments'] = [];
-    const annotationSets: Array<ApprovalDocumentDetail['comments'][number] & { annotationSet: SavedReviewPayload }> = [];
+    const annotationSets: Array<
+      ApprovalDocumentDetail['comments'][number] & { annotationSet: SavedReviewPayload }
+    > = [];
 
     comments.forEach((comment) => {
       const annotationSet = parseAnnotationComment(comment.body);
@@ -1003,7 +1161,10 @@ export function ApprovalRequestDetailPage() {
     async function loadDetail() {
       setLoading(true);
       try {
-        const response = await apiGet<ApprovalRequestDetail>(`/approvals/requests/${requestId}`, getToken() ?? undefined);
+        const response = await apiGet<ApprovalRequestDetail>(
+          `/approvals/requests/${requestId}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setDetail(response);
       } catch (nextError) {
@@ -1032,13 +1193,18 @@ export function ApprovalRequestDetailPage() {
       setDocumentLoading(true);
       setDocumentError('');
       try {
-        const response = await apiGet<ApprovalDocumentDetail>(`/documents/${documentId}`, getToken() ?? undefined);
+        const response = await apiGet<ApprovalDocumentDetail>(
+          `/documents/${documentId}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setDocumentDetail(response);
       } catch (nextError) {
         if (!active) return;
         setDocumentDetail(null);
-        setDocumentError(getErrorMessage(nextError, 'No fue posible cargar la vista del documento para revisión.'));
+        setDocumentError(
+          getErrorMessage(nextError, 'No fue posible cargar la vista del documento para revisión.')
+        );
       } finally {
         if (active) setDocumentLoading(false);
       }
@@ -1096,7 +1262,8 @@ export function ApprovalRequestDetailPage() {
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
       anchor.download =
-        documentDetail.currentVersion?.fileName ?? `${documentDetail.documentNumber}.${documentDetail.fileExtension ?? 'bin'}`;
+        documentDetail.currentVersion?.fileName ??
+        `${documentDetail.documentNumber}.${documentDetail.fileExtension ?? 'bin'}`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -1144,12 +1311,22 @@ export function ApprovalRequestDetailPage() {
               </div>
             </div>
 
-            <div className="document-drive-preview" style={{ marginTop: 20, position: 'static', maxHeight: 'none', overflow: 'visible', paddingRight: 0 }}>
+            <div
+              className="document-drive-preview"
+              style={{
+                marginTop: 20,
+                position: 'static',
+                maxHeight: 'none',
+                overflow: 'visible',
+                paddingRight: 0,
+              }}
+            >
               <div className="document-preview-hero">
                 <span className="document-preview-badge">Documento para revisar</span>
                 <h2>{detail.document?.name ?? 'Sin nombre disponible'}</h2>
                 <p className="muted">
-                  {detail.document?.documentNumber ?? 'Sin folio'} · {normalizeLabel(documentDetail?.status ?? detail.document?.status)}
+                  {detail.document?.documentNumber ?? 'Sin folio'} ·{' '}
+                  {normalizeLabel(documentDetail?.status ?? detail.document?.status)}
                 </p>
               </div>
 
@@ -1164,7 +1341,11 @@ export function ApprovalRequestDetailPage() {
                 </div>
                 <div className="state-card">
                   <span>Tamaño</span>
-                  <strong>{formatSize(documentDetail?.currentVersion?.sizeBytes ?? documentDetail?.sizeBytes)}</strong>
+                  <strong>
+                    {formatSize(
+                      documentDetail?.currentVersion?.sizeBytes ?? documentDetail?.sizeBytes
+                    )}
+                  </strong>
                 </div>
                 <div className="state-card">
                   <span>Formato</span>
@@ -1173,7 +1354,12 @@ export function ApprovalRequestDetailPage() {
               </div>
 
               <div className="document-preview-actions">
-                <button className="button secondary" type="button" onClick={() => void downloadCurrentFile()} disabled={!documentDetail}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => void downloadCurrentFile()}
+                  disabled={!documentDetail}
+                >
                   <Download size={18} />
                   Descargar archivo
                 </button>
@@ -1184,7 +1370,10 @@ export function ApprovalRequestDetailPage() {
                   </Link>
                 ) : null}
                 {detail.document?.id ? (
-                  <Link className="button secondary" href={`/documents/${detail.document.id}/review`}>
+                  <Link
+                    className="button secondary"
+                    href={`/documents/${detail.document.id}/review`}
+                  >
                     <MessageSquareMore size={18} />
                     Ver comentarios en visor
                   </Link>
@@ -1203,7 +1392,9 @@ export function ApprovalRequestDetailPage() {
                   className={`review-scope-button ${reviewMode === 'comments' ? 'active' : ''}`}
                   type="button"
                   onClick={() => setReviewMode('comments')}
-                  disabled={!documentComments.plain.length && !documentComments.annotationSets.length}
+                  disabled={
+                    !documentComments.plain.length && !documentComments.annotationSets.length
+                  }
                 >
                   Ver comentarios
                 </button>
@@ -1222,7 +1413,11 @@ export function ApprovalRequestDetailPage() {
                       {documentComments.annotationSets.length ? (
                         documentComments.annotationSets.map((entry) => {
                           const annotationCount = entry.annotationSet.annotations.length;
-                          const pages = Array.from(new Set(entry.annotationSet.annotations.map((item) => item.pageIndex + 1))).sort((left, right) => left - right);
+                          const pages = Array.from(
+                            new Set(
+                              entry.annotationSet.annotations.map((item) => item.pageIndex + 1)
+                            )
+                          ).sort((left, right) => left - right);
                           const kindSummary = Array.from(
                             entry.annotationSet.annotations.reduce((summary, item) => {
                               summary.set(item.kind, (summary.get(item.kind) ?? 0) + 1);
@@ -1234,15 +1429,26 @@ export function ApprovalRequestDetailPage() {
                             <div className="simple-document-item" key={entry.id}>
                               <strong>{entry.author?.name ?? 'Usuario'}</strong>
                               <span>
-                                {annotationCount} anotaciones · {pages.length ? `Páginas ${pages.join(', ')}` : 'Sin página definida'}
+                                {annotationCount} anotaciones ·{' '}
+                                {pages.length
+                                  ? `Páginas ${pages.join(', ')}`
+                                  : 'Sin página definida'}
                               </span>
                               <small>
                                 {kindSummary.length
-                                  ? kindSummary.map(([kind, count]) => `${describeAnnotationKind(kind)}: ${count}`).join(' · ')
+                                  ? kindSummary
+                                      .map(
+                                        ([kind, count]) =>
+                                          `${describeAnnotationKind(kind)}: ${count}`
+                                      )
+                                      .join(' · ')
                                   : 'Sin detalle de anotaciones'}
                               </small>
                               <small>
-                                {entry.annotationSet.versionId ? `Versión anotada: ${entry.annotationSet.versionId}` : 'Sin versión asociada'} · {new Date(entry.createdAt).toLocaleString()}
+                                {entry.annotationSet.versionId
+                                  ? `Versión anotada: ${entry.annotationSet.versionId}`
+                                  : 'Sin versión asociada'}{' '}
+                                · {new Date(entry.createdAt).toLocaleString()}
                               </small>
                             </div>
                           );
@@ -1268,12 +1474,17 @@ export function ApprovalRequestDetailPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="muted">No hay comentarios escritos aparte de las anotaciones del visor.</p>
+                        <p className="muted">
+                          No hay comentarios escritos aparte de las anotaciones del visor.
+                        </p>
                       )}
                     </div>
                     {detail.document?.id ? (
                       <div className="projects-actions" style={{ marginTop: 16 }}>
-                        <Link className="button secondary" href={`/documents/${detail.document.id}/review`}>
+                        <Link
+                          className="button secondary"
+                          href={`/documents/${detail.document.id}/review`}
+                        >
                           <MessageSquareMore size={18} />
                           Abrir visor con anotaciones
                         </Link>
@@ -1287,9 +1498,17 @@ export function ApprovalRequestDetailPage() {
                 </div>
               ) : documentDetail?.preview.available && previewUrl ? (
                 documentDetail.preview.mimeType?.startsWith('image/') ? (
-                  <img alt={documentDetail.name} className="document-preview-image" src={previewUrl} />
+                  <img
+                    alt={documentDetail.name}
+                    className="document-preview-image"
+                    src={previewUrl}
+                  />
                 ) : (
-                  <iframe className="document-preview-frame" src={previewUrl} title={documentDetail.name} />
+                  <iframe
+                    className="document-preview-frame"
+                    src={previewUrl}
+                    title={documentDetail.name}
+                  />
                 )
               ) : (
                 <div className="preview-empty">
@@ -1316,11 +1535,19 @@ export function ApprovalRequestDetailPage() {
                   <div className="simple-document-list">
                     <div className="simple-document-item">
                       <strong>Proyecto</strong>
-                      <span>{documentDetail?.project ? `${documentDetail.project.code} · ${documentDetail.project.name}` : 'Sin proyecto'}</span>
+                      <span>
+                        {documentDetail?.project
+                          ? `${documentDetail.project.code} · ${documentDetail.project.name}`
+                          : 'Sin proyecto'}
+                      </span>
                     </div>
                     <div className="simple-document-item">
                       <strong>Disciplina</strong>
-                      <span>{documentDetail?.discipline ? `${documentDetail.discipline.code} · ${documentDetail.discipline.name}` : 'Sin disciplina'}</span>
+                      <span>
+                        {documentDetail?.discipline
+                          ? `${documentDetail.discipline.code} · ${documentDetail.discipline.name}`
+                          : 'Sin disciplina'}
+                      </span>
                     </div>
                     <div className="simple-document-item">
                       <strong>Carpeta</strong>
@@ -1336,7 +1563,11 @@ export function ApprovalRequestDetailPage() {
                     </div>
                     <div className="simple-document-item">
                       <strong>Vencimiento</strong>
-                      <span>{documentDetail?.dueDate ? new Date(`${documentDetail.dueDate}T00:00:00`).toLocaleDateString() : 'Sin vencimiento'}</span>
+                      <span>
+                        {documentDetail?.dueDate
+                          ? new Date(`${documentDetail.dueDate}T00:00:00`).toLocaleDateString()
+                          : 'Sin vencimiento'}
+                      </span>
                     </div>
                   </div>
                 </article>
@@ -1363,8 +1594,14 @@ export function ApprovalRequestDetailPage() {
                     <div className="simple-document-list" style={{ marginTop: 16 }}>
                       <div className="simple-document-item">
                         <strong>Anotaciones del visor</strong>
-                        <span>{documentComments.annotationSets.length} paquete(s) de anotaciones guardados</span>
-                        <small>Usa “Ver comentarios” o “Ver comentarios en visor” para revisarlos sin ver el contenido técnico interno.</small>
+                        <span>
+                          {documentComments.annotationSets.length} paquete(s) de anotaciones
+                          guardados
+                        </span>
+                        <small>
+                          Usa “Ver comentarios” o “Ver comentarios en visor” para revisarlos sin ver
+                          el contenido técnico interno.
+                        </small>
                       </div>
                     </div>
                   ) : null}
@@ -1374,7 +1611,10 @@ export function ApprovalRequestDetailPage() {
 
             <div className="field" style={{ marginTop: 16 }}>
               <label>Comentario / decisión</label>
-              <textarea value={actionComment} onChange={(event) => setActionComment(event.target.value)} />
+              <textarea
+                value={actionComment}
+                onChange={(event) => setActionComment(event.target.value)}
+              />
             </div>
 
             <div className="projects-actions">
@@ -1382,15 +1622,27 @@ export function ApprovalRequestDetailPage() {
                 <CheckCircle2 size={18} />
                 Aprobar
               </button>
-              <button className="button secondary" type="button" onClick={() => void submitAction('request-changes')}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void submitAction('request-changes')}
+              >
                 <MessageSquareMore size={18} />
                 Solicitar cambios
               </button>
-              <button className="button danger-button" type="button" onClick={() => void submitAction('reject')}>
+              <button
+                className="button danger-button"
+                type="button"
+                onClick={() => void submitAction('reject')}
+              >
                 <XCircle size={18} />
                 Rechazar
               </button>
-              <button className="button secondary" type="button" onClick={() => void submitAction('comment')}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void submitAction('comment')}
+              >
                 Comentar
               </button>
             </div>
@@ -1399,8 +1651,16 @@ export function ApprovalRequestDetailPage() {
               {detail.actions.map((action) => (
                 <div className="simple-document-item" key={action.id}>
                   <strong>{normalizeLabel(action.action)}</strong>
-                  <span>{action.step ? `Paso ${action.step.stepOrder}: ${action.step.name}` : 'Sin paso asociado'} · {action.actor?.name ?? 'Usuario'}</span>
-                  <small>{action.comment || 'Sin comentario'} · {new Date(action.createdAt).toLocaleString()}</small>
+                  <span>
+                    {action.step
+                      ? `Paso ${action.step.stepOrder}: ${action.step.name}`
+                      : 'Sin paso asociado'}{' '}
+                    · {action.actor?.name ?? 'Usuario'}
+                  </span>
+                  <small>
+                    {action.comment || 'Sin comentario'} ·{' '}
+                    {new Date(action.createdAt).toLocaleString()}
+                  </small>
                 </div>
               ))}
             </div>
@@ -1417,7 +1677,7 @@ function TextField({
   label,
   value,
   onChange,
-  type = 'text'
+  type = 'text',
 }: {
   label: string;
   value: string;
@@ -1437,7 +1697,7 @@ function SelectField({
   value,
   onChange,
   options,
-  disabled = false
+  disabled = false,
 }: {
   label: string;
   value: string;

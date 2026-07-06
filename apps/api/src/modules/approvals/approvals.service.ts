@@ -22,7 +22,8 @@ export class ApprovalsService {
     @InjectRepository(ApprovalFlow) private readonly flows: Repository<ApprovalFlow>,
     @InjectRepository(ApprovalStep) private readonly steps: Repository<ApprovalStep>,
     @InjectRepository(ApprovalRequest) private readonly requests: Repository<ApprovalRequest>,
-    @InjectRepository(ApprovalRequestAction) private readonly actions: Repository<ApprovalRequestAction>,
+    @InjectRepository(ApprovalRequestAction)
+    private readonly actions: Repository<ApprovalRequestAction>,
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
     @InjectRepository(DocumentAuditLog) private readonly auditLogs: Repository<DocumentAuditLog>,
     private readonly scope: AccessScopeService,
@@ -37,7 +38,7 @@ export class ApprovalsService {
     const flows = await this.flows.find({
       where: { projectId },
       relations: ['steps'],
-      order: { updatedAt: 'DESC' }
+      order: { updatedAt: 'DESC' },
     });
 
     return flows.map((flow) => this.serializeFlow(flow));
@@ -63,7 +64,7 @@ export class ApprovalsService {
         scopeType: dto.scopeType ?? 'global',
         targetDocumentId: dto.targetDocumentId,
         requireForPublication: dto.requireForPublication ?? true,
-        createdById: userId
+        createdById: userId,
       })
     );
 
@@ -76,7 +77,7 @@ export class ApprovalsService {
             name: step.name,
             approverUserId: step.approverUserId,
             approverRoleId: step.approverRoleId,
-            required: step.required ?? true
+            required: step.required ?? true,
           })
         )
       );
@@ -97,7 +98,9 @@ export class ApprovalsService {
     const nextProjectId = flow.projectId;
     const nextScopeType = dto.scopeType ?? flow.scopeType;
     const nextTargetDocumentId =
-      dto.targetDocumentId !== undefined ? dto.targetDocumentId || undefined : flow.targetDocumentId;
+      dto.targetDocumentId !== undefined
+        ? dto.targetDocumentId || undefined
+        : flow.targetDocumentId;
 
     if (nextScopeType === 'document_specific' && nextTargetDocumentId) {
       const document = await this.documents.findOne({ where: { id: nextTargetDocumentId } });
@@ -111,7 +114,7 @@ export class ApprovalsService {
       entityType: dto.entityType ?? flow.entityType,
       scopeType: nextScopeType,
       targetDocumentId: nextScopeType === 'document_specific' ? nextTargetDocumentId : undefined,
-      requireForPublication: dto.requireForPublication ?? flow.requireForPublication
+      requireForPublication: dto.requireForPublication ?? flow.requireForPublication,
     });
 
     await this.flows.save(flow);
@@ -127,7 +130,7 @@ export class ApprovalsService {
               name: step.name,
               approverUserId: step.approverUserId,
               approverRoleId: step.approverRoleId,
-              required: step.required ?? true
+              required: step.required ?? true,
             })
           )
         );
@@ -177,11 +180,14 @@ export class ApprovalsService {
       where: {
         entityId: document.id,
         entityType: 'document',
-        status: In(['pending', 'in_process'])
-      }
+        status: In(['pending', 'in_process']),
+      },
     });
     if (openRequest) {
-      const existingWorkflow = await this.flows.findOne({ where: { id: openRequest.workflowId }, withDeleted: true });
+      const existingWorkflow = await this.flows.findOne({
+        where: { id: openRequest.workflowId },
+        withDeleted: true,
+      });
       if (existingWorkflow && existingWorkflow.active && !existingWorkflow.deletedAt) {
         return this.getRequestDetail(userId, openRequest.id);
       }
@@ -195,7 +201,8 @@ export class ApprovalsService {
           requestId: openRequest.id,
           actorId: userId,
           action: 'stopped',
-          comment: 'La solicitud anterior se cerró automáticamente porque su flujo ya no estaba disponible.'
+          comment:
+            'La solicitud anterior se cerró automáticamente porque su flujo ya no estaba disponible.',
         })
       );
     }
@@ -216,7 +223,7 @@ export class ApprovalsService {
         entityId: document.id,
         status: 'in_process',
         requestedAt: now,
-        lastActionAt: now
+        lastActionAt: now,
       })
     );
 
@@ -230,14 +237,14 @@ export class ApprovalsService {
         actorId: userId,
         action: 'submitted',
         comment: dto.comment,
-        stepOrder: orderedSteps[0].stepOrder
+        stepOrder: orderedSteps[0].stepOrder,
       })
     );
 
     await this.logDocumentAudit(document.id, userId, 'request_approval', undefined, {
       requestId: request.id,
       workflowId: workflow.id,
-      currentStepId: orderedSteps[0].id
+      currentStepId: orderedSteps[0].id,
     });
     await this.notifyApproverAssigned(request, orderedSteps[0], document);
 
@@ -254,20 +261,30 @@ export class ApprovalsService {
     const requests = await this.requests.find({
       where: {
         projectId: In(visibleProjectIds),
-        status: In(['pending', 'in_process', 'stopped'])
+        status: In(['pending', 'in_process', 'stopped']),
       },
-      order: { updatedAt: 'DESC' }
+      order: { updatedAt: 'DESC' },
     });
 
     const stepIds = requests.map((request) => request.currentStepId).filter(Boolean) as string[];
     const steps = stepIds.length ? await this.steps.find({ where: { id: In(stepIds) } }) : [];
     const stepsById = new Map(steps.map((step) => [step.id, step]));
-    const documents = await this.documents.find({ where: { id: In(requests.map((request) => request.entityId)) } });
+    const documents = await this.documents.find({
+      where: { id: In(requests.map((request) => request.entityId)) },
+    });
     const documentsById = new Map(documents.map((document) => [document.id, document]));
 
     return requests
-      .filter((request) => this.matchesCurrentApprover(stepsById.get(request.currentStepId ?? ''), userId, roles))
-      .map((request) => this.serializeRequest(request, stepsById.get(request.currentStepId ?? ''), documentsById.get(request.entityId)));
+      .filter((request) =>
+        this.matchesCurrentApprover(stepsById.get(request.currentStepId ?? ''), userId, roles)
+      )
+      .map((request) =>
+        this.serializeRequest(
+          request,
+          stepsById.get(request.currentStepId ?? ''),
+          documentsById.get(request.entityId)
+        )
+      );
   }
 
   async listHistory(userId: string, documentId?: string) {
@@ -276,7 +293,7 @@ export class ApprovalsService {
       await this.assertDocumentAccess(userId, documentId);
       const requests = await this.requests.find({
         where: { entityId: documentId, entityType: 'document' },
-        order: { createdAt: 'DESC' }
+        order: { createdAt: 'DESC' },
       });
       return Promise.all(requests.map((request) => this.getRequestDetail(userId, request.id)));
     }
@@ -284,7 +301,7 @@ export class ApprovalsService {
     const visibleProjectIds = await this.scope.visibleProjectIdsForUser(userId);
     const requests = await this.requests.find({
       where: { projectId: In(visibleProjectIds) },
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
 
     return Promise.all(requests.map((request) => this.getRequestDetail(userId, request.id)));
@@ -306,9 +323,9 @@ export class ApprovalsService {
       this.actions.find({
         where: { requestId },
         relations: ['actor', 'step'],
-        order: { createdAt: 'ASC' }
+        order: { createdAt: 'ASC' },
       }),
-      this.documents.findOne({ where: { id: request.entityId } })
+      this.documents.findOne({ where: { id: request.entityId } }),
     ]);
 
     if (!workflow) {
@@ -329,7 +346,7 @@ export class ApprovalsService {
             id: document.id,
             documentNumber: document.documentNumber,
             name: document.name,
-            status: document.status
+            status: document.status,
           }
         : null,
       actions: actions.map((action) => ({
@@ -338,15 +355,19 @@ export class ApprovalsService {
         comment: action.comment,
         stepOrder: action.stepOrder,
         createdAt: action.createdAt,
-        actor: action.actor ? { id: action.actor.id, name: action.actor.name, email: action.actor.email } : null,
-        step: action.step ? { id: action.step.id, name: action.step.name, stepOrder: action.step.stepOrder } : null
-      }))
+        actor: action.actor
+          ? { id: action.actor.id, name: action.actor.name, email: action.actor.email }
+          : null,
+        step: action.step
+          ? { id: action.step.id, name: action.step.name, stepOrder: action.step.stepOrder }
+          : null,
+      })),
     };
   }
 
   async approve(userId: string, roles: string[], requestId: string, dto: ApprovalActionDto) {
     const request = await this.loadActiveRequest(userId, requestId);
-    const { workflow, steps, document } = await this.loadRequestContext(request);
+    const { steps, document } = await this.loadRequestContext(request);
     const currentStep = steps.find((step) => step.id === request.currentStepId);
     if (!currentStep || !this.matchesCurrentApprover(currentStep, userId, roles)) {
       throw new ForbiddenException('No eres el aprobador actual de este paso');
@@ -369,7 +390,13 @@ export class ApprovalsService {
 
     await this.requests.save(request);
     await this.documents.save(document);
-    await this.logDocumentAudit(document.id, userId, 'approval', { requestStatus: 'in_process' }, { requestStatus: request.status });
+    await this.logDocumentAudit(
+      document.id,
+      userId,
+      'approval',
+      { requestStatus: 'in_process' },
+      { requestStatus: request.status }
+    );
     if (nextStep) {
       await this.notifyApproverAssigned(request, nextStep, document);
     } else {
@@ -395,7 +422,13 @@ export class ApprovalsService {
     await this.requests.save(request);
     await this.documents.save(document);
     await this.registerAction(request, currentStep, userId, 'rejected', dto.comment);
-    await this.logDocumentAudit(document.id, userId, 'rejection', { requestStatus: 'in_process' }, { requestStatus: request.status });
+    await this.logDocumentAudit(
+      document.id,
+      userId,
+      'rejection',
+      { requestStatus: 'in_process' },
+      { requestStatus: request.status }
+    );
     await this.notifyApprovalResult(request, document, 'rejected');
 
     return this.getRequestDetail(userId, request.id);
@@ -417,7 +450,13 @@ export class ApprovalsService {
     await this.requests.save(request);
     await this.documents.save(document);
     await this.registerAction(request, currentStep, userId, 'changes_requested', dto.comment);
-    await this.logDocumentAudit(document.id, userId, 'request_changes', { requestStatus: 'in_process' }, { requestStatus: request.status });
+    await this.logDocumentAudit(
+      document.id,
+      userId,
+      'request_changes',
+      { requestStatus: 'in_process' },
+      { requestStatus: request.status }
+    );
     await this.notifyStopped(request, document);
 
     return this.getRequestDetail(userId, request.id);
@@ -432,11 +471,15 @@ export class ApprovalsService {
       throw new ForbiddenException('No tienes acceso a esta solicitud');
     }
 
-    const step = request.currentStepId ? await this.steps.findOne({ where: { id: request.currentStepId } }) : null;
+    const step = request.currentStepId
+      ? await this.steps.findOne({ where: { id: request.currentStepId } })
+      : null;
     request.lastActionAt = new Date();
     await this.requests.save(request);
     await this.registerAction(request, step ?? undefined, userId, 'comment', dto.comment);
-    await this.logDocumentAudit(request.entityId, userId, 'approval_comment', undefined, { requestId: request.id });
+    await this.logDocumentAudit(request.entityId, userId, 'approval_comment', undefined, {
+      requestId: request.id,
+    });
 
     return this.getRequestDetail(userId, request.id);
   }
@@ -457,9 +500,9 @@ export class ApprovalsService {
         entityId: document.id,
         entityType: 'document',
         workflowId: applicableFlow.id,
-        status: 'approved'
+        status: 'approved',
       },
-      order: { completedAt: 'DESC' }
+      order: { completedAt: 'DESC' },
     });
 
     return Boolean(latestApproved);
@@ -469,7 +512,7 @@ export class ApprovalsService {
     const [workflow, steps, document] = await Promise.all([
       this.flows.findOne({ where: { id: request.workflowId } }),
       this.steps.find({ where: { workflowId: request.workflowId }, order: { stepOrder: 'ASC' } }),
-      this.documents.findOne({ where: { id: request.entityId } })
+      this.documents.findOne({ where: { id: request.entityId } }),
     ]);
 
     if (!workflow || !document) {
@@ -493,7 +536,7 @@ export class ApprovalsService {
         actorId,
         action,
         comment,
-        stepOrder: step?.stepOrder
+        stepOrder: step?.stepOrder,
       })
     );
   }
@@ -517,7 +560,11 @@ export class ApprovalsService {
     if (!(await this.scope.canAccessProject(userId, workflow.projectId))) {
       throw new ForbiddenException('No tienes acceso a este flujo');
     }
-    if (workflow.scopeType === 'document_specific' && workflow.targetDocumentId && workflow.targetDocumentId !== documentId) {
+    if (
+      workflow.scopeType === 'document_specific' &&
+      workflow.targetDocumentId &&
+      workflow.targetDocumentId !== documentId
+    ) {
       throw new ForbiddenException('El flujo no aplica a este documento');
     }
     return workflow;
@@ -526,11 +573,23 @@ export class ApprovalsService {
   private async findApplicableWorkflow(projectId: string, documentId: string) {
     const workflows = await this.flows.find({
       where: [
-        { projectId, entityType: 'document', scopeType: 'document_specific', targetDocumentId: documentId, active: true },
-        { projectId, entityType: 'document', scopeType: 'global', targetDocumentId: IsNull(), active: true }
+        {
+          projectId,
+          entityType: 'document',
+          scopeType: 'document_specific',
+          targetDocumentId: documentId,
+          active: true,
+        },
+        {
+          projectId,
+          entityType: 'document',
+          scopeType: 'global',
+          targetDocumentId: IsNull(),
+          active: true,
+        },
       ],
       relations: ['steps'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
 
     const specific = workflows.find((workflow) => workflow.scopeType === 'document_specific');
@@ -553,8 +612,8 @@ export class ApprovalsService {
     const stale = await this.requests.find({
       where: {
         status: In(['pending', 'in_process']),
-        lastActionAt: LessThan(threshold)
-      }
+        lastActionAt: LessThan(threshold),
+      },
     });
 
     for (const request of stale) {
@@ -566,20 +625,30 @@ export class ApprovalsService {
           requestId: request.id,
           actorId: request.requesterId,
           action: 'stopped',
-          comment: 'Flujo detenido automáticamente por inactividad mayor a 7 días.'
+          comment: 'Flujo detenido automáticamente por inactividad mayor a 7 días.',
         })
       );
       const document = await this.documents.findOne({ where: { id: request.entityId } });
       if (document && document.status === 'pending_approval') {
         document.status = 'in_review';
         await this.documents.save(document);
-        await this.logDocumentAudit(document.id, request.requesterId, 'approval_stopped', { requestStatus: 'in_process' }, { requestStatus: 'stopped' });
+        await this.logDocumentAudit(
+          document.id,
+          request.requesterId,
+          'approval_stopped',
+          { requestStatus: 'in_process' },
+          { requestStatus: 'stopped' }
+        );
         await this.notifyStopped(request, document);
       }
     }
   }
 
-  private async notifyApproverAssigned(request: ApprovalRequest, step: ApprovalStep, document: DocumentRecord) {
+  private async notifyApproverAssigned(
+    request: ApprovalRequest,
+    step: ApprovalStep,
+    document: DocumentRecord
+  ) {
     const recipients = await this.notifications.resolveApprovalRecipients(step);
     await this.notifications.notify({
       recipients,
@@ -590,7 +659,7 @@ export class ApprovalsService {
       entityId: document.id,
       category: 'approval',
       meta: { route: '/approvals', requestId: request.id, stepId: step.id },
-      dedupeKey: `approval-assigned:${request.id}:${step.id}`
+      dedupeKey: `approval-assigned:${request.id}:${step.id}`,
     });
   }
 
@@ -604,23 +673,28 @@ export class ApprovalsService {
       entityId: document.id,
       category: 'approval',
       meta: { route: '/approvals', requestId: request.id },
-      dedupeKey: `approval-stopped:${request.id}`
+      dedupeKey: `approval-stopped:${request.id}`,
     });
   }
 
-  private async notifyApprovalResult(request: ApprovalRequest, document: DocumentRecord, result: 'approved' | 'rejected') {
+  private async notifyApprovalResult(
+    request: ApprovalRequest,
+    document: DocumentRecord,
+    result: 'approved' | 'rejected'
+  ) {
     const label = result === 'approved' ? 'aprobado' : 'rechazado';
     await this.notifications.notify({
-      recipients: [{ userId: request.requesterId }, document.responsibleUserId ? { userId: document.responsibleUserId } : null].filter(
-        (item): item is { userId: string } => Boolean(item?.userId)
-      ),
+      recipients: [
+        { userId: request.requesterId },
+        document.responsibleUserId ? { userId: document.responsibleUserId } : null,
+      ].filter((item): item is { userId: string } => Boolean(item?.userId)),
       notificationType: 'document_approval_result',
       title: `Documento ${label}: ${document.name}`,
       body: `El documento ${document.documentNumber} fue ${label} en el flujo de aprobación.`,
       entityType: 'document',
       entityId: document.id,
       category: 'approval',
-      meta: { route: '/approvals', requestId: request.id }
+      meta: { route: '/approvals', requestId: request.id },
     });
   }
 
@@ -640,14 +714,18 @@ export class ApprovalsService {
         name: step.name,
         approverUserId: step.approverUserId,
         approverRoleId: step.approverRoleId,
-        required: step.required
+        required: step.required,
       })),
       createdAt: flow.createdAt,
-      updatedAt: flow.updatedAt
+      updatedAt: flow.updatedAt,
     };
   }
 
-  private serializeRequest(request: ApprovalRequest, currentStep?: ApprovalStep, document?: DocumentRecord) {
+  private serializeRequest(
+    request: ApprovalRequest,
+    currentStep?: ApprovalStep,
+    document?: DocumentRecord
+  ) {
     return {
       id: request.id,
       projectId: request.projectId,
@@ -658,7 +736,7 @@ export class ApprovalsService {
         ? {
             id: currentStep.id,
             name: currentStep.name,
-            stepOrder: currentStep.stepOrder
+            stepOrder: currentStep.stepOrder,
           }
         : null,
       document: document
@@ -666,9 +744,9 @@ export class ApprovalsService {
             id: document.id,
             documentNumber: document.documentNumber,
             name: document.name,
-            status: document.status
+            status: document.status,
           }
-        : null
+        : null,
     };
   }
 
@@ -696,7 +774,7 @@ export class ApprovalsService {
         actorId,
         action,
         beforeState,
-        afterState
+        afterState,
       })
     );
   }

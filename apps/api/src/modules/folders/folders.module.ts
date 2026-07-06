@@ -10,6 +10,6 @@ import { FoldersService } from './folders.service';
 @Module({
   imports: [AuditModule, ProjectsModule, TypeOrmModule.forFeature([Folder, Discipline])],
   controllers: [FoldersController],
-  providers: [FoldersService]
+  providers: [FoldersService],
 })
 export class FoldersModule {}

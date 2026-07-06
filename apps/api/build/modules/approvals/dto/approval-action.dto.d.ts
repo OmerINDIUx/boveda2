@@ -1,3 +1,3 @@
 export declare class ApprovalActionDto {
-    comment?: string;
+  comment?: string;
 }

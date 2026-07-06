@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+const DEFAULT_TIMEOUT = 30_000;
 
 function handleUnauthorized(response: Response) {
   if (response.status !== 401 || typeof window === 'undefined') {
@@ -34,70 +35,72 @@ async function readApiError(response: Response, method: string, path: string) {
   return `[${method} ${path}] API error ${response.status}`;
 }
 
-export async function apiGet<T>(path: string, token?: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    cache: 'no-store'
-  });
+async function request<T>(
+  method: string,
+  path: string,
+  options?: { body?: unknown; token?: string; signal?: AbortSignal; timeout?: number }
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options?.timeout ?? DEFAULT_TIMEOUT);
 
-  if (!response.ok) {
-    handleUnauthorized(response);
-    throw new Error(await readApiError(response, 'GET', path));
+  const externalSignal = options?.signal;
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timer);
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
   }
 
-  return response.json() as Promise<T>;
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options?.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+      ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      handleUnauthorized(response);
+      throw new Error(await readApiError(response, method, path));
+    }
+
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-export async function apiPost<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    handleUnauthorized(response);
-    throw new Error(await readApiError(response, 'POST', path));
-  }
-
-  return response.json() as Promise<T>;
+export async function apiGet<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
+  return request<T>('GET', path, { token, signal });
 }
 
-export async function apiPatch<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    handleUnauthorized(response);
-    throw new Error(await readApiError(response, 'PATCH', path));
-  }
-
-  return response.json() as Promise<T>;
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal
+): Promise<T> {
+  return request<T>('POST', path, { body, token, signal });
 }
 
-export async function apiPut<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify(body)
-  });
+export async function apiPatch<T>(
+  path: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal
+): Promise<T> {
+  return request<T>('PATCH', path, { body, token, signal });
+}
 
-  if (!response.ok) {
-    handleUnauthorized(response);
-    throw new Error(await readApiError(response, 'PUT', path));
-  }
-
-  return response.json() as Promise<T>;
+export async function apiPut<T>(
+  path: string,
+  body: unknown,
+  token?: string,
+  signal?: AbortSignal
+): Promise<T> {
+  return request<T>('PUT', path, { body, token, signal });
 }

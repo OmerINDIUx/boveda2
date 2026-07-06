@@ -44,7 +44,10 @@ export class NotificationsController {
   }
 
   @Post('preferences')
-  updatePreferences(@CurrentUser() user: RequestUser, @Body() dto: UpdateNotificationPreferencesDto) {
+  updatePreferences(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: UpdateNotificationPreferencesDto
+  ) {
     return this.notifications.updatePreferences(user.id, dto.items);
   }
 

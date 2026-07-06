@@ -25,7 +25,9 @@ export function NotificationsBell() {
       <Link className="nav-button notifications-trigger" href="/notifications">
         <Bell size={18} />
         <span>Notificaciones</span>
-        {count ? <strong className="notifications-count">{count > 99 ? '99+' : count}</strong> : null}
+        {count ? (
+          <strong className="notifications-count">{count > 99 ? '99+' : count}</strong>
+        ) : null}
       </Link>
     </div>
   );

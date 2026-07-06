@@ -64,7 +64,7 @@ export class DocumentIndexingService {
       const rawChunks = this.buildChunks(document, version, extracted);
       const existingChunks = await this.chunks.find({
         where: { documentId: document.id, versionId: version.id },
-        select: { id: true }
+        select: { id: true },
       });
       const existingChunkIds = existingChunks.map((chunk) => chunk.id);
 
@@ -89,7 +89,7 @@ export class DocumentIndexingService {
               content: item.content,
               tokenCount: item.tokenCount,
               pageNumber: item.pageNumber,
-              sectionLabel: item.sectionLabel
+              sectionLabel: item.sectionLabel,
             })
           )
         );
@@ -102,7 +102,7 @@ export class DocumentIndexingService {
               model: EMBEDDING_MODEL,
               dimensions: EMBEDDING_DIMENSIONS,
               embedding: this.createEmbedding(chunk.content),
-              contentHash: createHash('sha256').update(chunk.content).digest('hex')
+              contentHash: createHash('sha256').update(chunk.content).digest('hex'),
             })
           )
         );
@@ -115,13 +115,18 @@ export class DocumentIndexingService {
       await this.versions.save(version);
     } catch (error) {
       version.contentExtractionStatus = 'failed';
-      version.contentExtractionError = error instanceof Error ? error.message : 'No fue posible extraer el contenido';
+      version.contentExtractionError =
+        error instanceof Error ? error.message : 'No fue posible extraer el contenido';
       await this.versions.save(version);
       throw error;
     }
   }
 
-  async searchVisibleChunks(documentIds: string[], question: string, limit = 8): Promise<IndexedChunk[]> {
+  async searchVisibleChunks(
+    documentIds: string[],
+    question: string,
+    limit = 8
+  ): Promise<IndexedChunk[]> {
     if (!documentIds.length) {
       return [];
     }
@@ -136,7 +141,10 @@ export class DocumentIndexingService {
 
     const expandedQuestion = this.expandQuestion(question);
     const queryEmbedding = this.createEmbedding(expandedQuestion);
-    const allowSemanticOnly = this.isBroadDocumentQuestion(question) || this.isInvoiceQuestion(question) || this.isAmountQuestion(question);
+    const allowSemanticOnly =
+      this.isBroadDocumentQuestion(question) ||
+      this.isInvoiceQuestion(question) ||
+      this.isAmountQuestion(question);
     return rows
       .map((embedding) => {
         const semanticScore = this.cosineSimilarity(queryEmbedding, embedding.embedding);
@@ -146,7 +154,7 @@ export class DocumentIndexingService {
           embedding: embedding.embedding,
           score: semanticScore + this.keywordBoost(expandedQuestion, embedding.chunk.content),
           semanticScore,
-          keywordMatches
+          keywordMatches,
         };
       })
       .filter((item) => item.score > 0.02 || item.keywordMatches > 0)
@@ -155,11 +163,15 @@ export class DocumentIndexingService {
       .slice(0, limit);
   }
 
-  private async extractText(fileName: string, mimeType: string, buffer: Buffer): Promise<ExtractedDocument> {
+  private async extractText(
+    fileName: string,
+    mimeType: string,
+    buffer: Buffer
+  ): Promise<ExtractedDocument> {
     if (mimeType === 'text/plain') {
       return {
         contentType: 'text',
-        segments: [{ text: buffer.toString('utf8') }]
+        segments: [{ text: buffer.toString('utf8') }],
       };
     }
 
@@ -232,13 +244,14 @@ else:
 sys.stdout.write(json.dumps(output, ensure_ascii=True))
 `;
 
-    const pythonExecutable = process.env.HOLOCRON_PYTHON_PATH ?? process.env.PYTHON_PATH ?? 'python';
+    const pythonExecutable =
+      process.env.HOLOCRON_PYTHON_PATH ?? process.env.PYTHON_PATH ?? 'python';
     const result = await this.runPython(pythonExecutable, pythonCode, [fileName, mimeType], buffer);
     try {
       const parsed = JSON.parse(result) as ExtractedDocument;
       return {
         contentType: parsed.contentType,
-        segments: (parsed.segments ?? []).filter((segment) => segment.text?.trim().length)
+        segments: (parsed.segments ?? []).filter((segment) => segment.text?.trim().length),
       };
     } catch (error) {
       throw new InternalServerErrorException(
@@ -247,7 +260,12 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
     }
   }
 
-  private async runPython(executable: string, code: string, args: string[], stdin: Buffer): Promise<string> {
+  private async runPython(
+    executable: string,
+    code: string,
+    args: string[],
+    stdin: Buffer
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(executable, ['-c', code, ...args], { stdio: ['pipe', 'pipe', 'pipe'] });
       const stdout: Buffer[] = [];
@@ -255,7 +273,9 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
 
       child.stdout.on('data', (chunk) => stdout.push(Buffer.from(chunk)));
       child.stderr.on('data', (chunk) => stderr.push(Buffer.from(chunk)));
-      child.on('error', (error) => reject(new InternalServerErrorException(`No fue posible iniciar Python: ${error.message}`)));
+      child.on('error', (error) =>
+        reject(new InternalServerErrorException(`No fue posible iniciar Python: ${error.message}`))
+      );
       child.on('close', (codeValue) => {
         if (codeValue !== 0) {
           reject(
@@ -300,7 +320,7 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
 
     return {
       contentType: 'pdf',
-      segments
+      segments,
     };
   }
 
@@ -333,7 +353,8 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
 
       const bfrangeSections = decoded.match(/beginbfrange[\s\S]*?endbfrange/g) ?? [];
       for (const section of bfrangeSections) {
-        const entries = section.match(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g) ?? [];
+        const entries =
+          section.match(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g) ?? [];
         for (const entry of entries) {
           const parts = entry.match(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/);
           if (!parts) {
@@ -344,7 +365,10 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
           const end = Number.parseInt(parts[2], 16);
           let target = Number.parseInt(parts[3], 16);
           for (let code = start; code <= end; code += 1) {
-            unicodeMap.set(code, this.decodePdfUnicodeHex(target.toString(16).padStart(parts[3].length, '0')));
+            unicodeMap.set(
+              code,
+              this.decodePdfUnicodeHex(target.toString(16).padStart(parts[3].length, '0'))
+            );
             target += 1;
           }
         }
@@ -428,7 +452,9 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
     }
 
     const bytes = Buffer.from(normalized, 'hex');
-    const looksLikeWordCodes = normalized.length % 4 === 0 && bytes.every((_, index) => index % 2 === 0 ? bytes[index] === 0 : true);
+    const looksLikeWordCodes =
+      normalized.length % 4 === 0 &&
+      bytes.every((_, index) => (index % 2 === 0 ? bytes[index] === 0 : true));
 
     if (looksLikeWordCodes) {
       const codes: number[] = [];
@@ -474,7 +500,7 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
         f: 12,
         '(': 40,
         ')': 41,
-        '\\': 92
+        '\\': 92,
       };
       bytes.push(escaped[next] ?? next.charCodeAt(0));
     }
@@ -484,17 +510,18 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
 
   private decodePdfCharCodes(codes: number[], unicodeMaps: Array<Map<number, string>>) {
     const candidates = unicodeMaps
-      .map((unicodeMap) => this.normalizeWhitespace(codes.map((code) => unicodeMap.get(code) ?? '').join('')))
+      .map((unicodeMap) =>
+        this.normalizeWhitespace(codes.map((code) => unicodeMap.get(code) ?? '').join(''))
+      )
       .filter(Boolean);
 
     if (candidates.length) {
-      return candidates.sort((left, right) => this.scoreDecodedPdfText(right) - this.scoreDecodedPdfText(left))[0];
+      return candidates.sort(
+        (left, right) => this.scoreDecodedPdfText(right) - this.scoreDecodedPdfText(left)
+      )[0];
     }
 
-    const fallbackCandidates = [
-      this.codesToText(codes, 0),
-      this.codesToText(codes, -3)
-    ]
+    const fallbackCandidates = [this.codesToText(codes, 0), this.codesToText(codes, -3)]
       .map((candidate) => this.normalizeWhitespace(candidate))
       .filter(Boolean);
 
@@ -502,7 +529,9 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
       return '';
     }
 
-    return fallbackCandidates.sort((left, right) => this.scoreDecodedPdfText(right) - this.scoreDecodedPdfText(left))[0];
+    return fallbackCandidates.sort(
+      (left, right) => this.scoreDecodedPdfText(right) - this.scoreDecodedPdfText(left)
+    )[0];
   }
 
   private decodePdfUnicodeHex(hex: string) {
@@ -542,8 +571,17 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
     return visibleMatches.length + vowels.length * 2 + longWordBonus - weirdSymbols.length * 4;
   }
 
-  private buildChunks(document: DocumentRecord, version: DocumentVersion, extracted: ExtractedDocument) {
-    const segments: Array<{ content: string; tokenCount: number; pageNumber?: number; sectionLabel?: string }> = [];
+  private buildChunks(
+    document: DocumentRecord,
+    version: DocumentVersion,
+    extracted: ExtractedDocument
+  ) {
+    const segments: Array<{
+      content: string;
+      tokenCount: number;
+      pageNumber?: number;
+      sectionLabel?: string;
+    }> = [];
 
     for (const segment of extracted.segments) {
       const normalized = this.normalizeWhitespace(segment.text);
@@ -556,7 +594,7 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
           content: piece,
           tokenCount: this.estimateTokenCount(piece),
           pageNumber: segment.pageNumber,
-          sectionLabel: segment.sectionLabel
+          sectionLabel: segment.sectionLabel,
         });
       }
     }
@@ -571,8 +609,10 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
       `Version: ${version.revision}`,
       `Estado: ${document.status}`,
       document.dueDate ? `Vence: ${document.dueDate}` : undefined,
-      document.confidentialityLevel ? `Confidencialidad: ${document.confidentialityLevel}` : undefined,
-      version.notes ? `Notas de version: ${version.notes}` : undefined
+      document.confidentialityLevel
+        ? `Confidencialidad: ${document.confidentialityLevel}`
+        : undefined,
+      version.notes ? `Notas de version: ${version.notes}` : undefined,
     ]
       .filter(Boolean)
       .join('. ');
@@ -581,7 +621,7 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
       segments.push({
         content: header,
         tokenCount: this.estimateTokenCount(header),
-        sectionLabel: 'Resumen documental'
+        sectionLabel: 'Resumen documental',
       });
     }
 
@@ -664,7 +704,9 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
   }
 
   private isBroadDocumentQuestion(question: string) {
-    return /(resume|resumen|sintetiza|de que trata|que contiene|que hay dentro|que informacion tiene|que es este documento|que muestra|muestra este pdf|informacion general|descripcion general)/i.test(question);
+    return /(resume|resumen|sintetiza|de que trata|que contiene|que hay dentro|que informacion tiene|que es este documento|que muestra|muestra este pdf|informacion general|descripcion general)/i.test(
+      question
+    );
   }
 
   private isInvoiceQuestion(question: string) {
@@ -672,7 +714,9 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
   }
 
   private isAmountQuestion(question: string) {
-    return /(monto|montos|importe|total|cuanto|cuesta|costo|precio|valor|pagar|pago)/i.test(question);
+    return /(monto|montos|importe|total|cuanto|cuesta|costo|precio|valor|pagar|pago)/i.test(
+      question
+    );
   }
 
   private expandQuestion(question: string) {
@@ -680,19 +724,28 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
     const expansions: string[] = [normalized];
 
     if (this.isInvoiceQuestion(normalized)) {
-      expansions.push('invoice billed bill billing bill to due on due date vat tax subtotal total amount receipt payment paid supplier customer');
+      expansions.push(
+        'invoice billed bill billing bill to due on due date vat tax subtotal total amount receipt payment paid supplier customer'
+      );
     }
 
     if (this.isAmountQuestion(normalized)) {
-      expansions.push('amount total subtotal due paid payment price cost charge invoice usd mxn eur aud $');
+      expansions.push(
+        'amount total subtotal due paid payment price cost charge invoice usd mxn eur aud $'
+      );
     }
 
     if (/envato/i.test(normalized)) {
       expansions.push('envato elements elements.envato.com notices@elements.envato.com');
     }
 
-    if (this.isBroadDocumentQuestion(normalized) || /(documento|pdf|archivo|contenido)/i.test(normalized)) {
-      expansions.push('invoice billed bill to due on total amount vat email address customer supplier description details');
+    if (
+      this.isBroadDocumentQuestion(normalized) ||
+      /(documento|pdf|archivo|contenido)/i.test(normalized)
+    ) {
+      expansions.push(
+        'invoice billed bill to due on total amount vat email address customer supplier description details'
+      );
     }
 
     return expansions.join(' ');

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -28,8 +30,15 @@ import { StorageModule } from './storage/storage.module';
       username: process.env.MYSQL_USER ?? 'root',
       password: process.env.MYSQL_PASSWORD ?? '',
       autoLoadEntities: true,
-      synchronize: false
+      synchronize: false,
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: Number(process.env.THROTTLE_TTL ?? 60000),
+        limit: Number(process.env.THROTTLE_LIMIT ?? 60),
+      },
+    ]),
     AuthModule,
     UsersModule,
     RolesModule,
@@ -44,7 +53,13 @@ import { StorageModule } from './storage/storage.module';
     NotificationsModule,
     AiQueryModule,
     ClmModule,
-    StorageModule
-  ]
+    StorageModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

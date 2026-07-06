@@ -15,10 +15,17 @@ import { ApprovalsService } from './approvals.service';
   imports: [
     ProjectsModule,
     NotificationsModule,
-    TypeOrmModule.forFeature([ApprovalFlow, ApprovalStep, ApprovalRequest, ApprovalRequestAction, DocumentRecord, DocumentAuditLog])
+    TypeOrmModule.forFeature([
+      ApprovalFlow,
+      ApprovalStep,
+      ApprovalRequest,
+      ApprovalRequestAction,
+      DocumentRecord,
+      DocumentAuditLog,
+    ]),
   ],
   controllers: [ApprovalsController],
   providers: [ApprovalsService],
-  exports: [ApprovalsService]
+  exports: [ApprovalsService],
 })
 export class ApprovalsModule {}

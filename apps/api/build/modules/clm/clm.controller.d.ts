@@ -13,628 +13,688 @@ import { UpdateContractObligationDto } from './dto/update-contract-obligation.dt
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { ClmService } from './clm.service';
 export declare class ClmController {
-    private readonly clm;
-    constructor(clm: ClmService);
-    list(user: RequestUser, projectId?: string): Promise<{
+  private readonly clm;
+  constructor(clm: ClmService);
+  list(
+    user: RequestUser,
+    projectId?: string
+  ): Promise<
+    {
+      id: string;
+      name: string;
+      projectId: string;
+      supplierName: string | undefined;
+      clientName: string | undefined;
+      responsibleArea: string | undefined;
+      contractType: string | undefined;
+      status: string;
+      startDate: string | undefined;
+      endDate: string | undefined;
+      renewalDate: string | undefined;
+      amount: string | undefined;
+      currency: string;
+      responsibleUserId: string | undefined;
+      mainDocumentId: string | undefined;
+      currentVersionId: string | undefined;
+      renewable: boolean;
+      renewalNoticeDays: number | undefined;
+      closeReason: string | undefined;
+      closedAt: Date | undefined;
+      updatedAt: Date;
+      createdAt: Date;
+      project: import('../projects/project.entity').Project;
+      responsibleUser: import('../users/user.entity').User | undefined;
+      mainDocument: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }[]>;
-    create(user: RequestUser, dto: CreateContractDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        documentNumber: string;
+      } | null;
+      pendingObligations: number;
+    }[]
+  >;
+  create(
+    user: RequestUser,
+    dto: CreateContractDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    detail(user: RequestUser, id: string): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  detail(
+    user: RequestUser,
+    id: string
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    update(user: RequestUser, id: string, dto: UpdateContractDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  update(
+    user: RequestUser,
+    id: string,
+    dto: UpdateContractDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    createVersion(user: RequestUser, id: string, dto: CreateContractVersionDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  createVersion(
+    user: RequestUser,
+    id: string,
+    dto: CreateContractVersionDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    addAttachment(user: RequestUser, id: string, dto: CreateContractAttachmentDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  addAttachment(
+    user: RequestUser,
+    id: string,
+    dto: CreateContractAttachmentDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    addObligation(user: RequestUser, id: string, dto: CreateContractObligationDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  addObligation(
+    user: RequestUser,
+    id: string,
+    dto: CreateContractObligationDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    updateObligation(user: RequestUser, id: string, obligationId: string, dto: UpdateContractObligationDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  updateObligation(
+    user: RequestUser,
+    id: string,
+    obligationId: string,
+    dto: UpdateContractObligationDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    addMilestone(user: RequestUser, id: string, dto: CreateContractMilestoneDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  addMilestone(
+    user: RequestUser,
+    id: string,
+    dto: CreateContractMilestoneDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    updateMilestone(user: RequestUser, id: string, milestoneId: string, dto: UpdateContractMilestoneDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  updateMilestone(
+    user: RequestUser,
+    id: string,
+    milestoneId: string,
+    dto: UpdateContractMilestoneDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    addComment(user: RequestUser, id: string, dto: CreateContractCommentDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  addComment(
+    user: RequestUser,
+    id: string,
+    dto: CreateContractCommentDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    close(user: RequestUser, id: string, dto: CloseContractDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  close(
+    user: RequestUser,
+    id: string,
+    dto: CloseContractDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    renew(user: RequestUser, id: string, dto: RenewContractDto): Promise<{
-        currentVersion: import("./contract-version.entity").ContractVersion;
-        versions: import("./contract-version.entity").ContractVersion[];
-        attachments: import("./contract-attachment.entity").ContractAttachment[];
-        obligations: import("./contract-obligation.entity").ContractObligation[];
-        milestones: import("./contract-milestone.entity").ContractMilestone[];
-        comments: {
-            id: string;
-            body: string;
-            createdAt: Date;
-            author: {
-                id: string;
-                name: string;
-                email: string;
-            } | null;
-        }[];
-        audit: import("./contract-audit-log.entity").ContractAuditLog[];
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  renew(
+    user: RequestUser,
+    id: string,
+    dto: RenewContractDto
+  ): Promise<{
+    currentVersion: import('./contract-version.entity').ContractVersion;
+    versions: import('./contract-version.entity').ContractVersion[];
+    attachments: import('./contract-attachment.entity').ContractAttachment[];
+    obligations: import('./contract-obligation.entity').ContractObligation[];
+    milestones: import('./contract-milestone.entity').ContractMilestone[];
+    comments: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      author: {
         id: string;
         name: string;
-        projectId: string;
-        supplierName: string | undefined;
-        clientName: string | undefined;
-        responsibleArea: string | undefined;
-        contractType: string | undefined;
-        status: string;
-        startDate: string | undefined;
-        endDate: string | undefined;
-        renewalDate: string | undefined;
-        amount: string | undefined;
-        currency: string;
-        responsibleUserId: string | undefined;
-        mainDocumentId: string | undefined;
-        currentVersionId: string | undefined;
-        renewable: boolean;
-        renewalNoticeDays: number | undefined;
-        closeReason: string | undefined;
-        closedAt: Date | undefined;
-        updatedAt: Date;
-        createdAt: Date;
-        project: import("../projects/project.entity").Project;
-        responsibleUser: import("../users/user.entity").User | undefined;
-        mainDocument: {
-            id: string;
-            name: string;
-            documentNumber: string;
-        } | null;
-        pendingObligations: number;
-    }>;
-    ask(user: RequestUser, id: string, dto: AskContractQueryDto): Promise<{
-        answer: string;
-        status: string;
-        citations: {
-            sourceType: string;
-            label: string;
-            fragment: string;
-        }[];
-    }>;
-    syncAlerts(user: RequestUser, projectId?: string): Promise<{
-        ok: boolean;
-        alertsCreated: number;
-        contractsProcessed: number;
-    }>;
+        email: string;
+      } | null;
+    }[];
+    audit: import('./contract-audit-log.entity').ContractAuditLog[];
+    id: string;
+    name: string;
+    projectId: string;
+    supplierName: string | undefined;
+    clientName: string | undefined;
+    responsibleArea: string | undefined;
+    contractType: string | undefined;
+    status: string;
+    startDate: string | undefined;
+    endDate: string | undefined;
+    renewalDate: string | undefined;
+    amount: string | undefined;
+    currency: string;
+    responsibleUserId: string | undefined;
+    mainDocumentId: string | undefined;
+    currentVersionId: string | undefined;
+    renewable: boolean;
+    renewalNoticeDays: number | undefined;
+    closeReason: string | undefined;
+    closedAt: Date | undefined;
+    updatedAt: Date;
+    createdAt: Date;
+    project: import('../projects/project.entity').Project;
+    responsibleUser: import('../users/user.entity').User | undefined;
+    mainDocument: {
+      id: string;
+      name: string;
+      documentNumber: string;
+    } | null;
+    pendingObligations: number;
+  }>;
+  ask(
+    user: RequestUser,
+    id: string,
+    dto: AskContractQueryDto
+  ): Promise<{
+    answer: string;
+    status: string;
+    citations: {
+      sourceType: string;
+      label: string;
+      fragment: string;
+    }[];
+  }>;
+  syncAlerts(
+    user: RequestUser,
+    projectId?: string
+  ): Promise<{
+    ok: boolean;
+    alertsCreated: number;
+    contractsProcessed: number;
+  }>;
 }

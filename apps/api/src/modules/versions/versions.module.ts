@@ -6,6 +6,6 @@ import { VersionsService } from './versions.service';
 @Module({
   imports: [DocumentsModule],
   controllers: [VersionsController],
-  providers: [VersionsService]
+  providers: [VersionsService],
 })
 export class VersionsModule {}

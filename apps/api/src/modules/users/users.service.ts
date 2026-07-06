@@ -22,7 +22,10 @@ export class UsersService {
   }
 
   async findProfile(userId: string) {
-    const user = await this.users.findOne({ where: { id: userId }, relations: ['roles', 'roles.permissions'] });
+    const user = await this.users.findOne({
+      where: { id: userId },
+      relations: ['roles', 'roles.permissions'],
+    });
     if (!user) {
       throw new NotFoundException('Usuario no encontrado');
     }
@@ -43,7 +46,7 @@ export class UsersService {
       name: dto.name,
       email: dto.email,
       passwordHash: await bcrypt.hash(dto.password, 12),
-      roles: dto.roleIds?.length ? await this.roles.findBy({ id: In(dto.roleIds) }) : []
+      roles: dto.roleIds?.length ? await this.roles.findBy({ id: In(dto.roleIds) }) : [],
     });
     const saved = await this.users.save(user);
     await this.audit.record({
@@ -51,7 +54,7 @@ export class UsersService {
       action: 'user.create',
       entityType: 'user',
       entityId: saved.id,
-      metadata: { email: saved.email, roleIds: dto.roleIds ?? [] }
+      metadata: { email: saved.email, roleIds: dto.roleIds ?? [] },
     });
     return this.serializeUser(saved);
   }
@@ -75,7 +78,7 @@ export class UsersService {
       action: 'user.update',
       entityType: 'user',
       entityId: id,
-      metadata: { before, after: this.serializeUser(saved) }
+      metadata: { before, after: this.serializeUser(saved) },
     });
     return this.serializeUser(saved);
   }
@@ -94,7 +97,7 @@ export class UsersService {
       name: user.name,
       email: user.email,
       active: user.active,
-      roles: user.roles?.map((role) => ({ id: role.id, key: role.key, name: role.name })) ?? []
+      roles: user.roles?.map((role) => ({ id: role.id, key: role.key, name: role.name })) ?? [],
     };
   }
 }

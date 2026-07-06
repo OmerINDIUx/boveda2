@@ -1,0 +1,8 @@
+node_modules/
+.next/
+dist/
+build/
+.npm-cache/
+*.log
+package-lock.json
+next-env.d.ts

@@ -1,4 +1,14 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { DocumentRecord } from '../documents/document.entity';
 import { Project } from '../projects/project.entity';
 import { User } from '../users/user.entity';
@@ -52,7 +62,15 @@ export class Contract {
   currency!: string;
 
   @Column({ default: 'draft' })
-  status!: 'draft' | 'in_review' | 'approved' | 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'closed';
+  status!:
+    | 'draft'
+    | 'in_review'
+    | 'approved'
+    | 'active'
+    | 'expiring_soon'
+    | 'expired'
+    | 'renewed'
+    | 'closed';
 
   @Column({ name: 'responsible_user_id', nullable: true })
   responsibleUserId?: string;

@@ -1,7 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, CircleAlert, FileClock, FileText, FolderKanban, GitBranch, Landmark, MessageSquareQuote } from 'lucide-react';
+import {
+  AlertTriangle,
+  CircleAlert,
+  FileClock,
+  FileText,
+  FolderKanban,
+  GitBranch,
+  Landmark,
+  MessageSquareQuote,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet } from '../../lib/api';
 import { getSessionUser } from '../../lib/auth';
@@ -81,7 +90,7 @@ const metricCards = [
   { key: 'activeContracts', label: 'Contratos vigentes', icon: Landmark },
   { key: 'contractsExpiringSoon', label: 'Contratos proximos a vencer', icon: Landmark },
   { key: 'expiredContracts', label: 'Contratos vencidos', icon: Landmark },
-  { key: 'earlyAlerts', label: 'Alertas tempranas', icon: AlertTriangle }
+  { key: 'earlyAlerts', label: 'Alertas tempranas', icon: AlertTriangle },
 ] as const;
 
 function buildQueryString(params: Record<string, string | undefined>) {
@@ -184,8 +193,10 @@ function signalHref(signalKey: string) {
 function chartPointHref(chartKey: keyof ExecutiveDashboardResponse['charts'], point: ChartPoint) {
   switch (chartKey) {
     case 'documentStatusDistribution':
-      if (point.key === 'approved' || point.key === 'published') return documentHref({ preset: 'approved' });
-      if (point.key === 'pending_approval' || point.key === 'in_review') return documentHref({ preset: 'inReview' });
+      if (point.key === 'approved' || point.key === 'published')
+        return documentHref({ preset: 'approved' });
+      if (point.key === 'pending_approval' || point.key === 'in_review')
+        return documentHref({ preset: 'inReview' });
       if (point.key === 'draft') return documentHref({ preset: 'draft' });
       if (point.key === 'expired') return documentHref({ preset: 'expired' });
       return documentHref();
@@ -215,7 +226,7 @@ function formatMetric(value: MetricValue) {
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('es-MX', {
     dateStyle: 'medium',
-    timeStyle: 'short'
+    timeStyle: 'short',
   }).format(new Date(value));
 }
 
@@ -262,7 +273,10 @@ export function ExecutiveDashboard() {
       setError('');
 
       try {
-        const response = await apiGet<ExecutiveDashboardResponse>('/dashboard/executive', getToken());
+        const response = await apiGet<ExecutiveDashboardResponse>(
+          '/dashboard/executive',
+          getToken()
+        );
         if (!active) return;
         setData(response);
       } catch (nextError) {
@@ -279,7 +293,10 @@ export function ExecutiveDashboard() {
     };
   }, []);
 
-  const visibleSignals = useMemo(() => (data?.signals ?? []).filter((signal) => signal.count > 0), [data]);
+  const visibleSignals = useMemo(
+    () => (data?.signals ?? []).filter((signal) => signal.count > 0),
+    [data]
+  );
 
   return (
     <section className="executive-dashboard" id="dashboard-signals">
@@ -303,7 +320,11 @@ export function ExecutiveDashboard() {
           const value = data?.global[metric.key];
           const href = metricHref(metric.key);
           return (
-            <Link className={`card span-3 executive-metric executive-link-card ${metricTone(metric.key, value ?? null)}`} href={href} key={metric.key}>
+            <Link
+              className={`card span-3 executive-metric executive-link-card ${metricTone(metric.key, value ?? null)}`}
+              href={href}
+              key={metric.key}
+            >
               <div className="executive-metric-head">
                 <Icon size={20} />
                 <span>{metric.label}</span>
@@ -323,7 +344,11 @@ export function ExecutiveDashboard() {
           {visibleSignals.length ? (
             <div className="signal-list">
               {visibleSignals.map((signal) => (
-                <Link className={`signal-card executive-link-card ${signal.priority}`} href={signalHref(signal.key)} key={signal.key}>
+                <Link
+                  className={`signal-card executive-link-card ${signal.priority}`}
+                  href={signalHref(signal.key)}
+                  key={signal.key}
+                >
                   <div>
                     <strong>{signal.label}</strong>
                     <p>{signal.description}</p>
@@ -367,15 +392,78 @@ export function ExecutiveDashboard() {
                       </Link>
                       <div className="muted">{project.code}</div>
                     </td>
-                    <td><Link className="table-link" href={metricHrefByProject('activeProjects', project.id)}>{formatMetric(project.metrics.activeProjects)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('controlledDocuments', project.id)}>{formatMetric(project.metrics.controlledDocuments)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('approvedDocuments', project.id)}>{formatMetric(project.metrics.approvedDocuments)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('documentsInReview', project.id)}>{formatMetric(project.metrics.documentsInReview)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('expiredDocuments', project.id)}>{formatMetric(project.metrics.expiredDocuments)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('stoppedFlows', project.id)}>{formatMetric(project.metrics.stoppedFlows)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('openRfis', project.id)}>{formatMetric(project.metrics.openRfis)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('activeContracts', project.id)}>{formatMetric(project.metrics.activeContracts)}</Link></td>
-                    <td><Link className="table-link" href={metricHrefByProject('earlyAlerts', project.id)}>{formatMetric(project.metrics.earlyAlerts)}</Link></td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('activeProjects', project.id)}
+                      >
+                        {formatMetric(project.metrics.activeProjects)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('controlledDocuments', project.id)}
+                      >
+                        {formatMetric(project.metrics.controlledDocuments)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('approvedDocuments', project.id)}
+                      >
+                        {formatMetric(project.metrics.approvedDocuments)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('documentsInReview', project.id)}
+                      >
+                        {formatMetric(project.metrics.documentsInReview)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('expiredDocuments', project.id)}
+                      >
+                        {formatMetric(project.metrics.expiredDocuments)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('stoppedFlows', project.id)}
+                      >
+                        {formatMetric(project.metrics.stoppedFlows)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('openRfis', project.id)}
+                      >
+                        {formatMetric(project.metrics.openRfis)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('activeContracts', project.id)}
+                      >
+                        {formatMetric(project.metrics.activeContracts)}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link
+                        className="table-link"
+                        href={metricHrefByProject('earlyAlerts', project.id)}
+                      >
+                        {formatMetric(project.metrics.earlyAlerts)}
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -387,11 +475,17 @@ export function ExecutiveDashboard() {
       <div className="grid" style={{ marginTop: 16 }}>
         <article className="card span-4">
           <ChartHeader title="Distribucion documental por estado" />
-          <DonutChart data={data?.charts.documentStatusDistribution ?? []} chartKey="documentStatusDistribution" />
+          <DonutChart
+            data={data?.charts.documentStatusDistribution ?? []}
+            chartKey="documentStatusDistribution"
+          />
         </article>
         <article className="card span-4">
           <ChartHeader title="Documentos por disciplina" />
-          <BarChart data={data?.charts.documentsByDiscipline ?? []} chartKey="documentsByDiscipline" />
+          <BarChart
+            data={data?.charts.documentsByDiscipline ?? []}
+            chartKey="documentsByDiscipline"
+          />
         </article>
         <article className="card span-4">
           <ChartHeader title="Renovaciones proximas" />
@@ -406,7 +500,11 @@ export function ExecutiveDashboard() {
         </article>
         <article className="card span-6">
           <ChartHeader title="Contratos por estado" />
-          <BarChart data={data?.charts.contractsByStatus ?? []} compact chartKey="contractsByStatus" />
+          <BarChart
+            data={data?.charts.contractsByStatus ?? []}
+            compact
+            chartKey="contractsByStatus"
+          />
         </article>
       </div>
     </section>
@@ -421,9 +519,24 @@ function ChartHeader({ title }: { title: string }) {
   );
 }
 
-function DonutChart({ data, chartKey }: { data: ChartPoint[]; chartKey: keyof ExecutiveDashboardResponse['charts'] }) {
+function DonutChart({
+  data,
+  chartKey,
+}: {
+  data: ChartPoint[];
+  chartKey: keyof ExecutiveDashboardResponse['charts'];
+}) {
   const total = data.reduce((sum, item) => sum + item.value, 0);
-  const palette = ['#0f766e', '#0284c7', '#d97706', '#dc2626', '#7c3aed', '#475569', '#14b8a6', '#ea580c'];
+  const palette = [
+    '#0f766e',
+    '#0284c7',
+    '#d97706',
+    '#dc2626',
+    '#7c3aed',
+    '#475569',
+    '#14b8a6',
+    '#ea580c',
+  ];
 
   if (!data.length || total === 0) {
     return <p className="muted">Sin datos disponibles para esta distribucion.</p>;
@@ -448,8 +561,15 @@ function DonutChart({ data, chartKey }: { data: ChartPoint[]; chartKey: keyof Ex
       </div>
       <div className="chart-legend">
         {data.map((item, index) => (
-          <Link className="chart-legend-item executive-link-card" href={chartPointHref(chartKey, item)} key={item.key}>
-            <span className="chart-dot" style={{ backgroundColor: palette[index % palette.length] }} />
+          <Link
+            className="chart-legend-item executive-link-card"
+            href={chartPointHref(chartKey, item)}
+            key={item.key}
+          >
+            <span
+              className="chart-dot"
+              style={{ backgroundColor: palette[index % palette.length] }}
+            />
             <span>{item.label}</span>
             <strong>{item.value}</strong>
           </Link>
@@ -459,7 +579,15 @@ function DonutChart({ data, chartKey }: { data: ChartPoint[]; chartKey: keyof Ex
   );
 }
 
-function BarChart({ data, compact = false, chartKey }: { data: ChartPoint[]; compact?: boolean; chartKey: keyof ExecutiveDashboardResponse['charts'] }) {
+function BarChart({
+  data,
+  compact = false,
+  chartKey,
+}: {
+  data: ChartPoint[];
+  compact?: boolean;
+  chartKey: keyof ExecutiveDashboardResponse['charts'];
+}) {
   const max = Math.max(...data.map((item) => item.value), 0);
 
   if (!data.length || max === 0) {
@@ -469,7 +597,11 @@ function BarChart({ data, compact = false, chartKey }: { data: ChartPoint[]; com
   return (
     <div className={`bar-chart ${compact ? 'compact' : ''}`}>
       {data.map((item) => (
-        <Link className="bar-chart-row executive-link-card" href={chartPointHref(chartKey, item)} key={item.key}>
+        <Link
+          className="bar-chart-row executive-link-card"
+          href={chartPointHref(chartKey, item)}
+          key={item.key}
+        >
           <div className="bar-chart-labels">
             <span>{item.label}</span>
             <strong>{item.value}</strong>

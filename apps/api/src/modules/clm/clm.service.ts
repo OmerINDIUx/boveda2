@@ -34,13 +34,16 @@ export class ClmService {
   constructor(
     @InjectRepository(Contract) private readonly contracts: Repository<Contract>,
     @InjectRepository(ContractVersion) private readonly versions: Repository<ContractVersion>,
-    @InjectRepository(ContractAttachment) private readonly attachments: Repository<ContractAttachment>,
-    @InjectRepository(ContractObligation) private readonly obligations: Repository<ContractObligation>,
+    @InjectRepository(ContractAttachment)
+    private readonly attachments: Repository<ContractAttachment>,
+    @InjectRepository(ContractObligation)
+    private readonly obligations: Repository<ContractObligation>,
     @InjectRepository(ContractMilestone) private readonly milestones: Repository<ContractMilestone>,
     @InjectRepository(ContractComment) private readonly comments: Repository<ContractComment>,
     @InjectRepository(ContractAuditLog) private readonly auditLogs: Repository<ContractAuditLog>,
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
-    @InjectRepository(DocumentVersion) private readonly documentVersions: Repository<DocumentVersion>,
+    @InjectRepository(DocumentVersion)
+    private readonly documentVersions: Repository<DocumentVersion>,
     private readonly scope: AccessScopeService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService
@@ -58,7 +61,7 @@ export class ClmService {
     const items = await this.contracts.find({
       where: projectId ? { projectId } : projectIds.map((id) => ({ projectId: id })),
       relations: ['project', 'responsibleUser', 'mainDocument'],
-      order: { updatedAt: 'DESC' }
+      order: { updatedAt: 'DESC' },
     });
 
     return Promise.all(items.map((contract) => this.toListItem(contract)));
@@ -75,13 +78,13 @@ export class ClmService {
         renewalDate: dto.renewalDate,
         renewalNoticeDays: dto.renewalNoticeDays ? Number(dto.renewalNoticeDays) : 30,
         createdById: userId,
-        status: this.normalizeStatus(dto.status, dto.endDate)
+        status: this.normalizeStatus(dto.status, dto.endDate),
       })
     );
 
     await this.log(contract.id, userId, 'create', undefined, {
       name: contract.name,
-      status: contract.status
+      status: contract.status,
     });
 
     await this.syncAlerts(contract);
@@ -91,19 +94,40 @@ export class ClmService {
   async getDetail(userId: string, contractId: string, logView = true) {
     const contract = await this.assertContractAccess(userId, contractId);
     const [versions, attachments, obligations, milestones, comments, audit] = await Promise.all([
-      this.versions.find({ where: { contractId }, relations: ['uploadedBy'], order: { createdAt: 'DESC' } }),
-      this.attachments.find({ where: { contractId }, relations: ['uploadedBy'], order: { createdAt: 'DESC' } }),
-      this.obligations.find({ where: { contractId }, relations: ['responsibleUser', 'evidenceDocument'], order: { createdAt: 'DESC' } }),
-      this.milestones.find({ where: { contractId }, relations: ['responsibleUser', 'evidenceDocument'], order: { milestoneDate: 'ASC' } }),
-      this.comments.find({ where: { contractId }, relations: ['author'], order: { createdAt: 'DESC' } }),
-      this.auditLogs.find({ where: { contractId }, order: { createdAt: 'DESC' } })
+      this.versions.find({
+        where: { contractId },
+        relations: ['uploadedBy'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.attachments.find({
+        where: { contractId },
+        relations: ['uploadedBy'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.obligations.find({
+        where: { contractId },
+        relations: ['responsibleUser', 'evidenceDocument'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.milestones.find({
+        where: { contractId },
+        relations: ['responsibleUser', 'evidenceDocument'],
+        order: { milestoneDate: 'ASC' },
+      }),
+      this.comments.find({
+        where: { contractId },
+        relations: ['author'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.auditLogs.find({ where: { contractId }, order: { createdAt: 'DESC' } }),
     ]);
 
     if (logView) {
       await this.log(contractId, userId, 'view');
     }
 
-    const currentVersion = versions.find((item) => item.id === contract.currentVersionId) ?? versions[0] ?? null;
+    const currentVersion =
+      versions.find((item) => item.id === contract.currentVersionId) ?? versions[0] ?? null;
 
     return {
       ...(await this.toListItem(contract)),
@@ -116,9 +140,11 @@ export class ClmService {
         id: comment.id,
         body: comment.body,
         createdAt: comment.createdAt,
-        author: comment.author ? { id: comment.author.id, name: comment.author.name, email: comment.author.email } : null
+        author: comment.author
+          ? { id: comment.author.id, name: comment.author.name, email: comment.author.email }
+          : null,
       })),
-      audit
+      audit,
     };
   }
 
@@ -129,12 +155,23 @@ export class ClmService {
 
     Object.assign(contract, {
       ...dto,
-      renewalNoticeDays: dto.renewalNoticeDays ? Number(dto.renewalNoticeDays) : contract.renewalNoticeDays
+      renewalNoticeDays: dto.renewalNoticeDays
+        ? Number(dto.renewalNoticeDays)
+        : contract.renewalNoticeDays,
     });
-    contract.status = this.normalizeStatus(dto.status ?? contract.status, dto.endDate ?? contract.endDate);
+    contract.status = this.normalizeStatus(
+      dto.status ?? contract.status,
+      dto.endDate ?? contract.endDate
+    );
 
     await this.contracts.save(contract);
-    await this.log(contractId, userId, 'edit', this.snapshotContract(before), this.snapshotContract(contract));
+    await this.log(
+      contractId,
+      userId,
+      'edit',
+      this.snapshotContract(before),
+      this.snapshotContract(contract)
+    );
     await this.syncAlerts(contract);
     return this.getDetail(userId, contractId, false);
   }
@@ -152,7 +189,7 @@ export class ClmService {
         mimeType: dto.mimeType,
         sizeBytes: Number(dto.sizeBytes ?? stored.sizeBytes),
         uploadedById: userId,
-        changeSummary: dto.changeSummary
+        changeSummary: dto.changeSummary,
       })
     );
 
@@ -161,7 +198,13 @@ export class ClmService {
       contract.status = 'in_review';
     }
     await this.contracts.save(contract);
-    await this.log(contractId, userId, 'upload_new_version', { previousVersionId: contract.currentVersionId }, { versionId: version.id });
+    await this.log(
+      contractId,
+      userId,
+      'upload_new_version',
+      { previousVersionId: contract.currentVersionId },
+      { versionId: version.id }
+    );
     return this.getDetail(userId, contractId, false);
   }
 
@@ -178,10 +221,13 @@ export class ClmService {
         mimeType: dto.mimeType,
         sizeBytes: Number(dto.sizeBytes ?? stored.sizeBytes),
         uploadedById: userId,
-        notes: dto.notes
+        notes: dto.notes,
       })
     );
-    await this.log(contractId, userId, 'add_attachment', undefined, { attachmentId: attachment.id, fileName: attachment.fileName });
+    await this.log(contractId, userId, 'add_attachment', undefined, {
+      attachmentId: attachment.id,
+      fileName: attachment.fileName,
+    });
     return this.getDetail(userId, contractId, false);
   }
 
@@ -196,15 +242,23 @@ export class ClmService {
         commitmentDate: dto.commitmentDate,
         status: this.normalizeObligationStatus(dto.status, dto.commitmentDate),
         evidenceDocumentId: dto.evidenceDocumentId,
-        comments: dto.comments
+        comments: dto.comments,
       })
     );
-    await this.log(contractId, userId, 'add_obligation', undefined, { obligationId: obligation.id, description: obligation.description });
+    await this.log(contractId, userId, 'add_obligation', undefined, {
+      obligationId: obligation.id,
+      description: obligation.description,
+    });
     await this.syncAlerts(contract);
     return this.getDetail(userId, contractId, false);
   }
 
-  async updateObligation(userId: string, contractId: string, obligationId: string, dto: UpdateContractObligationDto) {
+  async updateObligation(
+    userId: string,
+    contractId: string,
+    obligationId: string,
+    dto: UpdateContractObligationDto
+  ) {
     const contract = await this.assertContractAccess(userId, contractId);
     const obligation = await this.obligations.findOne({ where: { id: obligationId, contractId } });
     if (!obligation) {
@@ -213,9 +267,18 @@ export class ClmService {
     await this.assertDocumentBelongsToProject(contract.projectId, dto.evidenceDocumentId);
     const before = { ...obligation };
     Object.assign(obligation, dto);
-    obligation.status = this.normalizeObligationStatus(dto.status ?? obligation.status, dto.commitmentDate ?? obligation.commitmentDate);
+    obligation.status = this.normalizeObligationStatus(
+      dto.status ?? obligation.status,
+      dto.commitmentDate ?? obligation.commitmentDate
+    );
     await this.obligations.save(obligation);
-    await this.log(contractId, userId, 'edit_obligation', before as Record<string, unknown>, obligation as unknown as Record<string, unknown>);
+    await this.log(
+      contractId,
+      userId,
+      'edit_obligation',
+      before as Record<string, unknown>,
+      obligation as unknown as Record<string, unknown>
+    );
     await this.syncAlerts(contract);
     return this.getDetail(userId, contractId, false);
   }
@@ -231,15 +294,23 @@ export class ClmService {
         responsibleUserId: dto.responsibleUserId,
         status: dto.status ?? 'pending',
         evidenceDocumentId: dto.evidenceDocumentId,
-        notes: dto.notes
+        notes: dto.notes,
       })
     );
-    await this.log(contractId, userId, 'add_milestone', undefined, { milestoneId: milestone.id, name: milestone.name });
+    await this.log(contractId, userId, 'add_milestone', undefined, {
+      milestoneId: milestone.id,
+      name: milestone.name,
+    });
     await this.syncAlerts(contract);
     return this.getDetail(userId, contractId, false);
   }
 
-  async updateMilestone(userId: string, contractId: string, milestoneId: string, dto: UpdateContractMilestoneDto) {
+  async updateMilestone(
+    userId: string,
+    contractId: string,
+    milestoneId: string,
+    dto: UpdateContractMilestoneDto
+  ) {
     const contract = await this.assertContractAccess(userId, contractId);
     const milestone = await this.milestones.findOne({ where: { id: milestoneId, contractId } });
     if (!milestone) {
@@ -255,7 +326,13 @@ export class ClmService {
       milestone.completedAt = undefined;
     }
     await this.milestones.save(milestone);
-    await this.log(contractId, userId, 'edit_milestone', before as Record<string, unknown>, milestone as unknown as Record<string, unknown>);
+    await this.log(
+      contractId,
+      userId,
+      'edit_milestone',
+      before as Record<string, unknown>,
+      milestone as unknown as Record<string, unknown>
+    );
     await this.syncAlerts(contract);
     return this.getDetail(userId, contractId, false);
   }
@@ -266,7 +343,7 @@ export class ClmService {
       this.comments.create({
         contractId,
         authorId: userId,
-        body: dto.body
+        body: dto.body,
       })
     );
     await this.log(contractId, userId, 'comment', undefined, { commentId: comment.id });
@@ -308,25 +385,28 @@ export class ClmService {
   }
 
   async ask(userId: string, contractId: string, dto: AskContractQueryDto) {
-    const contract = await this.assertContractAccess(userId, contractId);
+    await this.assertContractAccess(userId, contractId);
     const detail = await this.getDetail(userId, contractId, false);
     const chunks = this.buildKnowledgeChunks(detail);
     const scored = chunks
       .map((chunk) => ({
         ...chunk,
-        score: this.scoreChunk(dto.question, chunk.text)
+        score: this.scoreChunk(dto.question, chunk.text),
       }))
       .filter((chunk) => chunk.score > 0.12)
       .sort((left, right) => right.score - left.score)
       .slice(0, 6);
 
-    await this.log(contractId, userId, 'ask_ai', undefined, { question: dto.question, citations: scored.length });
+    await this.log(contractId, userId, 'ask_ai', undefined, {
+      question: dto.question,
+      citations: scored.length,
+    });
 
     if (!scored.length) {
       return {
         answer: 'No encontre informacion suficiente en este contrato para responder con seguridad.',
         status: 'insufficient_information',
-        citations: []
+        citations: [],
       };
     }
 
@@ -336,8 +416,8 @@ export class ClmService {
       citations: scored.map((item) => ({
         sourceType: item.sourceType,
         label: item.label,
-        fragment: item.text
-      }))
+        fragment: item.text,
+      })),
     };
   }
 
@@ -349,13 +429,16 @@ export class ClmService {
     if (!projectIds.length) {
       return [];
     }
-    return this.contracts.find({ where: projectIds.map((id) => ({ projectId: id })), relations: ['responsibleUser'] });
+    return this.contracts.find({
+      where: projectIds.map((id) => ({ projectId: id })),
+      relations: ['responsibleUser'],
+    });
   }
 
   private async assertContractAccess(userId: string, contractId: string) {
     const contract = await this.contracts.findOne({
       where: { id: contractId },
-      relations: ['project', 'responsibleUser', 'mainDocument']
+      relations: ['project', 'responsibleUser', 'mainDocument'],
     });
     if (!contract) {
       throw new NotFoundException('Contrato no encontrado');
@@ -382,7 +465,9 @@ export class ClmService {
 
   private async toListItem(contract: Contract) {
     const obligationRows = await this.obligations.find({ where: { contractId: contract.id } });
-    const pendingObligations = obligationRows.filter((item) => this.normalizeObligationStatus(item.status, item.commitmentDate) !== 'completed').length;
+    const pendingObligations = obligationRows.filter(
+      (item) => this.normalizeObligationStatus(item.status, item.commitmentDate) !== 'completed'
+    ).length;
     const status = this.normalizeStatus(contract.status, contract.endDate);
     if (status !== contract.status) {
       contract.status = status;
@@ -418,10 +503,10 @@ export class ClmService {
         ? {
             id: contract.mainDocument.id,
             name: contract.mainDocument.name,
-            documentNumber: contract.mainDocument.documentNumber
+            documentNumber: contract.mainDocument.documentNumber,
           }
         : null,
-      pendingObligations
+      pendingObligations,
     };
   }
 
@@ -448,7 +533,10 @@ export class ClmService {
     }
   }
 
-  private normalizeObligationStatus(status: ContractObligation['status'] | undefined, commitmentDate?: string) {
+  private normalizeObligationStatus(
+    status: ContractObligation['status'] | undefined,
+    commitmentDate?: string
+  ) {
     if (status === 'completed' || status === 'waived') {
       return status;
     }
@@ -494,7 +582,7 @@ export class ClmService {
         entityId: contract.id,
         category: 'contract',
         meta: { route: '/clm' },
-        dedupeKey: `contract-soon:${contract.id}:${this.today()}`
+        dedupeKey: `contract-soon:${contract.id}:${this.today()}`,
       });
       created += 1;
     }
@@ -525,7 +613,7 @@ export class ClmService {
         actorId,
         action,
         beforeState,
-        afterState
+        afterState,
       })
     );
   }
@@ -545,7 +633,7 @@ export class ClmService {
       contractType: contract.contractType,
       mainDocumentId: contract.mainDocumentId,
       closeReason: contract.closeReason,
-      closedAt: contract.closedAt
+      closedAt: contract.closedAt,
     };
   }
 
@@ -563,17 +651,17 @@ export class ClmService {
         detail.startDate ? `Inicio: ${detail.startDate}.` : undefined,
         detail.endDate ? `Vencimiento: ${detail.endDate}.` : undefined,
         detail.renewalDate ? `Renovacion: ${detail.renewalDate}.` : undefined,
-        detail.amount ? `Monto: ${detail.amount} ${detail.currency}.` : undefined
+        detail.amount ? `Monto: ${detail.amount} ${detail.currency}.` : undefined,
       ]
         .filter(Boolean)
-        .join(' ')
+        .join(' '),
     });
 
     for (const obligation of detail.obligations) {
       chunks.push({
         sourceType: 'obligation',
         label: 'Obligacion contractual',
-        text: `Obligacion: ${obligation.description}. Responsable: ${obligation.responsibleUser?.name ?? 'Sin asignar'}. Fecha compromiso: ${obligation.commitmentDate ?? 'Sin fecha'}. Estado: ${obligation.status}. Comentarios: ${obligation.comments ?? 'Sin comentarios'}.`
+        text: `Obligacion: ${obligation.description}. Responsable: ${obligation.responsibleUser?.name ?? 'Sin asignar'}. Fecha compromiso: ${obligation.commitmentDate ?? 'Sin fecha'}. Estado: ${obligation.status}. Comentarios: ${obligation.comments ?? 'Sin comentarios'}.`,
       });
     }
 
@@ -581,7 +669,7 @@ export class ClmService {
       chunks.push({
         sourceType: 'milestone',
         label: 'Hito contractual',
-        text: `Hito: ${milestone.name}. Fecha: ${milestone.milestoneDate}. Responsable: ${milestone.responsibleUser?.name ?? 'Sin asignar'}. Estado: ${milestone.status}. Notas: ${milestone.notes ?? 'Sin notas'}.`
+        text: `Hito: ${milestone.name}. Fecha: ${milestone.milestoneDate}. Responsable: ${milestone.responsibleUser?.name ?? 'Sin asignar'}. Estado: ${milestone.status}. Notas: ${milestone.notes ?? 'Sin notas'}.`,
       });
     }
 
@@ -589,7 +677,7 @@ export class ClmService {
       chunks.push({
         sourceType: 'comment',
         label: 'Comentario',
-        text: `Comentario de ${comment.author?.name ?? 'usuario'}: ${comment.body}`
+        text: `Comentario de ${comment.author?.name ?? 'usuario'}: ${comment.body}`,
       });
     }
 
@@ -597,7 +685,7 @@ export class ClmService {
       chunks.push({
         sourceType: 'version',
         label: `Version ${version.versionLabel}`,
-        text: `Version ${version.versionLabel} del archivo ${version.fileName}. Resumen de cambios: ${version.changeSummary ?? 'Sin resumen de cambios'}.`
+        text: `Version ${version.versionLabel} del archivo ${version.fileName}. Resumen de cambios: ${version.changeSummary ?? 'Sin resumen de cambios'}.`,
       });
     }
 

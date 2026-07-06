@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -57,19 +68,31 @@ export class DocumentsController {
 
   @Patch(':id')
   @Permissions(PermissionKey.DocumentsEdit)
-  update(@Param('id') id: string, @CurrentUser() user: RequestUser, @Body() dto: UpdateDocumentDto) {
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: UpdateDocumentDto
+  ) {
     return this.documents.update(user.id, id, dto);
   }
 
   @Post(':id/comments')
   @Permissions(PermissionKey.DocumentsView)
-  comment(@Param('id') id: string, @CurrentUser() user: RequestUser, @Body() dto: CreateDocumentCommentDto) {
+  comment(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateDocumentCommentDto
+  ) {
     return this.documents.addComment(user.id, id, dto);
   }
 
   @Post(':id/versions')
   @Permissions(PermissionKey.DocumentsCreate)
-  version(@Param('id') id: string, @CurrentUser() user: RequestUser, @Body() dto: CreateDocumentVersionDto) {
+  version(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateDocumentVersionDto
+  ) {
     return this.documents.createVersion(user.id, id, dto);
   }
 

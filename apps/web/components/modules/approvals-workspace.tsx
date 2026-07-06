@@ -1,11 +1,26 @@
 'use client';
 
-import { CheckCircle2, Clock3, FileCheck2, GitBranchPlus, MessageSquareMore, Search, ShieldAlert, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock3,
+  FileCheck2,
+  GitBranchPlus,
+  MessageSquareMore,
+  Search,
+  ShieldAlert,
+  XCircle,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPost } from '../../lib/api';
 
 type ProjectOption = { id: string; name: string; code: string };
-type DocumentOption = { id: string; documentNumber: string; name: string; projectId: string; status: string };
+type DocumentOption = {
+  id: string;
+  documentNumber: string;
+  name: string;
+  projectId: string;
+  status: string;
+};
 type UserOption = { id: string; name: string; email: string };
 
 type WorkflowStep = {
@@ -72,21 +87,33 @@ const emptyFlowForm: FlowForm = {
   name: '',
   scopeType: 'global',
   targetDocumentId: '',
-  requireForPublication: true
+  requireForPublication: true,
 };
 
 const fallbackProjects: ProjectOption[] = [
-  { id: 'mock-project-1', name: 'Torre Ejecutiva Norte', code: 'HOL-PRJ-001' }
+  { id: 'mock-project-1', name: 'Torre Ejecutiva Norte', code: 'HOL-PRJ-001' },
 ];
 
 const fallbackDocuments: DocumentOption[] = [
-  { id: 'mock-doc-1', documentNumber: 'ARC-IFC-012', name: 'Plano de fachada nivel 12', projectId: 'mock-project-1', status: 'pending_approval' },
-  { id: 'mock-doc-2', documentNumber: 'MEC-SUB-021', name: 'Ficha de equipos HVAC', projectId: 'mock-project-1', status: 'in_review' }
+  {
+    id: 'mock-doc-1',
+    documentNumber: 'ARC-IFC-012',
+    name: 'Plano de fachada nivel 12',
+    projectId: 'mock-project-1',
+    status: 'pending_approval',
+  },
+  {
+    id: 'mock-doc-2',
+    documentNumber: 'MEC-SUB-021',
+    name: 'Ficha de equipos HVAC',
+    projectId: 'mock-project-1',
+    status: 'in_review',
+  },
 ];
 
 const fallbackUsers: UserOption[] = [
   { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' },
-  { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' }
+  { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' },
 ];
 
 const fallbackFlows: Workflow[] = [
@@ -100,9 +127,15 @@ const fallbackFlows: Workflow[] = [
     active: true,
     steps: [
       { id: 'st-1', stepOrder: 1, name: 'Revisión técnica', approverUserId: 'u-1', required: true },
-      { id: 'st-2', stepOrder: 2, name: 'Liberación de coordinación', approverUserId: 'u-2', required: true }
-    ]
-  }
+      {
+        id: 'st-2',
+        stepOrder: 2,
+        name: 'Liberación de coordinación',
+        approverUserId: 'u-2',
+        required: true,
+      },
+    ],
+  },
 ];
 
 const fallbackPending: ApprovalRequest[] = [
@@ -112,8 +145,13 @@ const fallbackPending: ApprovalRequest[] = [
     requestedAt: '2026-07-02T09:00:00.000Z',
     lastActionAt: '2026-07-02T09:00:00.000Z',
     currentStep: { id: 'st-1', name: 'Revisión técnica', stepOrder: 1 },
-    document: { id: 'mock-doc-1', documentNumber: 'ARC-IFC-012', name: 'Plano de fachada nivel 12', status: 'pending_approval' }
-  }
+    document: {
+      id: 'mock-doc-1',
+      documentNumber: 'ARC-IFC-012',
+      name: 'Plano de fachada nivel 12',
+      status: 'pending_approval',
+    },
+  },
 ];
 
 const fallbackRequestDetail: Record<string, ApprovalRequestDetail> = {
@@ -125,7 +163,12 @@ const fallbackRequestDetail: Record<string, ApprovalRequestDetail> = {
     workflow: fallbackFlows[0],
     currentStepId: 'st-1',
     currentStep: { id: 'st-1', name: 'Revisión técnica', stepOrder: 1 },
-    document: { id: 'mock-doc-1', documentNumber: 'ARC-IFC-012', name: 'Plano de fachada nivel 12', status: 'pending_approval' },
+    document: {
+      id: 'mock-doc-1',
+      documentNumber: 'ARC-IFC-012',
+      name: 'Plano de fachada nivel 12',
+      status: 'pending_approval',
+    },
     actions: [
       {
         id: 'act-1',
@@ -134,10 +177,10 @@ const fallbackRequestDetail: Record<string, ApprovalRequestDetail> = {
         stepOrder: 1,
         createdAt: '2026-07-02T09:00:00.000Z',
         actor: fallbackUsers[0],
-        step: { id: 'st-1', name: 'Revisión técnica', stepOrder: 1 }
-      }
-    ]
-  }
+        step: { id: 'st-1', name: 'Revisión técnica', stepOrder: 1 },
+      },
+    ],
+  },
 };
 
 function getToken() {
@@ -161,7 +204,7 @@ export function ApprovalsWorkspace() {
   const [flowForm, setFlowForm] = useState<FlowForm>(emptyFlowForm);
   const [steps, setSteps] = useState<WorkflowStep[]>([
     { stepOrder: 1, name: '', approverUserId: '', required: true },
-    { stepOrder: 2, name: '', approverUserId: '', required: true }
+    { stepOrder: 2, name: '', approverUserId: '', required: true },
   ]);
   const [newRequestDocumentId, setNewRequestDocumentId] = useState('');
   const [newRequestWorkflowId, setNewRequestWorkflowId] = useState('');
@@ -174,21 +217,32 @@ export function ApprovalsWorkspace() {
 
     async function loadData() {
       try {
-        const [projectsResponse, documentsResponse, usersResponse, pendingResponse] = await Promise.all([
-          apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<DocumentOption[]>(`/documents${search ? `?search=${encodeURIComponent(search)}` : ''}`, getToken() ?? undefined),
-          apiGet<UserOption[]>('/users', getToken() ?? undefined),
-          apiGet<ApprovalRequest[]>('/approvals/requests/pending', getToken() ?? undefined)
-        ]);
+        const [projectsResponse, documentsResponse, usersResponse, pendingResponse] =
+          await Promise.all([
+            apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
+            apiGet<DocumentOption[]>(
+              `/documents${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+              getToken() ?? undefined
+            ),
+            apiGet<UserOption[]>('/users', getToken() ?? undefined),
+            apiGet<ApprovalRequest[]>('/approvals/requests/pending', getToken() ?? undefined),
+          ]);
 
         if (!active) return;
         setProjects(projectsResponse.length ? projectsResponse : fallbackProjects);
         setDocuments(documentsResponse.length ? documentsResponse : fallbackDocuments);
         setUsers(usersResponse.length ? usersResponse : fallbackUsers);
         setPending(pendingResponse.length ? pendingResponse : fallbackPending);
-        setSelectedRequestId((current) => current || pendingResponse[0]?.id || fallbackPending[0]?.id || '');
-        setFlowForm((current) => ({ ...current, projectId: current.projectId || projectsResponse[0]?.id || fallbackProjects[0].id }));
-        setNewRequestDocumentId((current) => current || documentsResponse[0]?.id || fallbackDocuments[0].id);
+        setSelectedRequestId(
+          (current) => current || pendingResponse[0]?.id || fallbackPending[0]?.id || ''
+        );
+        setFlowForm((current) => ({
+          ...current,
+          projectId: current.projectId || projectsResponse[0]?.id || fallbackProjects[0].id,
+        }));
+        setNewRequestDocumentId(
+          (current) => current || documentsResponse[0]?.id || fallbackDocuments[0].id
+        );
       } catch {
         if (!active) return;
         setProjects(fallbackProjects);
@@ -196,7 +250,10 @@ export function ApprovalsWorkspace() {
         setUsers(fallbackUsers);
         setPending(fallbackPending);
         setSelectedRequestId((current) => current || fallbackPending[0]?.id || '');
-        setFlowForm((current) => ({ ...current, projectId: current.projectId || fallbackProjects[0].id }));
+        setFlowForm((current) => ({
+          ...current,
+          projectId: current.projectId || fallbackProjects[0].id,
+        }));
         setNewRequestDocumentId((current) => current || fallbackDocuments[0].id);
         setError('Se cargó una vista de ejemplo porque la API de aprobaciones aún no respondió.');
       }
@@ -211,10 +268,17 @@ export function ApprovalsWorkspace() {
   useEffect(() => {
     if (!flowForm.projectId) return;
     let active = true;
-    apiGet<Workflow[]>(`/approvals/flows?projectId=${encodeURIComponent(flowForm.projectId)}`, getToken() ?? undefined)
+    apiGet<Workflow[]>(
+      `/approvals/flows?projectId=${encodeURIComponent(flowForm.projectId)}`,
+      getToken() ?? undefined
+    )
       .then((response) => {
         if (!active) return;
-        setFlows(response.length ? response : fallbackFlows.filter((flow) => flow.projectId === flowForm.projectId));
+        setFlows(
+          response.length
+            ? response
+            : fallbackFlows.filter((flow) => flow.projectId === flowForm.projectId)
+        );
       })
       .catch(() => {
         if (!active) return;
@@ -229,12 +293,18 @@ export function ApprovalsWorkspace() {
   useEffect(() => {
     if (!selectedRequestId) return;
     let active = true;
-    apiGet<ApprovalRequestDetail>(`/approvals/requests/${selectedRequestId}`, getToken() ?? undefined)
+    apiGet<ApprovalRequestDetail>(
+      `/approvals/requests/${selectedRequestId}`,
+      getToken() ?? undefined
+    )
       .then((response) => {
         if (active) setRequestDetail(response);
       })
       .catch(() => {
-        if (active) setRequestDetail(fallbackRequestDetail[selectedRequestId] ?? fallbackRequestDetail['req-1']);
+        if (active)
+          setRequestDetail(
+            fallbackRequestDetail[selectedRequestId] ?? fallbackRequestDetail['req-1']
+          );
       });
 
     return () => {
@@ -246,17 +316,30 @@ export function ApprovalsWorkspace() {
     return [
       { label: 'Solicitudes pendientes', value: pending.length, icon: Clock3 },
       { label: 'Flujos activos', value: flows.length, icon: GitBranchPlus },
-      { label: 'Aprobados hoy', value: pending.filter((item) => item.status === 'approved').length, icon: CheckCircle2 },
-      { label: 'Detenidos o vencidos', value: pending.filter((item) => ['stopped', 'expired'].includes(item.status)).length, icon: ShieldAlert }
+      {
+        label: 'Aprobados hoy',
+        value: pending.filter((item) => item.status === 'approved').length,
+        icon: CheckCircle2,
+      },
+      {
+        label: 'Detenidos o vencidos',
+        value: pending.filter((item) => ['stopped', 'expired'].includes(item.status)).length,
+        icon: ShieldAlert,
+      },
     ];
   }, [pending, flows]);
 
   function setStep(index: number, patch: Partial<WorkflowStep>) {
-    setSteps((current) => current.map((step, stepIndex) => (stepIndex === index ? { ...step, ...patch } : step)));
+    setSteps((current) =>
+      current.map((step, stepIndex) => (stepIndex === index ? { ...step, ...patch } : step))
+    );
   }
 
   function addStep() {
-    setSteps((current) => [...current, { stepOrder: current.length + 1, name: '', approverUserId: '', required: true }]);
+    setSteps((current) => [
+      ...current,
+      { stepOrder: current.length + 1, name: '', approverUserId: '', required: true },
+    ]);
   }
 
   async function createFlow() {
@@ -268,9 +351,10 @@ export function ApprovalsWorkspace() {
           name: flowForm.name,
           entityType: 'document',
           scopeType: flowForm.scopeType,
-          targetDocumentId: flowForm.scopeType === 'document_specific' ? flowForm.targetDocumentId : undefined,
+          targetDocumentId:
+            flowForm.scopeType === 'document_specific' ? flowForm.targetDocumentId : undefined,
           requireForPublication: flowForm.requireForPublication,
-          steps: steps.map((step, index) => ({ ...step, stepOrder: index + 1 }))
+          steps: steps.map((step, index) => ({ ...step, stepOrder: index + 1 })),
         },
         getToken() ?? undefined
       );
@@ -278,7 +362,7 @@ export function ApprovalsWorkspace() {
       setFlowForm((current) => ({ ...emptyFlowForm, projectId: current.projectId }));
       setSteps([
         { stepOrder: 1, name: '', approverUserId: '', required: true },
-        { stepOrder: 2, name: '', approverUserId: '', required: true }
+        { stepOrder: 2, name: '', approverUserId: '', required: true },
       ]);
     } catch {
       setError('No fue posible crear el workflow.');
@@ -300,9 +384,9 @@ export function ApprovalsWorkspace() {
           requestedAt: created.requestedAt,
           lastActionAt: created.lastActionAt,
           currentStep: created.currentStep,
-          document: created.document
+          document: created.document,
         },
-        ...current
+        ...current,
       ]);
       setSelectedRequestId(created.id);
       setRequestDetail(created);
@@ -328,7 +412,7 @@ export function ApprovalsWorkspace() {
                 status: updated.status,
                 lastActionAt: updated.lastActionAt,
                 currentStep: updated.currentStep,
-                document: updated.document
+                document: updated.document,
               }
             : item
         )
@@ -344,7 +428,10 @@ export function ApprovalsWorkspace() {
       <div className="topbar">
         <div>
           <h1>Aprobaciones</h1>
-          <p className="muted">Configura workflows, inicia solicitudes y resuelve documentos pendientes con trazabilidad por paso.</p>
+          <p className="muted">
+            Configura workflows, inicia solicitudes y resuelve documentos pendientes con
+            trazabilidad por paso.
+          </p>
         </div>
       </div>
 
@@ -374,35 +461,54 @@ export function ApprovalsWorkspace() {
               label="Proyecto"
               value={flowForm.projectId}
               onChange={(value) => setFlowForm((current) => ({ ...current, projectId: value }))}
-              options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+              options={projects.map((project) => ({
+                value: project.id,
+                label: `${project.code} · ${project.name}`,
+              }))}
             />
-            <TextField label="Nombre del flujo" value={flowForm.name} onChange={(value) => setFlowForm((current) => ({ ...current, name: value }))} />
+            <TextField
+              label="Nombre del flujo"
+              value={flowForm.name}
+              onChange={(value) => setFlowForm((current) => ({ ...current, name: value }))}
+            />
             <SelectField
               label="Alcance"
               value={flowForm.scopeType}
-              onChange={(value) => setFlowForm((current) => ({ ...current, scopeType: value as FlowForm['scopeType'] }))}
+              onChange={(value) =>
+                setFlowForm((current) => ({
+                  ...current,
+                  scopeType: value as FlowForm['scopeType'],
+                }))
+              }
               options={[
                 { value: 'global', label: 'Global' },
-                { value: 'document_specific', label: 'Específico por documento' }
+                { value: 'document_specific', label: 'Específico por documento' },
               ]}
             />
             {flowForm.scopeType === 'document_specific' ? (
               <SelectField
                 label="Documento objetivo"
                 value={flowForm.targetDocumentId}
-                onChange={(value) => setFlowForm((current) => ({ ...current, targetDocumentId: value }))}
+                onChange={(value) =>
+                  setFlowForm((current) => ({ ...current, targetDocumentId: value }))
+                }
                 options={documents
                   .filter((document) => document.projectId === flowForm.projectId)
-                  .map((document) => ({ value: document.id, label: `${document.documentNumber} · ${document.name}` }))}
+                  .map((document) => ({
+                    value: document.id,
+                    label: `${document.documentNumber} · ${document.name}`,
+                  }))}
               />
             ) : null}
             <SelectField
               label="Requiere aprobación para publicar"
               value={flowForm.requireForPublication ? 'yes' : 'no'}
-              onChange={(value) => setFlowForm((current) => ({ ...current, requireForPublication: value === 'yes' }))}
+              onChange={(value) =>
+                setFlowForm((current) => ({ ...current, requireForPublication: value === 'yes' }))
+              }
               options={[
                 { value: 'yes', label: 'Sí' },
-                { value: 'no', label: 'No' }
+                { value: 'no', label: 'No' },
               ]}
             />
           </div>
@@ -412,12 +518,19 @@ export function ApprovalsWorkspace() {
               <div className="simple-document-item" key={index}>
                 <strong>Paso {index + 1}</strong>
                 <div className="quick-filters-grid">
-                  <TextField label="Nombre del paso" value={step.name} onChange={(value) => setStep(index, { name: value })} />
+                  <TextField
+                    label="Nombre del paso"
+                    value={step.name}
+                    onChange={(value) => setStep(index, { name: value })}
+                  />
                   <SelectField
                     label="Aprobador"
                     value={step.approverUserId ?? ''}
                     onChange={(value) => setStep(index, { approverUserId: value })}
-                    options={users.map((user) => ({ value: user.id, label: `${user.name} · ${user.email}` }))}
+                    options={users.map((user) => ({
+                      value: user.id,
+                      label: `${user.name} · ${user.email}`,
+                    }))}
                   />
                   <SelectField
                     label="Requerido"
@@ -425,7 +538,7 @@ export function ApprovalsWorkspace() {
                     onChange={(value) => setStep(index, { required: value === 'yes' })}
                     options={[
                       { value: 'yes', label: 'Sí' },
-                      { value: 'no', label: 'No' }
+                      { value: 'no', label: 'No' },
                     ]}
                   />
                 </div>
@@ -452,7 +565,11 @@ export function ApprovalsWorkspace() {
             <label>Buscar documento</label>
             <div className="search-input">
               <Search size={16} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Documento o código" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Documento o código"
+              />
             </div>
           </div>
           <div className="project-list">
@@ -465,7 +582,9 @@ export function ApprovalsWorkspace() {
               >
                 <div className="project-list-head">
                   <strong>{item.document?.documentNumber ?? 'Documento'}</strong>
-                  <span className={`pill ${item.status === 'approved' ? 'success' : item.status === 'rejected' ? 'danger' : 'warning'}`}>
+                  <span
+                    className={`pill ${item.status === 'approved' ? 'success' : item.status === 'rejected' ? 'danger' : 'warning'}`}
+                  >
                     {normalizeLabel(item.status)}
                   </span>
                 </div>
@@ -485,7 +604,10 @@ export function ApprovalsWorkspace() {
             label="Documento"
             value={newRequestDocumentId}
             onChange={setNewRequestDocumentId}
-            options={documents.map((document) => ({ value: document.id, label: `${document.documentNumber} · ${document.name}` }))}
+            options={documents.map((document) => ({
+              value: document.id,
+              label: `${document.documentNumber} · ${document.name}`,
+            }))}
           />
           <SelectField
             label="Workflow"
@@ -504,8 +626,14 @@ export function ApprovalsWorkspace() {
             {flows.map((flow) => (
               <div className="simple-document-item" key={flow.id}>
                 <strong>{flow.name}</strong>
-                <span>{normalizeLabel(flow.scopeType)} · {flow.steps.length} pasos</span>
-                <small>{flow.requireForPublication ? 'Bloquea publicación sin aprobación' : 'Publicación libre'}</small>
+                <span>
+                  {normalizeLabel(flow.scopeType)} · {flow.steps.length} pasos
+                </span>
+                <small>
+                  {flow.requireForPublication
+                    ? 'Bloquea publicación sin aprobación'
+                    : 'Publicación libre'}
+                </small>
               </div>
             ))}
           </div>
@@ -542,23 +670,43 @@ export function ApprovalsWorkspace() {
 
               <div className="field" style={{ marginTop: 16 }}>
                 <label>Comentario / decisión</label>
-                <textarea value={actionComment} onChange={(event) => setActionComment(event.target.value)} placeholder="Escribe una observación para aprobar, rechazar o pedir cambios." />
+                <textarea
+                  value={actionComment}
+                  onChange={(event) => setActionComment(event.target.value)}
+                  placeholder="Escribe una observación para aprobar, rechazar o pedir cambios."
+                />
               </div>
 
               <div className="projects-actions">
-                <button className="button" type="button" onClick={() => void submitAction('approve')}>
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => void submitAction('approve')}
+                >
                   <CheckCircle2 size={18} />
                   Aprobar
                 </button>
-                <button className="button secondary" type="button" onClick={() => void submitAction('request-changes')}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => void submitAction('request-changes')}
+                >
                   <MessageSquareMore size={18} />
                   Solicitar cambios
                 </button>
-                <button className="button danger-button" type="button" onClick={() => void submitAction('reject')}>
+                <button
+                  className="button danger-button"
+                  type="button"
+                  onClick={() => void submitAction('reject')}
+                >
                   <XCircle size={18} />
                   Rechazar
                 </button>
-                <button className="button secondary" type="button" onClick={() => void submitAction('comment')}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => void submitAction('comment')}
+                >
                   Comentar
                 </button>
               </div>
@@ -568,9 +716,15 @@ export function ApprovalsWorkspace() {
                   <div className="simple-document-item" key={action.id}>
                     <strong>{normalizeLabel(action.action)}</strong>
                     <span>
-                      {action.step ? `Paso ${action.step.stepOrder}: ${action.step.name}` : 'Sin paso asociado'} · {action.actor?.name ?? 'Usuario'}
+                      {action.step
+                        ? `Paso ${action.step.stepOrder}: ${action.step.name}`
+                        : 'Sin paso asociado'}{' '}
+                      · {action.actor?.name ?? 'Usuario'}
                     </span>
-                    <small>{action.comment || 'Sin comentario'} · {new Date(action.createdAt).toLocaleString()}</small>
+                    <small>
+                      {action.comment || 'Sin comentario'} ·{' '}
+                      {new Date(action.createdAt).toLocaleString()}
+                    </small>
                   </div>
                 ))}
               </div>
@@ -588,7 +742,7 @@ function TextField({
   label,
   value,
   onChange,
-  type = 'text'
+  type = 'text',
 }: {
   label: string;
   value: string;
@@ -607,7 +761,7 @@ function SelectField({
   label,
   value,
   onChange,
-  options
+  options,
 }: {
   label: string;
   value: string;

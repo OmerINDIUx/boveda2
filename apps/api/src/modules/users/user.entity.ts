@@ -6,7 +6,7 @@ import {
   JoinTable,
   ManyToMany,
   PrimaryGeneratedColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
 } from 'typeorm';
 import { Role } from '../roles/role.entity';
 
@@ -34,7 +34,7 @@ export class User {
   @JoinTable({
     name: 'role_user',
     joinColumn: { name: 'user_id' },
-    inverseJoinColumn: { name: 'role_id' }
+    inverseJoinColumn: { name: 'role_id' },
   })
   roles!: Role[];
 

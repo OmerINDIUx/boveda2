@@ -1,6 +1,18 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-export const PROJECT_CATALOG_CATEGORIES = ['workType', 'currentStage', 'priority', 'status'] as const;
+export const PROJECT_CATALOG_CATEGORIES = [
+  'workType',
+  'currentStage',
+  'priority',
+  'status',
+] as const;
 export type ProjectCatalogCategory = (typeof PROJECT_CATALOG_CATEGORIES)[number];
 
 @Entity('project_catalog_options')

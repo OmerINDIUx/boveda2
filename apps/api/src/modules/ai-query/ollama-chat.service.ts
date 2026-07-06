@@ -47,24 +47,24 @@ export class OllamaChatService {
                 'No inventes datos. Si la evidencia no permite responder, dilo explicitamente.',
                 'No pegues fragmentos crudos salvo que sean datos puntuales como folios, importes, fechas o correos.',
                 'Cuando el usuario pregunte por montos, identifica importes, moneda y concepto si aparecen.',
-                'Cuando el usuario pregunte si es factura, decide por senales documentales como Invoice, Bill To, VAT, Total, Due o datos fiscales.'
-              ].join(' ')
+                'Cuando el usuario pregunte si es factura, decide por senales documentales como Invoice, Bill To, VAT, Total, Due o datos fiscales.',
+              ].join(' '),
             },
             {
               role: 'user',
-              content: `Pregunta: ${question}\n\nEvidencia autorizada:\n${this.formatEvidence(citations)}`
-            }
+              content: `Pregunta: ${question}\n\nEvidencia autorizada:\n${this.formatEvidence(citations)}`,
+            },
           ],
           options: {
-            temperature: 0.1
-          }
-        })
+            temperature: 0.1,
+          },
+        }),
       });
 
       if (!response.ok) {
         const detail = await response.text().catch(() => '');
         return {
-          error: `Ollama respondio ${response.status}. Revisa que el modelo "${model}" este instalado.${detail ? ` Detalle: ${detail.slice(0, 180)}` : ''}`
+          error: `Ollama respondio ${response.status}. Revisa que el modelo "${model}" este instalado.${detail ? ` Detalle: ${detail.slice(0, 180)}` : ''}`,
         };
       }
 
@@ -77,7 +77,7 @@ export class OllamaChatService {
       }
 
       return {
-        error: `No pude conectar con Ollama en ${baseUrl}. Inicia Ollama o ajusta OLLAMA_BASE_URL.`
+        error: `No pude conectar con Ollama en ${baseUrl}. Inicia Ollama o ajusta OLLAMA_BASE_URL.`,
       };
     } finally {
       clearTimeout(timeout);
@@ -88,12 +88,14 @@ export class OllamaChatService {
     return citations
       .slice(0, 6)
       .map((citation, index) => {
-        const page = citation.pageNumber ? `pagina ${citation.pageNumber}` : 'pagina no identificada';
+        const page = citation.pageNumber
+          ? `pagina ${citation.pageNumber}`
+          : 'pagina no identificada';
         return [
           `[${index + 1}] Documento: ${citation.documentName}`,
           `Version: ${citation.versionLabel}`,
           `Ubicacion: ${page}`,
-          `Texto: ${citation.fragment}`
+          `Texto: ${citation.fragment}`,
         ].join('\n');
       })
       .join('\n\n');

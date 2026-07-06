@@ -12,7 +12,11 @@ import { Rfi } from '../rfis/rfi.entity';
 import { NotificationDelivery } from './notification-delivery.entity';
 import { NotificationPreference } from './notification-preference.entity';
 import { Notification } from './notification.entity';
-import { NOTIFICATION_DEFAULTS, NOTIFICATION_TYPES, NotificationType } from './notifications.constants';
+import {
+  NOTIFICATION_DEFAULTS,
+  NOTIFICATION_TYPES,
+  NotificationType,
+} from './notifications.constants';
 import { SmtpMailService } from './smtp-mail.service';
 
 type NotificationRecipient = {
@@ -44,14 +48,18 @@ export class NotificationsService {
 
   constructor(
     @InjectRepository(Notification) private readonly notifications: Repository<Notification>,
-    @InjectRepository(NotificationPreference) private readonly preferences: Repository<NotificationPreference>,
-    @InjectRepository(NotificationDelivery) private readonly deliveries: Repository<NotificationDelivery>,
+    @InjectRepository(NotificationPreference)
+    private readonly preferences: Repository<NotificationPreference>,
+    @InjectRepository(NotificationDelivery)
+    private readonly deliveries: Repository<NotificationDelivery>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
-    @InjectRepository(ApprovalRequest) private readonly approvalRequests: Repository<ApprovalRequest>,
+    @InjectRepository(ApprovalRequest)
+    private readonly approvalRequests: Repository<ApprovalRequest>,
     @InjectRepository(ApprovalStep) private readonly approvalSteps: Repository<ApprovalStep>,
     @InjectRepository(Contract) private readonly contracts: Repository<Contract>,
-    @InjectRepository(ContractObligation) private readonly obligations: Repository<ContractObligation>,
+    @InjectRepository(ContractObligation)
+    private readonly obligations: Repository<ContractObligation>,
     @InjectRepository(Rfi) private readonly rfis: Repository<Rfi>,
     private readonly mailer: SmtpMailService,
     private readonly config: ConfigService
@@ -98,7 +106,7 @@ export class NotificationsService {
         notificationType,
         label: defaults.label,
         inAppEnabled: row?.inAppEnabled ?? defaults.inApp,
-        emailEnabled: row?.emailEnabled ?? defaults.email
+        emailEnabled: row?.emailEnabled ?? defaults.email,
       };
     });
   }
@@ -107,7 +115,9 @@ export class NotificationsService {
     userId: string,
     items: Array<{ notificationType: string; inAppEnabled: boolean; emailEnabled: boolean }>
   ) {
-    const existing = await this.preferences.find({ where: { userId, notificationType: In(items.map((item) => item.notificationType)) } });
+    const existing = await this.preferences.find({
+      where: { userId, notificationType: In(items.map((item) => item.notificationType)) },
+    });
     const existingMap = new Map(existing.map((row) => [row.notificationType, row]));
     const rows = items.map((item) => {
       const current = existingMap.get(item.notificationType);
@@ -116,7 +126,7 @@ export class NotificationsService {
         userId,
         notificationType: item.notificationType,
         inAppEnabled: item.inAppEnabled,
-        emailEnabled: item.emailEnabled
+        emailEnabled: item.emailEnabled,
       });
     });
     await this.preferences.save(rows);
@@ -127,7 +137,13 @@ export class NotificationsService {
     userId: string,
     title: string,
     body: string,
-    meta?: { type?: string; entityType?: string; entityId?: string; notificationType?: NotificationType; route?: string }
+    meta?: {
+      type?: string;
+      entityType?: string;
+      entityId?: string;
+      notificationType?: NotificationType;
+      route?: string;
+    }
   ) {
     await this.notify({
       recipients: [{ userId }],
@@ -137,7 +153,7 @@ export class NotificationsService {
       entityType: meta?.entityType,
       entityId: meta?.entityId,
       category: meta?.type,
-      meta: meta?.route ? { route: meta.route } : undefined
+      meta: meta?.route ? { route: meta.route } : undefined,
     });
   }
 
@@ -152,8 +168,12 @@ export class NotificationsService {
       return { delivered: 0, skipped: 0 };
     }
 
-    const users = await this.users.find({ where: { id: In([...uniqueRecipients.keys()]), active: true } });
-    const preferences = await this.preferences.find({ where: { userId: In(users.map((user) => user.id)) } });
+    const users = await this.users.find({
+      where: { id: In([...uniqueRecipients.keys()]), active: true },
+    });
+    const preferences = await this.preferences.find({
+      where: { userId: In(users.map((user) => user.id)) },
+    });
     const preferenceMap = new Map<string, NotificationPreference>();
     for (const row of preferences) {
       preferenceMap.set(`${row.userId}:${row.notificationType}`, row);
@@ -179,7 +199,7 @@ export class NotificationsService {
               notificationType: payload.notificationType,
               entityType: payload.entityType,
               entityId: payload.entityId,
-              metaJson: payload.meta ? JSON.stringify(payload.meta) : undefined
+              metaJson: payload.meta ? JSON.stringify(payload.meta) : undefined,
             })
           );
           delivered += 1;
@@ -200,10 +220,16 @@ export class NotificationsService {
             to: user.email,
             subject: payload.title,
             text: `${payload.title}\n\n${payload.body}`,
-            html: this.buildEmailHtml(user.name, payload)
+            html: this.buildEmailHtml(user.name, payload),
           });
           if (result.status === 'skipped') {
-            await this.updateDeliveryStatus(user.id, 'email', payload.dedupeKey, 'skipped', result.message);
+            await this.updateDeliveryStatus(
+              user.id,
+              'email',
+              payload.dedupeKey,
+              'skipped',
+              result.message
+            );
             skipped += 1;
           } else {
             delivered += 1;
@@ -216,7 +242,9 @@ export class NotificationsService {
             'failed',
             error instanceof Error ? error.message : 'Fallo inesperado'
           );
-          this.logger.error(`No fue posible enviar correo a ${user.email}: ${error instanceof Error ? error.message : String(error)}`);
+          this.logger.error(
+            `No fue posible enviar correo a ${user.email}: ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
     }
@@ -240,16 +268,16 @@ export class NotificationsService {
     const expiring = await this.documents.find({
       where: {
         dueDate: Between(today, soon),
-        status: Not(In(['approved', 'archived', 'expired']))
+        status: Not(In(['approved', 'archived', 'expired'])),
       },
-      relations: ['responsibleUser', 'uploadedBy']
+      relations: ['responsibleUser', 'uploadedBy'],
     });
     const expired = await this.documents.find({
       where: {
         dueDate: LessThan(today),
-        status: Not(In(['archived', 'expired']))
+        status: Not(In(['archived', 'expired'])),
       },
-      relations: ['responsibleUser', 'uploadedBy']
+      relations: ['responsibleUser', 'uploadedBy'],
     });
 
     for (const document of expired) {
@@ -266,7 +294,7 @@ export class NotificationsService {
         entityId: document.id,
         category: 'document',
         meta: { route: '/documents' },
-        dedupeKey: `document-expired:${document.id}:${today}`
+        dedupeKey: `document-expired:${document.id}:${today}`,
       });
     }
 
@@ -280,7 +308,7 @@ export class NotificationsService {
         entityId: document.id,
         category: 'document',
         meta: { route: '/documents' },
-        dedupeKey: `document-soon:${document.id}:${today}`
+        dedupeKey: `document-soon:${document.id}:${today}`,
       });
     }
 
@@ -293,16 +321,16 @@ export class NotificationsService {
     const expiring = await this.contracts.find({
       where: {
         endDate: Between(today, soon),
-        status: Not(In(['expired', 'closed', 'renewed']))
+        status: Not(In(['expired', 'closed', 'renewed'])),
       },
-      relations: ['responsibleUser']
+      relations: ['responsibleUser'],
     });
     const expired = await this.contracts.find({
       where: {
         endDate: LessThan(today),
-        status: Not(In(['expired', 'closed', 'renewed']))
+        status: Not(In(['expired', 'closed', 'renewed'])),
       },
-      relations: ['responsibleUser']
+      relations: ['responsibleUser'],
     });
 
     for (const contract of expired) {
@@ -317,7 +345,7 @@ export class NotificationsService {
         entityId: contract.id,
         category: 'contract',
         meta: { route: '/clm' },
-        dedupeKey: `contract-expired:${contract.id}:${today}`
+        dedupeKey: `contract-expired:${contract.id}:${today}`,
       });
     }
 
@@ -331,7 +359,7 @@ export class NotificationsService {
         entityId: contract.id,
         category: 'contract',
         meta: { route: '/clm' },
-        dedupeKey: `contract-soon:${contract.id}:${today}`
+        dedupeKey: `contract-soon:${contract.id}:${today}`,
       });
     }
 
@@ -342,8 +370,8 @@ export class NotificationsService {
     const stopped = await this.approvalRequests.find({
       where: {
         status: 'stopped',
-        completedAt: MoreThanDate(this.daysAgo(1))
-      }
+        completedAt: MoreThanDate(this.daysAgo(1)),
+      },
     });
 
     for (const request of stopped) {
@@ -356,7 +384,7 @@ export class NotificationsService {
         entityId: request.entityId,
         category: 'approval',
         meta: { route: '/approvals' },
-        dedupeKey: `approval-stopped:${request.id}`
+        dedupeKey: `approval-stopped:${request.id}`,
       });
     }
 
@@ -368,9 +396,9 @@ export class NotificationsService {
     const overdue = await this.rfis.find({
       where: {
         dueDate: LessThan(today),
-        status: Not(In(['closed', 'overdue']))
+        status: Not(In(['closed', 'overdue'])),
       },
-      relations: ['assignedTo', 'requester']
+      relations: ['assignedTo', 'requester'],
     });
 
     for (const rfi of overdue) {
@@ -386,7 +414,7 @@ export class NotificationsService {
         entityId: rfi.id,
         category: 'rfi',
         meta: { route: '/rfis' },
-        dedupeKey: `rfi-overdue:${rfi.id}:${today}`
+        dedupeKey: `rfi-overdue:${rfi.id}:${today}`,
       });
     }
 
@@ -398,9 +426,9 @@ export class NotificationsService {
     const pending = await this.obligations.find({
       where: {
         commitmentDate: LessThan(this.addDays(today, 7)),
-        status: Not(In(['completed', 'waived']))
+        status: Not(In(['completed', 'waived'])),
       },
-      relations: ['responsibleUser', 'contract']
+      relations: ['responsibleUser', 'contract'],
     });
 
     for (const obligation of pending) {
@@ -413,7 +441,7 @@ export class NotificationsService {
         entityId: obligation.id,
         category: 'contract',
         meta: { route: '/clm' },
-        dedupeKey: `contract-obligation:${obligation.id}:${today}`
+        dedupeKey: `contract-obligation:${obligation.id}:${today}`,
       });
     }
 
@@ -432,7 +460,9 @@ export class NotificationsService {
 
     if (step.approverRoleId) {
       const users = await this.users.find({ relations: ['roles'], where: { active: true } });
-      return this.toRecipients(users.filter((user) => user.roles?.some((role) => role.id === step.approverRoleId)));
+      return this.toRecipients(
+        users.filter((user) => user.roles?.some((role) => role.id === step.approverRoleId))
+      );
     }
 
     return [];
@@ -453,13 +483,15 @@ export class NotificationsService {
           subject: payload.title,
           notificationType: payload.notificationType,
           entityType: payload.entityType,
-          entityId: payload.entityId
+          entityId: payload.entityId,
         })
       );
       return false;
     }
 
-    const existing = await this.deliveries.findOne({ where: { userId, channel, dedupeKey: payload.dedupeKey } });
+    const existing = await this.deliveries.findOne({
+      where: { userId, channel, dedupeKey: payload.dedupeKey },
+    });
     if (existing) {
       return true;
     }
@@ -473,7 +505,7 @@ export class NotificationsService {
         notificationType: payload.notificationType,
         entityType: payload.entityType,
         entityId: payload.entityId,
-        dedupeKey: payload.dedupeKey
+        dedupeKey: payload.dedupeKey,
       })
     );
     return false;
@@ -509,12 +541,13 @@ export class NotificationsService {
       entityId: notification.entityId,
       readAt: notification.readAt,
       createdAt: notification.createdAt,
-      meta: notification.metaJson ? JSON.parse(notification.metaJson) : null
+      meta: notification.metaJson ? JSON.parse(notification.metaJson) : null,
     };
   }
 
   private buildEmailHtml(name: string, payload: NotifyPayload) {
-    const appUrl = this.config.get<string>('WEB_APP_URL') ?? this.config.get<string>('WEB_ORIGIN') ?? '';
+    const appUrl =
+      this.config.get<string>('WEB_APP_URL') ?? this.config.get<string>('WEB_ORIGIN') ?? '';
     const route = payload.meta?.route ? `${appUrl}${payload.meta.route}` : '';
     return [
       `<div style="font-family:Segoe UI,Arial,sans-serif;color:#172033;line-height:1.5">`,
@@ -523,7 +556,7 @@ export class NotificationsService {
       `<p>${payload.body}</p>`,
       route ? `<p><a href="${route}" style="color:#0f766e">Abrir en Holocron</a></p>` : '',
       `<p style="color:#667085;font-size:12px">Este aviso fue generado por Holocron.</p>`,
-      `</div>`
+      `</div>`,
     ].join('');
   }
 

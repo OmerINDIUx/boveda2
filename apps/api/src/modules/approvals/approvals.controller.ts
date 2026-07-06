@@ -40,7 +40,11 @@ export class ApprovalsController {
 
   @Patch('flows/:id')
   @Permissions(PermissionKey.ApprovalsManage)
-  updateFlow(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateApprovalFlowDto) {
+  updateFlow(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateApprovalFlowDto
+  ) {
     return this.approvals.updateFlow(user.id, id, dto);
   }
 
@@ -76,25 +80,41 @@ export class ApprovalsController {
 
   @Post('requests/:id/approve')
   @Permissions(PermissionKey.DocumentsApprove)
-  approve(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: ApprovalActionDto) {
+  approve(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ApprovalActionDto
+  ) {
     return this.approvals.approve(user.id, user.roles, id, dto);
   }
 
   @Post('requests/:id/reject')
   @Permissions(PermissionKey.DocumentsApprove)
-  reject(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: ApprovalActionDto) {
+  reject(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ApprovalActionDto
+  ) {
     return this.approvals.reject(user.id, user.roles, id, dto);
   }
 
   @Post('requests/:id/request-changes')
   @Permissions(PermissionKey.DocumentsApprove)
-  requestChanges(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: ApprovalActionDto) {
+  requestChanges(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ApprovalActionDto
+  ) {
     return this.approvals.requestChanges(user.id, user.roles, id, dto);
   }
 
   @Post('requests/:id/comment')
   @Permissions(PermissionKey.DocumentsApprove)
-  comment(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: ApprovalActionDto) {
+  comment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ApprovalActionDto
+  ) {
     return this.approvals.comment(user.id, id, dto);
   }
 }

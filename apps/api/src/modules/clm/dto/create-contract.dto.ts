@@ -25,7 +25,15 @@ export class CreateContractDto {
 
   @IsOptional()
   @IsString()
-  status?: 'draft' | 'in_review' | 'approved' | 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'closed';
+  status?:
+    | 'draft'
+    | 'in_review'
+    | 'approved'
+    | 'active'
+    | 'expiring_soon'
+    | 'expired'
+    | 'renewed'
+    | 'closed';
 
   @IsOptional()
   @IsString()

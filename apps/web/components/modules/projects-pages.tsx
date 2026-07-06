@@ -11,7 +11,7 @@ import {
   PencilLine,
   Plus,
   Search,
-  ShieldBan
+  ShieldBan,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getSessionUser } from '../../lib/auth';
@@ -60,7 +60,13 @@ type ProjectDetail = {
   folders: FolderNode[];
   recentDocuments: ProjectDocument[];
   criticalDocuments: ProjectDocument[];
-  documentsSummary: { total: number; approved: number; inReview: number; overdue: number; critical: number };
+  documentsSummary: {
+    total: number;
+    approved: number;
+    inReview: number;
+    overdue: number;
+    critical: number;
+  };
   availableDisciplines: Array<{ id: string; code: string; name: string }>;
 };
 
@@ -137,7 +143,7 @@ const emptyForm: ProjectForm = {
   targetDate: '',
   status: 'planificacion',
   assignedUserIds: [],
-  disciplineIds: []
+  disciplineIds: [],
 };
 
 const emptyFilters: Filters = {
@@ -147,7 +153,7 @@ const emptyFilters: Filters = {
   status: '',
   responsibleId: '',
   dateFrom: '',
-  dateTo: ''
+  dateTo: '',
 };
 
 const fallbackProjects: ProjectSummary[] = [
@@ -155,7 +161,8 @@ const fallbackProjects: ProjectSummary[] = [
     id: 'mock-1',
     name: 'Torre Ejecutiva Norte',
     code: 'HOL-PRJ-001',
-    description: 'Gestión integral de ingeniería, submittals y control documental para edificio corporativo.',
+    description:
+      'Gestión integral de ingeniería, submittals y control documental para edificio corporativo.',
     workType: 'Edificación vertical',
     currentStage: 'Coordinación IFC',
     priority: 'alta',
@@ -165,13 +172,13 @@ const fallbackProjects: ProjectSummary[] = [
     responsible: { id: 'u1', name: 'Laura Méndez', email: 'laura@holocron.local' },
     assignedUsers: [
       { id: 'u1', name: 'Laura Méndez', email: 'laura@holocron.local', role: 'owner' },
-      { id: 'u2', name: 'José Ramírez', email: 'jose@holocron.local', role: 'manager' }
+      { id: 'u2', name: 'José Ramírez', email: 'jose@holocron.local', role: 'manager' },
     ],
     disciplines: [
       { id: 'd1', code: 'ARC', name: 'Arquitectura' },
-      { id: 'd2', code: 'MEC', name: 'Mecánica' }
+      { id: 'd2', code: 'MEC', name: 'Mecánica' },
     ],
-    metrics: { documents: 48, approved: 31, critical: 5, progress: 65 }
+    metrics: { documents: 48, approved: 31, critical: 5, progress: 65 },
   },
   {
     id: 'mock-2',
@@ -188,10 +195,10 @@ const fallbackProjects: ProjectSummary[] = [
     assignedUsers: [{ id: 'u3', name: 'Paola Cruz', email: 'paola@holocron.local', role: 'owner' }],
     disciplines: [
       { id: 'd3', code: 'CIV', name: 'Civil' },
-      { id: 'd4', code: 'ELE', name: 'Eléctrica' }
+      { id: 'd4', code: 'ELE', name: 'Eléctrica' },
     ],
-    metrics: { documents: 76, approved: 39, critical: 11, progress: 51 }
-  }
+    metrics: { documents: 76, approved: 39, critical: 11, progress: 51 },
+  },
 ];
 
 const fallbackDetail: Record<string, ProjectDetail> = {
@@ -204,16 +211,21 @@ const fallbackDetail: Record<string, ProjectDetail> = {
         name: '02_Tecnico',
         path: '02_Tecnico',
         children: [
-          { id: 'f-2a', name: 'ARC_Arquitectura', path: '02_Tecnico/ARC_Arquitectura', children: [] },
-          { id: 'f-2b', name: 'MEC_Mecánica', path: '02_Tecnico/MEC_Mecánica', children: [] }
-        ]
+          {
+            id: 'f-2a',
+            name: 'ARC_Arquitectura',
+            path: '02_Tecnico/ARC_Arquitectura',
+            children: [],
+          },
+          { id: 'f-2b', name: 'MEC_Mecánica', path: '02_Tecnico/MEC_Mecánica', children: [] },
+        ],
       },
-      { id: 'f-3', name: '03_Obra', path: '03_Obra', children: [] }
+      { id: 'f-3', name: '03_Obra', path: '03_Obra', children: [] },
     ],
     recentDocuments: [],
     criticalDocuments: [],
     documentsSummary: { total: 48, approved: 31, inReview: 9, overdue: 3, critical: 5 },
-    availableDisciplines: fallbackProjects[0].disciplines
+    availableDisciplines: fallbackProjects[0].disciplines,
   },
   'mock-2': {
     project: fallbackProjects[1],
@@ -225,15 +237,15 @@ const fallbackDetail: Record<string, ProjectDetail> = {
         path: '02_Tecnico',
         children: [
           { id: 'f-5a', name: 'CIV_Civil', path: '02_Tecnico/CIV_Civil', children: [] },
-          { id: 'f-5b', name: 'ELE_Eléctrica', path: '02_Tecnico/ELE_Eléctrica', children: [] }
-        ]
-      }
+          { id: 'f-5b', name: 'ELE_Eléctrica', path: '02_Tecnico/ELE_Eléctrica', children: [] },
+        ],
+      },
     ],
     recentDocuments: [],
     criticalDocuments: [],
     documentsSummary: { total: 76, approved: 39, inReview: 19, overdue: 6, critical: 11 },
-    availableDisciplines: fallbackProjects[1].disciplines
-  }
+    availableDisciplines: fallbackProjects[1].disciplines,
+  },
 };
 
 const fallbackDocuments: Record<string, ProjectDocumentsResponse> = {
@@ -248,7 +260,7 @@ const fallbackDocuments: Record<string, ProjectDocumentsResponse> = {
         updatedAt: '2026-07-01T16:20:00.000Z',
         folder: { id: 'f-2a', name: 'ARC_Arquitectura' },
         discipline: { id: 'd1', code: 'ARC', name: 'Arquitectura' },
-        responsibleUser: { id: 'u1', name: 'Laura Méndez', email: 'laura@holocron.local' }
+        responsibleUser: { id: 'u1', name: 'Laura Méndez', email: 'laura@holocron.local' },
       },
       {
         id: 'doc-2',
@@ -259,7 +271,7 @@ const fallbackDocuments: Record<string, ProjectDocumentsResponse> = {
         updatedAt: '2026-07-01T10:05:00.000Z',
         folder: { id: 'f-2b', name: 'MEC_Mecánica' },
         discipline: { id: 'd2', code: 'MEC', name: 'Mecánica' },
-        responsibleUser: { id: 'u2', name: 'José Ramírez', email: 'jose@holocron.local' }
+        responsibleUser: { id: 'u2', name: 'José Ramírez', email: 'jose@holocron.local' },
       },
       {
         id: 'doc-3',
@@ -270,12 +282,12 @@ const fallbackDocuments: Record<string, ProjectDocumentsResponse> = {
         updatedAt: '2026-06-30T08:40:00.000Z',
         folder: { id: 'f-3', name: '03_Obra' },
         discipline: null,
-        responsibleUser: { id: 'u1', name: 'Laura Méndez', email: 'laura@holocron.local' }
-      }
+        responsibleUser: { id: 'u1', name: 'Laura Méndez', email: 'laura@holocron.local' },
+      },
     ],
     summary: { total: 48, approved: 31, inReview: 9, overdue: 3, critical: 5 },
     recent: [],
-    critical: []
+    critical: [],
   },
   'mock-2': {
     items: [
@@ -288,7 +300,7 @@ const fallbackDocuments: Record<string, ProjectDocumentsResponse> = {
         updatedAt: '2026-07-02T07:30:00.000Z',
         folder: { id: 'f-5a', name: 'CIV_Civil' },
         discipline: { id: 'd3', code: 'CIV', name: 'Civil' },
-        responsibleUser: { id: 'u3', name: 'Paola Cruz', email: 'paola@holocron.local' }
+        responsibleUser: { id: 'u3', name: 'Paola Cruz', email: 'paola@holocron.local' },
       },
       {
         id: 'doc-5',
@@ -299,18 +311,20 @@ const fallbackDocuments: Record<string, ProjectDocumentsResponse> = {
         updatedAt: '2026-07-01T18:15:00.000Z',
         folder: { id: 'f-5b', name: 'ELE_Eléctrica' },
         discipline: { id: 'd4', code: 'ELE', name: 'Eléctrica' },
-        responsibleUser: { id: 'u3', name: 'Paola Cruz', email: 'paola@holocron.local' }
-      }
+        responsibleUser: { id: 'u3', name: 'Paola Cruz', email: 'paola@holocron.local' },
+      },
     ],
     summary: { total: 76, approved: 39, inReview: 19, overdue: 6, critical: 11 },
     recent: [],
-    critical: []
-  }
+    critical: [],
+  },
 };
 
 for (const key of Object.keys(fallbackDetail)) {
   fallbackDetail[key].recentDocuments = [...fallbackDocuments[key].items].slice(0, 3);
-  fallbackDetail[key].criticalDocuments = fallbackDocuments[key].items.filter((item) => item.status !== 'approved');
+  fallbackDetail[key].criticalDocuments = fallbackDocuments[key].items.filter(
+    (item) => item.status !== 'approved'
+  );
   fallbackDocuments[key].recent = fallbackDetail[key].recentDocuments;
   fallbackDocuments[key].critical = fallbackDetail[key].criticalDocuments;
 }
@@ -416,7 +430,7 @@ export function ProjectsListPage() {
       { label: 'Proyectos activos', value: activeProjects, tone: 'ok', icon: FolderTree },
       { label: 'Con alertas críticas', value: criticalProjects, tone: 'warn', icon: AlertTriangle },
       { label: 'Documentos trazados', value: totalDocuments, tone: 'info', icon: FileText },
-      { label: 'Críticos o vencidos', value: overdueDocuments, tone: 'danger', icon: FileClock }
+      { label: 'Críticos o vencidos', value: overdueDocuments, tone: 'danger', icon: FileClock },
     ];
   }, [projects]);
 
@@ -424,7 +438,8 @@ export function ProjectsListPage() {
     const needle = search.trim().toLowerCase();
     if (!needle) return projects;
     return projects.filter((project) => {
-      const haystack = `${project.code} ${project.name} ${project.currentStage ?? ''} ${project.responsible?.name ?? ''}`.toLowerCase();
+      const haystack =
+        `${project.code} ${project.name} ${project.currentStage ?? ''} ${project.responsible?.name ?? ''}`.toLowerCase();
       return haystack.includes(needle);
     });
   }, [projects, search]);
@@ -434,7 +449,9 @@ export function ProjectsListPage() {
       <div className="topbar">
         <div>
           <h1>Proyectos</h1>
-          <p className="muted">Cada proyecto concentra sus documentos, carpetas, responsables y trazabilidad.</p>
+          <p className="muted">
+            Cada proyecto concentra sus documentos, carpetas, responsables y trazabilidad.
+          </p>
         </div>
         <div className="projects-actions">
           {canManage ? (
@@ -464,7 +481,9 @@ export function ProjectsListPage() {
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <h2>Listado de proyectos</h2>
-          <span className="pill">{loading ? 'Cargando' : `${filteredProjects.length} registros`}</span>
+          <span className="pill">
+            {loading ? 'Cargando' : `${filteredProjects.length} registros`}
+          </span>
         </div>
         <div className="field">
           <label>Búsqueda rápida</label>
@@ -547,7 +566,10 @@ export function ProjectDetailPage() {
         const query = buildQuery(filters);
         const [detailResponse, documentsResponse] = await Promise.all([
           apiGet<ProjectDetail>(`/projects/${projectId}`, getToken() ?? undefined),
-          apiGet<ProjectDocumentsResponse>(`/projects/${projectId}/documents${query ? `?${query}` : ''}`, getToken() ?? undefined)
+          apiGet<ProjectDocumentsResponse>(
+            `/projects/${projectId}/documents${query ? `?${query}` : ''}`,
+            getToken() ?? undefined
+          ),
         ]);
 
         if (!active) return;
@@ -573,7 +595,9 @@ export function ProjectDetailPage() {
     if (!projectId || !detail) return;
     try {
       await apiPatch(`/projects/${projectId}/deactivate`, {}, getToken() ?? undefined);
-      setDetail((current) => (current ? { ...current, project: { ...current.project, isActive: false } } : current));
+      setDetail((current) =>
+        current ? { ...current, project: { ...current.project, isActive: false } } : current
+      );
     } catch (error) {
       setError(getErrorMessage(error, 'No fue posible desactivar el proyecto en este momento.'));
     }
@@ -604,7 +628,9 @@ export function ProjectDetailPage() {
       <div className="topbar">
         <div>
           <h1>{detail.project.name}</h1>
-          <p className="muted">Aquí vive la estructura completa del proyecto: carpetas, documentos y seguimiento.</p>
+          <p className="muted">
+            Aquí vive la estructura completa del proyecto: carpetas, documentos y seguimiento.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href="/projects">
@@ -646,7 +672,9 @@ export function ProjectDetailPage() {
             <p className="muted">{detail.project.description || 'Sin descripción ejecutiva.'}</p>
           </div>
           <div className="project-hero-actions">
-            <span className={`pill ${detail.project.isActive ? '' : 'danger'}`}>{detail.project.isActive ? 'Activo' : 'Inactivo'}</span>
+            <span className={`pill ${detail.project.isActive ? '' : 'danger'}`}>
+              {detail.project.isActive ? 'Activo' : 'Inactivo'}
+            </span>
           </div>
         </div>
 
@@ -701,8 +729,13 @@ export function ProjectDetailPage() {
             <h2>Carpetas del proyecto</h2>
             <FolderTree size={18} color="var(--primary)" />
           </div>
-          <p className="muted">Cada documento del proyecto debe vivir dentro de una de estas carpetas.</p>
-          <FolderTreeView nodes={detail.folders} onSelectFolder={(folderId) => setFilters((current) => ({ ...current, folderId }))} />
+          <p className="muted">
+            Cada documento del proyecto debe vivir dentro de una de estas carpetas.
+          </p>
+          <FolderTreeView
+            nodes={detail.folders}
+            onSelectFolder={(folderId) => setFilters((current) => ({ ...current, folderId }))}
+          />
         </article>
 
         <article className="card span-4">
@@ -720,7 +753,7 @@ export function ProjectDetailPage() {
                   setFilters((current) => ({
                     ...current,
                     status: document.status,
-                    disciplineId: document.discipline?.id ?? current.disciplineId
+                    disciplineId: document.discipline?.id ?? current.disciplineId,
                   }))
                 }
               >
@@ -738,7 +771,11 @@ export function ProjectDetailPage() {
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <h2>Filtros rápidos</h2>
-          <button className="button secondary" type="button" onClick={() => setFilters(emptyFilters)}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => setFilters(emptyFilters)}
+          >
             Limpiar
           </button>
         </div>
@@ -747,7 +784,9 @@ export function ProjectDetailPage() {
             <label>Disciplina</label>
             <select
               value={filters.disciplineId}
-              onChange={(event) => setFilters((current) => ({ ...current, disciplineId: event.target.value }))}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, disciplineId: event.target.value }))
+              }
             >
               <option value="">Todas</option>
               {detail.availableDisciplines.map((discipline) => (
@@ -762,12 +801,19 @@ export function ProjectDetailPage() {
             <input
               placeholder="Id de carpeta"
               value={filters.folderId}
-              onChange={(event) => setFilters((current) => ({ ...current, folderId: event.target.value }))}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, folderId: event.target.value }))
+              }
             />
           </div>
           <div className="field">
             <label>Estado documental</label>
-            <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+            <select
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, status: event.target.value }))
+              }
+            >
               <option value="">Todos</option>
               <option value="draft">Borrador</option>
               <option value="in_review">En revisión</option>
@@ -780,7 +826,9 @@ export function ProjectDetailPage() {
             <input
               placeholder="Id de usuario"
               value={filters.responsibleId}
-              onChange={(event) => setFilters((current) => ({ ...current, responsibleId: event.target.value }))}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, responsibleId: event.target.value }))
+              }
             />
           </div>
           <div className="field">
@@ -788,7 +836,9 @@ export function ProjectDetailPage() {
             <input
               type="date"
               value={filters.dateFrom}
-              onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, dateFrom: event.target.value }))
+              }
             />
           </div>
           <div className="field">
@@ -796,7 +846,9 @@ export function ProjectDetailPage() {
             <input
               type="date"
               value={filters.dateTo}
-              onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, dateTo: event.target.value }))
+              }
             />
           </div>
         </div>
@@ -805,7 +857,9 @@ export function ProjectDetailPage() {
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <h2>Tabla de documentos</h2>
-          <span className="pill">{loading ? 'Actualizando' : `${documents?.items.length ?? 0} documentos`}</span>
+          <span className="pill">
+            {loading ? 'Actualizando' : `${documents?.items.length ?? 0} documentos`}
+          </span>
         </div>
         <div className="projects-actions" style={{ marginBottom: 12 }}>
           <Link className="button secondary" href={`/documents?projectId=${detail.project.id}`}>
@@ -830,11 +884,17 @@ export function ProjectDetailPage() {
                 <tr key={document.id}>
                   <td>{document.documentNumber}</td>
                   <td>{document.name}</td>
-                  <td>{document.discipline ? `${document.discipline.code} · ${document.discipline.name}` : 'General'}</td>
+                  <td>
+                    {document.discipline
+                      ? `${document.discipline.code} · ${document.discipline.name}`
+                      : 'General'}
+                  </td>
                   <td>{document.folder?.name ?? 'Sin carpeta'}</td>
                   <td>{document.responsibleUser?.name ?? 'Sin responsable'}</td>
                   <td>
-                    <span className={`pill ${document.status === 'approved' ? 'success' : document.status === 'draft' ? 'warning' : ''}`}>
+                    <span
+                      className={`pill ${document.status === 'approved' ? 'success' : document.status === 'draft' ? 'warning' : ''}`}
+                    >
                       {normalizeLabel(document.status)}
                     </span>
                   </td>
@@ -874,7 +934,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [formOptions, setFormOptions] = useState<FormOptionsResponse>({
     users: [],
     disciplines: [],
-    catalogs: { workType: [], currentStage: [], priority: [], status: [] }
+    catalogs: { workType: [], currentStage: [], priority: [], status: [] },
   });
   const [responsibleSearch, setResponsibleSearch] = useState('');
   const [codeTouched, setCodeTouched] = useState(false);
@@ -887,16 +947,21 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
     async function loadFormOptions() {
       try {
-        const response = await apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined);
+        const response = await apiGet<FormOptionsResponse>(
+          '/projects/form-options',
+          getToken() ?? undefined
+        );
         if (!active) return;
         setFormOptions(response);
       } catch {
         if (!active) return;
         const fallbackUsers = fallbackProjects.flatMap((project) => [
           ...(project.responsible ? [project.responsible] : []),
-          ...project.assignedUsers
+          ...project.assignedUsers,
         ]);
-        const uniqueUsers = Array.from(new Map(fallbackUsers.map((user) => [user.id, user])).values());
+        const uniqueUsers = Array.from(
+          new Map(fallbackUsers.map((user) => [user.id, user])).values()
+        );
         const fallbackDisciplines = Array.from(
           new Map(
             fallbackProjects
@@ -910,30 +975,114 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
           disciplines: fallbackDisciplines.map((discipline) => ({
             id: discipline.id,
             code: discipline.code,
-            name: discipline.name
+            name: discipline.name,
           })),
           catalogs: {
             workType: [
-              { id: 'work-1', category: 'workType', value: 'edificacion_vertical', label: 'Edificación vertical', sortOrder: 10, isActive: true },
-              { id: 'work-2', category: 'workType', value: 'infraestructura_hidraulica', label: 'Infraestructura hidráulica', sortOrder: 20, isActive: true }
+              {
+                id: 'work-1',
+                category: 'workType',
+                value: 'edificacion_vertical',
+                label: 'Edificación vertical',
+                sortOrder: 10,
+                isActive: true,
+              },
+              {
+                id: 'work-2',
+                category: 'workType',
+                value: 'infraestructura_hidraulica',
+                label: 'Infraestructura hidráulica',
+                sortOrder: 20,
+                isActive: true,
+              },
             ],
             currentStage: [
-              { id: 'stage-1', category: 'currentStage', value: 'planificacion', label: 'Planificación', sortOrder: 10, isActive: true },
-              { id: 'stage-2', category: 'currentStage', value: 'coordinacion_ifc', label: 'Coordinación IFC', sortOrder: 20, isActive: true },
-              { id: 'stage-3', category: 'currentStage', value: 'construccion', label: 'Construcción', sortOrder: 30, isActive: true }
+              {
+                id: 'stage-1',
+                category: 'currentStage',
+                value: 'planificacion',
+                label: 'Planificación',
+                sortOrder: 10,
+                isActive: true,
+              },
+              {
+                id: 'stage-2',
+                category: 'currentStage',
+                value: 'coordinacion_ifc',
+                label: 'Coordinación IFC',
+                sortOrder: 20,
+                isActive: true,
+              },
+              {
+                id: 'stage-3',
+                category: 'currentStage',
+                value: 'construccion',
+                label: 'Construcción',
+                sortOrder: 30,
+                isActive: true,
+              },
             ],
             priority: [
-              { id: 'priority-1', category: 'priority', value: 'baja', label: 'Baja', sortOrder: 10, isActive: true },
-              { id: 'priority-2', category: 'priority', value: 'media', label: 'Media', sortOrder: 20, isActive: true },
-              { id: 'priority-3', category: 'priority', value: 'alta', label: 'Alta', sortOrder: 30, isActive: true },
-              { id: 'priority-4', category: 'priority', value: 'critica', label: 'Crítica', sortOrder: 40, isActive: true }
+              {
+                id: 'priority-1',
+                category: 'priority',
+                value: 'baja',
+                label: 'Baja',
+                sortOrder: 10,
+                isActive: true,
+              },
+              {
+                id: 'priority-2',
+                category: 'priority',
+                value: 'media',
+                label: 'Media',
+                sortOrder: 20,
+                isActive: true,
+              },
+              {
+                id: 'priority-3',
+                category: 'priority',
+                value: 'alta',
+                label: 'Alta',
+                sortOrder: 30,
+                isActive: true,
+              },
+              {
+                id: 'priority-4',
+                category: 'priority',
+                value: 'critica',
+                label: 'Crítica',
+                sortOrder: 40,
+                isActive: true,
+              },
             ],
             status: [
-              { id: 'status-1', category: 'status', value: 'planificacion', label: 'Planificación', sortOrder: 10, isActive: true },
-              { id: 'status-2', category: 'status', value: 'en_ejecucion', label: 'En ejecución', sortOrder: 20, isActive: true },
-              { id: 'status-3', category: 'status', value: 'en_riesgo', label: 'En riesgo', sortOrder: 30, isActive: true }
-            ]
-          }
+              {
+                id: 'status-1',
+                category: 'status',
+                value: 'planificacion',
+                label: 'Planificación',
+                sortOrder: 10,
+                isActive: true,
+              },
+              {
+                id: 'status-2',
+                category: 'status',
+                value: 'en_ejecucion',
+                label: 'En ejecución',
+                sortOrder: 20,
+                isActive: true,
+              },
+              {
+                id: 'status-3',
+                category: 'status',
+                value: 'en_riesgo',
+                label: 'En riesgo',
+                sortOrder: 30,
+                isActive: true,
+              },
+            ],
+          },
         });
       }
     }
@@ -952,7 +1101,10 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<ProjectDetail>(`/projects/${projectId}`, getToken() ?? undefined);
+        const response = await apiGet<ProjectDetail>(
+          `/projects/${projectId}`,
+          getToken() ?? undefined
+        );
         if (!active) return;
         setForm({
           name: response.project.name,
@@ -965,7 +1117,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
           targetDate: response.project.targetDate ?? '',
           status: response.project.status ?? 'planificacion',
           assignedUserIds: response.project.assignedUsers.map((user) => user.id),
-          disciplineIds: response.project.disciplines.map((discipline) => discipline.id)
+          disciplineIds: response.project.disciplines.map((discipline) => discipline.id),
         });
         setCodeTouched(true);
       } catch {
@@ -982,7 +1134,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
             targetDate: fallback.project.targetDate ?? '',
             status: fallback.project.status ?? 'planificacion',
             assignedUserIds: fallback.project.assignedUsers.map((user) => user.id),
-            disciplineIds: fallback.project.disciplines.map((discipline) => discipline.id)
+            disciplineIds: fallback.project.disciplines.map((discipline) => discipline.id),
           });
           setCodeTouched(true);
           setError('No fue posible cargar la API; se habilitó el formulario con datos locales.');
@@ -1011,7 +1163,9 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const filteredUsers = useMemo(() => {
     const needle = responsibleSearch.trim().toLowerCase();
     if (!needle) return formOptions.users;
-    return formOptions.users.filter((user) => `${user.name} ${user.email}`.toLowerCase().includes(needle));
+    return formOptions.users.filter((user) =>
+      `${user.name} ${user.email}`.toLowerCase().includes(needle)
+    );
   }, [formOptions.users, responsibleSearch]);
 
   async function submit() {
@@ -1026,7 +1180,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
     const payload = {
       ...form,
       assignedUserIds: mode === 'create' ? [] : form.assignedUserIds,
-      disciplineIds: form.disciplineIds
+      disciplineIds: form.disciplineIds,
     };
 
     try {
@@ -1042,11 +1196,22 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
         return;
       }
 
-      const updated = await apiPatch<ProjectDetail>(`/projects/${projectId}`, payload, getToken() ?? undefined);
+      const updated = await apiPatch<ProjectDetail>(
+        `/projects/${projectId}`,
+        payload,
+        getToken() ?? undefined
+      );
       router.push(`/projects/${updated.project.id}`);
       router.refresh();
     } catch (error) {
-      setError(getErrorMessage(error, mode === 'create' ? 'No fue posible crear el proyecto.' : 'No fue posible actualizar el proyecto.'));
+      setError(
+        getErrorMessage(
+          error,
+          mode === 'create'
+            ? 'No fue posible crear el proyecto.'
+            : 'No fue posible actualizar el proyecto.'
+        )
+      );
     } finally {
       setSaving(false);
     }
@@ -1057,7 +1222,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
       ...current,
       disciplineIds: current.disciplineIds.includes(disciplineId)
         ? current.disciplineIds.filter((id) => id !== disciplineId)
-        : [...current.disciplineIds, disciplineId]
+        : [...current.disciplineIds, disciplineId],
     }));
   }
 
@@ -1073,7 +1238,10 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </p>
         </div>
         <div className="projects-actions">
-          <Link className="button secondary" href={mode === 'create' ? '/projects' : `/projects/${projectId}`}>
+          <Link
+            className="button secondary"
+            href={mode === 'create' ? '/projects' : `/projects/${projectId}`}
+          >
             Cancelar
           </Link>
         </div>
@@ -1087,7 +1255,11 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
         ) : (
           <>
             <div className="quick-filters-grid">
-              <FormField label="Nombre" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+              <FormField
+                label="Nombre"
+                value={form.name}
+                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+              />
               <FormField
                 label="Código interno"
                 value={form.code}
@@ -1100,25 +1272,37 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 label="Tipo de obra"
                 value={form.workType}
                 onChange={(value) => setForm((current) => ({ ...current, workType: value }))}
-                options={formOptions.catalogs.workType.map((option) => ({ value: option.value, label: option.label }))}
+                options={formOptions.catalogs.workType.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
               />
               <SelectField
                 label="Etapa actual"
                 value={form.currentStage}
                 onChange={(value) => setForm((current) => ({ ...current, currentStage: value }))}
-                options={formOptions.catalogs.currentStage.map((option) => ({ value: option.value, label: option.label }))}
+                options={formOptions.catalogs.currentStage.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
               />
               <SelectField
                 label="Prioridad"
                 value={form.priority}
                 onChange={(value) => setForm((current) => ({ ...current, priority: value }))}
-                options={formOptions.catalogs.priority.map((option) => ({ value: option.value, label: option.label }))}
+                options={formOptions.catalogs.priority.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
               />
               <SelectField
                 label="Estado"
                 value={form.status}
                 onChange={(value) => setForm((current) => ({ ...current, status: value }))}
-                options={formOptions.catalogs.status.map((option) => ({ value: option.value, label: option.label }))}
+                options={formOptions.catalogs.status.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
               />
               <div className="field">
                 <label>Catálogos del proyecto</label>
@@ -1133,7 +1317,9 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 value={form.responsibleUserId}
                 search={responsibleSearch}
                 onSearchChange={setResponsibleSearch}
-                onChange={(value) => setForm((current) => ({ ...current, responsibleUserId: value }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, responsibleUserId: value }))
+                }
               />
               <FormField
                 label="Fecha objetivo"
@@ -1143,18 +1329,33 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
               />
               <div className="field span-2">
                 <label>Disciplinas del proyecto</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: 10,
+                  }}
+                >
                   {formOptions.disciplines.map((discipline) => (
                     <label
                       key={discipline.id}
-                      style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 12 }}
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'center',
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 12,
+                      }}
                     >
                       <input
                         type="checkbox"
                         checked={form.disciplineIds.includes(discipline.id)}
                         onChange={() => toggleDiscipline(discipline.id)}
                       />
-                      <span>{discipline.code} · {discipline.name}</span>
+                      <span>
+                        {discipline.code} · {discipline.name}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -1171,11 +1372,19 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
               </div>
               <div className="field span-2">
                 <label>Descripción</label>
-                <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+                <textarea
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                />
               </div>
             </div>
             <div className="projects-actions">
-              <Link className="button secondary" href={mode === 'create' ? '/projects' : `/projects/${projectId}`}>
+              <Link
+                className="button secondary"
+                href={mode === 'create' ? '/projects' : `/projects/${projectId}`}
+              >
                 Volver
               </Link>
               <button className="button" type="button" onClick={submit} disabled={saving}>
@@ -1189,7 +1398,13 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   );
 }
 
-function FolderTreeView({ nodes, onSelectFolder }: { nodes: FolderNode[]; onSelectFolder: (folderId: string) => void }) {
+function FolderTreeView({
+  nodes,
+  onSelectFolder,
+}: {
+  nodes: FolderNode[];
+  onSelectFolder: (folderId: string) => void;
+}) {
   return (
     <div className="folder-tree">
       {nodes.map((node) => (
@@ -1202,7 +1417,7 @@ function FolderTreeView({ nodes, onSelectFolder }: { nodes: FolderNode[]; onSele
 function FolderTreeNode({
   node,
   depth,
-  onSelectFolder
+  onSelectFolder,
 }: {
   node: FolderNode;
   depth: number;
@@ -1210,11 +1425,21 @@ function FolderTreeNode({
 }) {
   return (
     <>
-      <button className="folder-tree-node" style={{ paddingLeft: 12 + depth * 18 }} type="button" onClick={() => onSelectFolder(node.id)}>
+      <button
+        className="folder-tree-node"
+        style={{ paddingLeft: 12 + depth * 18 }}
+        type="button"
+        onClick={() => onSelectFolder(node.id)}
+      >
         <span>{node.name}</span>
       </button>
       {node.children.map((child) => (
-        <FolderTreeNode key={child.id} node={child} depth={depth + 1} onSelectFolder={onSelectFolder} />
+        <FolderTreeNode
+          key={child.id}
+          node={child}
+          depth={depth + 1}
+          onSelectFolder={onSelectFolder}
+        />
       ))}
     </>
   );
@@ -1240,7 +1465,7 @@ function FormField({
   label,
   value,
   onChange,
-  type = 'text'
+  type = 'text',
 }: {
   label: string;
   value: string;
@@ -1259,7 +1484,7 @@ function SelectField({
   label,
   value,
   onChange,
-  options
+  options,
 }: {
   label: string;
   value: string;
@@ -1286,7 +1511,7 @@ function SearchableUserField({
   value,
   search,
   onSearchChange,
-  onChange
+  onChange,
 }: {
   users: UserOption[];
   value: string;
@@ -1297,8 +1522,16 @@ function SearchableUserField({
   return (
     <div className="field">
       <label>Responsable</label>
-      <input placeholder="Buscar usuario por nombre o correo" value={search} onChange={(event) => onSearchChange(event.target.value)} />
-      <select value={value} onChange={(event) => onChange(event.target.value)} style={{ marginTop: 8 }}>
+      <input
+        placeholder="Buscar usuario por nombre o correo"
+        value={search}
+        onChange={(event) => onSearchChange(event.target.value)}
+      />
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        style={{ marginTop: 8 }}
+      >
         <option value="">Selecciona un responsable</option>
         {users.map((user) => (
           <option key={user.id} value={user.id}>

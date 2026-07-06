@@ -69,13 +69,15 @@ export default function AiQueryPage() {
         const [projectsResponse, documentsResponse, historyResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken()),
           apiGet<DocumentOption[]>('/documents', getToken()),
-          apiGet<QueryHistoryItem[]>('/ai-query/history', getToken())
+          apiGet<QueryHistoryItem[]>('/ai-query/history', getToken()),
         ]);
         setProjects(projectsResponse);
         setDocuments(documentsResponse);
         setHistory(historyResponse);
       } catch {
-        setMessage('La consulta inteligente quedo lista en API, pero esta vista no pudo cargar catalogos iniciales.');
+        setMessage(
+          'La consulta inteligente quedo lista en API, pero esta vista no pudo cargar catalogos iniciales.'
+        );
       }
     }
 
@@ -96,7 +98,7 @@ export default function AiQueryPage() {
         {
           question,
           projectId: projectId || undefined,
-          documentId: documentId || undefined
+          documentId: documentId || undefined,
         },
         getToken()
       );
@@ -105,7 +107,11 @@ export default function AiQueryPage() {
       setHistory(refreshedHistory);
     } catch (error) {
       const detail = error instanceof Error ? error.message : '';
-      setMessage(detail ? `No fue posible completar la consulta. ${detail}` : 'No fue posible completar la consulta. Verifica permisos, alcance o disponibilidad del extractor.');
+      setMessage(
+        detail
+          ? `No fue posible completar la consulta. ${detail}`
+          : 'No fue posible completar la consulta. Verifica permisos, alcance o disponibilidad del extractor.'
+      );
     } finally {
       setLoading(false);
     }
@@ -177,7 +183,9 @@ export default function AiQueryPage() {
             <div style={{ marginTop: 20 }}>
               <div className="panel-header">
                 <h2>Respuesta</h2>
-                <span className={`pill ${result.status === 'answered' ? 'success' : 'warning'}`}>{formatStatus(result.status)}</span>
+                <span className={`pill ${result.status === 'answered' ? 'success' : 'warning'}`}>
+                  {formatStatus(result.status)}
+                </span>
               </div>
               <article className="state-card">
                 <span>Documentos dentro del alcance</span>
@@ -209,7 +217,10 @@ export default function AiQueryPage() {
             ) : (
               <div className="simple-document-item">
                 <strong>Sin fuentes todavia</strong>
-                <small>Cuando haya evidencia, veras documento, version, pagina o seccion y el fragmento utilizado.</small>
+                <small>
+                  Cuando haya evidencia, veras documento, version, pagina o seccion y el fragmento
+                  utilizado.
+                </small>
               </div>
             )}
           </div>
@@ -236,13 +247,15 @@ export default function AiQueryPage() {
                       answer: item.answer,
                       status: item.status,
                       scopedDocumentCount: 0,
-                      citations: item.citationsJson ?? []
+                      citations: item.citationsJson ?? [],
                     })
                   }
                 >
                   <div className="project-list-head">
                     <strong>{item.question}</strong>
-                    <span className={`pill ${item.status === 'answered' ? 'success' : 'warning'}`}>{formatStatus(item.status)}</span>
+                    <span className={`pill ${item.status === 'answered' ? 'success' : 'warning'}`}>
+                      {formatStatus(item.status)}
+                    </span>
                   </div>
                   <span>{item.answer}</span>
                   <small className="muted">{new Date(item.createdAt).toLocaleString()}</small>
@@ -267,7 +280,9 @@ export default function AiQueryPage() {
         <article className="card span-4 project-metric warn">
           <ShieldCheck size={20} />
           <strong>Sin invenciones</strong>
-          <span>Si no hay evidencia suficiente, la respuesta lo indica en lugar de completar huecos.</span>
+          <span>
+            Si no hay evidencia suficiente, la respuesta lo indica en lugar de completar huecos.
+          </span>
         </article>
         <article className="card span-4 project-metric ok">
           <FileText size={20} />

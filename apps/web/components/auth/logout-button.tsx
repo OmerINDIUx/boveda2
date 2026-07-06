@@ -8,7 +8,7 @@ export function LogoutButton() {
     if (token) {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/auth/logout`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       }).catch(() => undefined);
     }
 

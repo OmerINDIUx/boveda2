@@ -1,2 +1,1 @@
-export declare class DashboardModule {
-}
+export declare class DashboardModule {}

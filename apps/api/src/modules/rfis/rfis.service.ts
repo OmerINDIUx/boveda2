@@ -70,7 +70,9 @@ export class RfisService {
     }
 
     const items = await builder.getMany();
-    return items.map((item) => this.serializeListItem(item, user.permissions.includes(PermissionKey.DocumentsView)));
+    return items.map((item) =>
+      this.serializeListItem(item, user.permissions.includes(PermissionKey.DocumentsView))
+    );
   }
 
   async getFormOptions(user: RequestUser, projectId?: string) {
@@ -81,9 +83,13 @@ export class RfisService {
 
     if (!projectId) {
       return {
-        projects: projects.map((project) => ({ id: project.id, name: project.name, code: project.code })),
+        projects: projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          code: project.code,
+        })),
         projectMembers: [],
-        documents: []
+        documents: [],
       };
     }
 
@@ -91,31 +97,35 @@ export class RfisService {
       this.members.find({
         where: { projectId },
         relations: ['user'],
-        order: { createdAt: 'ASC' }
+        order: { createdAt: 'ASC' },
       }),
       user.permissions.includes(PermissionKey.DocumentsView)
         ? this.documents.find({
             where: { projectId },
-            order: { updatedAt: 'DESC' }
+            order: { updatedAt: 'DESC' },
           })
-        : Promise.resolve([])
+        : Promise.resolve([]),
     ]);
 
     return {
-      projects: projects.map((project) => ({ id: project.id, name: project.name, code: project.code })),
+      projects: projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        code: project.code,
+      })),
       projectMembers: members
         .filter((member) => member.user)
         .map((member) => ({
           id: member.user.id,
           name: member.user.name,
           email: member.user.email,
-          role: member.role
+          role: member.role,
         })),
       documents: documents.map((document) => ({
         id: document.id,
         name: document.name,
-        documentNumber: document.documentNumber
-      }))
+        documentNumber: document.documentNumber,
+      })),
     };
   }
 
@@ -144,7 +154,7 @@ export class RfisService {
         dueDate: dto.dueDate,
         assignedToId: dto.assignedToId,
         createdById: user.id,
-        status: 'open'
+        status: 'open',
       })
     );
 
@@ -156,7 +166,7 @@ export class RfisService {
       title: rfi.title,
       status: rfi.status,
       assignedToId: rfi.assignedToId,
-      dueDate: rfi.dueDate
+      dueDate: rfi.dueDate,
     });
 
     if (rfi.assignedToId && rfi.assignedToId !== user.id) {
@@ -169,7 +179,7 @@ export class RfisService {
         entityId: rfi.id,
         category: 'rfi',
         meta: { route: '/rfis' },
-        dedupeKey: `rfi-assigned:${rfi.id}:${rfi.assignedToId}`
+        dedupeKey: `rfi-assigned:${rfi.id}:${rfi.assignedToId}`,
       });
     }
 
@@ -183,7 +193,7 @@ export class RfisService {
         rfiId,
         userId: user.id,
         body: dto.body,
-        type: 'comment'
+        type: 'comment',
       })
     );
 
@@ -215,7 +225,7 @@ export class RfisService {
         rfiId,
         userId: user.id,
         body: dto.answer,
-        type: 'response'
+        type: 'response',
       })
     );
 
@@ -233,7 +243,7 @@ export class RfisService {
         entityType: 'rfi',
         entityId: rfi.id,
         category: 'rfi',
-        meta: { route: '/rfis' }
+        meta: { route: '/rfis' },
       });
     }
 
@@ -258,13 +268,17 @@ export class RfisService {
           rfiId,
           userId: user.id,
           body: dto.note,
-          type: 'system'
+          type: 'system',
         })
       );
     }
 
     await this.logHistory(rfiId, user.id, 'status_changed', before, this.snapshot(rfi));
-    await this.notifyAssignedOnActivity(rfi, user.id, `El RFI "${rfi.title}" cambió a estado ${rfi.status}.`);
+    await this.notifyAssignedOnActivity(
+      rfi,
+      user.id,
+      `El RFI "${rfi.title}" cambió a estado ${rfi.status}.`
+    );
 
     return this.getDetail(user, rfiId);
   }
@@ -328,8 +342,8 @@ export class RfisService {
         assignedTo: true,
         attachments: { uploadedBy: true },
         comments: { author: true, attachments: { uploadedBy: true } },
-        history: { actor: true }
-      }
+        history: { actor: true },
+      },
     });
   }
 
@@ -349,14 +363,25 @@ export class RfisService {
       closedAt: rfi.closedAt,
       createdAt: rfi.createdAt,
       updatedAt: rfi.updatedAt,
-      requester: rfi.requester ? { id: rfi.requester.id, name: rfi.requester.name, email: rfi.requester.email } : null,
-      assignedTo: rfi.assignedTo ? { id: rfi.assignedTo.id, name: rfi.assignedTo.name, email: rfi.assignedTo.email } : null,
-      project: rfi.project ? { id: rfi.project.id, name: rfi.project.name, code: rfi.project.code } : null,
-      document: includeDocument && rfi.document
-        ? { id: rfi.document.id, name: rfi.document.name, documentNumber: rfi.document.documentNumber }
+      requester: rfi.requester
+        ? { id: rfi.requester.id, name: rfi.requester.name, email: rfi.requester.email }
         : null,
+      assignedTo: rfi.assignedTo
+        ? { id: rfi.assignedTo.id, name: rfi.assignedTo.name, email: rfi.assignedTo.email }
+        : null,
+      project: rfi.project
+        ? { id: rfi.project.id, name: rfi.project.name, code: rfi.project.code }
+        : null,
+      document:
+        includeDocument && rfi.document
+          ? {
+              id: rfi.document.id,
+              name: rfi.document.name,
+              documentNumber: rfi.document.documentNumber,
+            }
+          : null,
       commentsCount,
-      attachmentsCount
+      attachmentsCount,
     };
   }
 
@@ -370,8 +395,12 @@ export class RfisService {
           body: comment.body,
           type: comment.type,
           createdAt: comment.createdAt,
-          author: comment.author ? { id: comment.author.id, name: comment.author.name, email: comment.author.email } : null,
-          attachments: (comment.attachments ?? []).map((attachment) => this.serializeAttachment(attachment))
+          author: comment.author
+            ? { id: comment.author.id, name: comment.author.name, email: comment.author.email }
+            : null,
+          attachments: (comment.attachments ?? []).map((attachment) =>
+            this.serializeAttachment(attachment)
+          ),
         })),
       attachments: (rfi.attachments ?? [])
         .filter((attachment) => !attachment.commentId)
@@ -384,8 +413,10 @@ export class RfisService {
           beforeState: item.beforeState,
           afterState: item.afterState,
           createdAt: item.createdAt,
-          actor: item.actor ? { id: item.actor.id, name: item.actor.name, email: item.actor.email } : null
-        }))
+          actor: item.actor
+            ? { id: item.actor.id, name: item.actor.name, email: item.actor.email }
+            : null,
+        })),
     };
   }
 
@@ -397,8 +428,12 @@ export class RfisService {
       sizeBytes: Number(attachment.sizeBytes),
       createdAt: attachment.createdAt,
       uploadedBy: attachment.uploadedBy
-        ? { id: attachment.uploadedBy.id, name: attachment.uploadedBy.name, email: attachment.uploadedBy.email }
-        : null
+        ? {
+            id: attachment.uploadedBy.id,
+            name: attachment.uploadedBy.name,
+            email: attachment.uploadedBy.email,
+          }
+        : null,
     };
   }
 
@@ -409,7 +444,9 @@ export class RfisService {
     commentId?: string
   ) {
     for (const file of files) {
-      const cleanBase64 = file.base64Content.includes(',') ? file.base64Content.split(',')[1] : file.base64Content;
+      const cleanBase64 = file.base64Content.includes(',')
+        ? file.base64Content.split(',')[1]
+        : file.base64Content;
       const buffer = Buffer.from(cleanBase64, 'base64');
       const stored = await this.storage.put(buffer, file.fileName, file.mimeType);
       await this.attachments.save(
@@ -420,7 +457,7 @@ export class RfisService {
           fileName: stored.fileName,
           mimeType: stored.mimeType,
           sizeBytes: stored.sizeBytes,
-          uploadedById: userId
+          uploadedById: userId,
         })
       );
     }
@@ -439,7 +476,7 @@ export class RfisService {
         actorId,
         action,
         beforeState,
-        afterState
+        afterState,
       })
     );
   }
@@ -454,7 +491,7 @@ export class RfisService {
       status: rfi.status,
       assignedToId: rfi.assignedToId,
       documentId: rfi.documentId,
-      closedAt: rfi.closedAt?.toISOString() ?? null
+      closedAt: rfi.closedAt?.toISOString() ?? null,
     };
   }
 
@@ -476,8 +513,8 @@ export class RfisService {
       where: {
         dueDate: LessThan(start.toISOString().slice(0, 10)),
         status: Not(In(['closed', 'overdue'])),
-        ...(projectIds?.length ? { projectId: In(projectIds) } : {})
-      }
+        ...(projectIds?.length ? { projectId: In(projectIds) } : {}),
+      },
     });
 
     for (const rfi of overdue) {
@@ -501,7 +538,7 @@ export class RfisService {
       entityType: 'rfi',
       entityId: rfi.id,
       category: 'rfi',
-      meta: { route: '/rfis' }
+      meta: { route: '/rfis' },
     });
   }
 }

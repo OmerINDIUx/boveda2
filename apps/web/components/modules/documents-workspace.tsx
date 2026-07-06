@@ -1,12 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { Bot, CheckCircle2, Download, Eye, FileClock, FilePlus2, History, MessageSquare, Printer, Search, Send, Upload } from 'lucide-react';
+import {
+  Bot,
+  CheckCircle2,
+  Download,
+  Eye,
+  FileClock,
+  FilePlus2,
+  History,
+  MessageSquare,
+  Printer,
+  Search,
+  Send,
+  Upload,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 
 type ProjectOption = { id: string; name: string; code: string };
-type SimpleOption = { id: string; name: string; code?: string };
 
 type DocumentListItem = {
   id: string;
@@ -36,8 +48,20 @@ type DocumentDetail = DocumentListItem & {
   preview: { available: boolean; mimeType: string | null; url: string | null };
   metadata: Array<{ id: string; metaKey: string; metaValue?: string; valueType: string }>;
   versions: DocumentVersion[];
-  comments: Array<{ id: string; body: string; createdAt: string; author: { id: string; name: string; email: string } | null }>;
-  audit: Array<{ id: string; action: string; createdAt: string; actorId?: string; beforeState?: unknown; afterState?: unknown }>;
+  comments: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: { id: string; name: string; email: string } | null;
+  }>;
+  audit: Array<{
+    id: string;
+    action: string;
+    createdAt: string;
+    actorId?: string;
+    beforeState?: unknown;
+    afterState?: unknown;
+  }>;
 };
 
 type DocumentVersion = {
@@ -86,12 +110,12 @@ const emptyUploadForm: UploadForm = {
   responsibleUserId: '',
   status: 'draft',
   revision: 'A',
-  notes: ''
+  notes: '',
 };
 
 const fallbackProjects: ProjectOption[] = [
   { id: 'mock-project-1', name: 'Torre Ejecutiva Norte', code: 'HOL-PRJ-001' },
-  { id: 'mock-project-2', name: 'Planta de Tratamiento Oriente', code: 'HOL-PRJ-014' }
+  { id: 'mock-project-2', name: 'Planta de Tratamiento Oriente', code: 'HOL-PRJ-014' },
 ];
 
 const fallbackDocuments: DocumentListItem[] = [
@@ -115,7 +139,7 @@ const fallbackDocuments: DocumentListItem[] = [
     project: fallbackProjects[0],
     folder: { id: 'f-1', name: 'ARC_Arquitectura' },
     discipline: { id: 'd-1', code: 'ARC', name: 'Arquitectura' },
-    responsibleUser: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' }
+    responsibleUser: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' },
   },
   {
     id: 'mock-doc-2',
@@ -137,8 +161,8 @@ const fallbackDocuments: DocumentListItem[] = [
     project: fallbackProjects[0],
     folder: { id: 'f-2', name: 'MEC_Mecánica' },
     discipline: { id: 'd-2', code: 'MEC', name: 'Mecánica' },
-    responsibleUser: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' }
-  }
+    responsibleUser: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' },
+  },
 ];
 
 const fallbackDetail: Record<string, DocumentDetail> = {
@@ -153,12 +177,12 @@ const fallbackDetail: Record<string, DocumentDetail> = {
       sizeBytes: 1443000,
       notes: 'Emisión coordinada IFC',
       createdAt: '2026-07-02T09:00:00.000Z',
-      uploadedBy: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' }
+      uploadedBy: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' },
     },
     preview: { available: true, mimeType: 'application/pdf', url: null },
     metadata: [
       { id: 'm-1', metaKey: 'cliente', metaValue: 'Grupo Holocron', valueType: 'string' },
-      { id: 'm-2', metaKey: 'paquete', metaValue: 'Fachadas', valueType: 'string' }
+      { id: 'm-2', metaKey: 'paquete', metaValue: 'Fachadas', valueType: 'string' },
     ],
     versions: [
       {
@@ -170,7 +194,7 @@ const fallbackDetail: Record<string, DocumentDetail> = {
         sizeBytes: 1443000,
         notes: 'Emisión coordinada IFC',
         createdAt: '2026-07-02T09:00:00.000Z',
-        uploadedBy: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' }
+        uploadedBy: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' },
       },
       {
         id: 'ver-0',
@@ -181,21 +205,26 @@ const fallbackDetail: Record<string, DocumentDetail> = {
         sizeBytes: 1321000,
         notes: 'Revisión de coordinación',
         createdAt: '2026-06-30T15:00:00.000Z',
-        uploadedBy: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' }
-      }
+        uploadedBy: { id: 'u-1', name: 'Laura Méndez', email: 'laura@holocron.local' },
+      },
     ],
     comments: [
       {
         id: 'c-1',
         body: 'Actualizar cotas de borde antes de liberar a obra.',
         createdAt: '2026-07-02T09:15:00.000Z',
-        author: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' }
-      }
+        author: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' },
+      },
     ],
     audit: [
       { id: 'a-1', action: 'visualization', createdAt: '2026-07-02T09:20:00.000Z', actorId: 'u-2' },
-      { id: 'a-2', action: 'upload_new_version', createdAt: '2026-07-02T09:00:00.000Z', actorId: 'u-1' }
-    ]
+      {
+        id: 'a-2',
+        action: 'upload_new_version',
+        createdAt: '2026-07-02T09:00:00.000Z',
+        actorId: 'u-1',
+      },
+    ],
   },
   'mock-doc-2': {
     ...fallbackDocuments[1],
@@ -208,10 +237,16 @@ const fallbackDetail: Record<string, DocumentDetail> = {
       sizeBytes: 932000,
       notes: 'Submittal para aprobación',
       createdAt: '2026-07-01T17:20:00.000Z',
-      uploadedBy: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' }
+      uploadedBy: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' },
     },
-    preview: { available: false, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', url: null },
-    metadata: [{ id: 'm-3', metaKey: 'proveedor', metaValue: 'HVAC Solutions', valueType: 'string' }],
+    preview: {
+      available: false,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      url: null,
+    },
+    metadata: [
+      { id: 'm-3', metaKey: 'proveedor', metaValue: 'HVAC Solutions', valueType: 'string' },
+    ],
     versions: [
       {
         id: 'ver-2',
@@ -222,12 +257,19 @@ const fallbackDetail: Record<string, DocumentDetail> = {
         sizeBytes: 932000,
         notes: 'Submittal para aprobación',
         createdAt: '2026-07-01T17:20:00.000Z',
-        uploadedBy: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' }
-      }
+        uploadedBy: { id: 'u-2', name: 'José Ramírez', email: 'jose@holocron.local' },
+      },
     ],
     comments: [],
-    audit: [{ id: 'a-3', action: 'request_approval', createdAt: '2026-07-01T17:25:00.000Z', actorId: 'u-2' }]
-  }
+    audit: [
+      {
+        id: 'a-3',
+        action: 'request_approval',
+        createdAt: '2026-07-01T17:25:00.000Z',
+        actorId: 'u-2',
+      },
+    ],
+  },
 };
 
 function getToken() {
@@ -259,14 +301,17 @@ async function fileToPayload(file: File): Promise<FilePayload> {
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
     base64Content,
-    sizeBytes: file.size
+    sizeBytes: file.size,
   };
 }
 
 async function fetchProtectedBlob(path: string) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`, {
-    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}
-  });
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`,
+    {
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    }
+  );
 
   if (!response.ok) {
     throw new Error('No fue posible descargar el archivo');
@@ -299,7 +344,10 @@ export function DocumentsWorkspace() {
       try {
         const [projectsResponse, documentsResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<DocumentListItem[]>(`/documents${search ? `?search=${encodeURIComponent(search)}` : ''}`, getToken() ?? undefined)
+          apiGet<DocumentListItem[]>(
+            `/documents${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+            getToken() ?? undefined
+          ),
         ]);
         if (!active) return;
         setProjects(projectsResponse.length ? projectsResponse : fallbackProjects);
@@ -330,10 +378,14 @@ export function DocumentsWorkspace() {
     async function loadDetail() {
       setDetailLoading(true);
       try {
-        const response = await apiGet<DocumentDetail>(`/documents/${selectedDocumentId}`, getToken() ?? undefined);
+        const response = await apiGet<DocumentDetail>(
+          `/documents/${selectedDocumentId}`,
+          getToken() ?? undefined
+        );
         if (!canceled) setDetail(response);
       } catch {
-        if (!canceled) setDetail(fallbackDetail[selectedDocumentId] ?? fallbackDetail['mock-doc-1']);
+        if (!canceled)
+          setDetail(fallbackDetail[selectedDocumentId] ?? fallbackDetail['mock-doc-1']);
       } finally {
         if (!canceled) setDetailLoading(false);
       }
@@ -373,7 +425,7 @@ export function DocumentsWorkspace() {
       { label: 'Documentos', value: total, icon: FilePlus2 },
       { label: 'Pendientes de aprobación', value: approvals, icon: Send },
       { label: 'En revisión', value: review, icon: Eye },
-      { label: 'Vencidos', value: overdue, icon: FileClock }
+      { label: 'Vencidos', value: overdue, icon: FileClock },
     ];
   }, [documents]);
 
@@ -387,14 +439,14 @@ export function DocumentsWorkspace() {
   function openNewVersion() {
     if (!detail) return;
     setUploadMode('version');
-    setUploadForm((current) => ({
+    setUploadForm(() => ({
       ...emptyUploadForm,
       projectId: detail.projectId,
       folderId: detail.folderId ?? '',
       disciplineId: detail.disciplineId ?? '',
       documentNumber: detail.documentNumber,
       name: detail.name,
-      revision: detail.currentVersion?.revision ? `${detail.currentVersion.revision}-1` : 'B'
+      revision: detail.currentVersion?.revision ? `${detail.currentVersion.revision}-1` : 'B',
     }));
     setUploadFile(null);
     setShowUpload(true);
@@ -425,7 +477,7 @@ export function DocumentsWorkspace() {
             fileName: uploadFile.fileName,
             mimeType: uploadFile.mimeType,
             base64Content: uploadFile.base64Content,
-            sizeBytes: uploadFile.sizeBytes
+            sizeBytes: uploadFile.sizeBytes,
           },
           getToken() ?? undefined
         );
@@ -440,7 +492,7 @@ export function DocumentsWorkspace() {
             base64Content: uploadFile.base64Content,
             sizeBytes: uploadFile.sizeBytes,
             revision: uploadForm.revision,
-            notes: uploadForm.notes
+            notes: uploadForm.notes,
           },
           getToken() ?? undefined
         );
@@ -457,7 +509,11 @@ export function DocumentsWorkspace() {
   async function saveComment() {
     if (!detail || !comment.trim()) return;
     try {
-      const updated = await apiPost<DocumentDetail>(`/documents/${detail.id}/comments`, { body: comment }, getToken() ?? undefined);
+      const updated = await apiPost<DocumentDetail>(
+        `/documents/${detail.id}/comments`,
+        { body: comment },
+        getToken() ?? undefined
+      );
       setDetail(updated);
       setComment('');
     } catch {
@@ -470,11 +526,20 @@ export function DocumentsWorkspace() {
     try {
       if (action === 'request-approval') {
         await apiPost('/approvals/requests', { documentId: detail.id }, getToken() ?? undefined);
-        const refreshed = await apiGet<DocumentDetail>(`/documents/${detail.id}`, getToken() ?? undefined);
+        const refreshed = await apiGet<DocumentDetail>(
+          `/documents/${detail.id}`,
+          getToken() ?? undefined
+        );
         setDetail(refreshed);
-        setDocuments((current) => current.map((item) => (item.id === refreshed.id ? refreshed : item)));
+        setDocuments((current) =>
+          current.map((item) => (item.id === refreshed.id ? refreshed : item))
+        );
       } else {
-        const result = await apiPost<DocumentDetail | { ok: true }>(`/documents/${detail.id}/${action}`, {}, getToken() ?? undefined);
+        const result = await apiPost<DocumentDetail | { ok: true }>(
+          `/documents/${detail.id}/${action}`,
+          {},
+          getToken() ?? undefined
+        );
         if ('id' in result) {
           setDetail(result);
           setDocuments((current) => current.map((item) => (item.id === result.id ? result : item)));
@@ -490,7 +555,11 @@ export function DocumentsWorkspace() {
   async function updateStatus(status: string) {
     if (!detail) return;
     try {
-      const updated = await apiPatch<DocumentDetail>(`/documents/${detail.id}`, { status }, getToken() ?? undefined);
+      const updated = await apiPatch<DocumentDetail>(
+        `/documents/${detail.id}`,
+        { status },
+        getToken() ?? undefined
+      );
       setDetail(updated);
       setDocuments((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch {
@@ -505,7 +574,9 @@ export function DocumentsWorkspace() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = detail.currentVersion?.fileName ?? `${detail.documentNumber}.${detail.fileExtension ?? 'bin'}`;
+      anchor.download =
+        detail.currentVersion?.fileName ??
+        `${detail.documentNumber}.${detail.fileExtension ?? 'bin'}`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -518,7 +589,9 @@ export function DocumentsWorkspace() {
       <div className="topbar">
         <div>
           <h1>Documentos</h1>
-          <p className="muted">Carga, visor, historial de versiones, comentarios y auditoría documental.</p>
+          <p className="muted">
+            Carga, visor, historial de versiones, comentarios y auditoría documental.
+          </p>
         </div>
         <div className="projects-actions">
           <button className="button" type="button" onClick={openNewUpload}>
@@ -553,7 +626,11 @@ export function DocumentsWorkspace() {
             <label>Buscar</label>
             <div className="search-input">
               <Search size={16} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Número, nombre o disciplina" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Número, nombre o disciplina"
+              />
             </div>
           </div>
           <div className="project-list">
@@ -566,13 +643,16 @@ export function DocumentsWorkspace() {
               >
                 <div className="project-list-head">
                   <strong>{document.documentNumber}</strong>
-                  <span className={`pill ${document.status === 'approved' ? 'success' : document.status === 'expired' ? 'danger' : 'warning'}`}>
+                  <span
+                    className={`pill ${document.status === 'approved' ? 'success' : document.status === 'expired' ? 'danger' : 'warning'}`}
+                  >
                     {normalizeLabel(document.status)}
                   </span>
                 </div>
                 <span>{document.name}</span>
                 <small className="muted">
-                  {document.project?.code ?? document.projectId} · {document.discipline?.code ?? 'General'}
+                  {document.project?.code ?? document.projectId} ·{' '}
+                  {document.discipline?.code ?? 'General'}
                 </small>
               </button>
             ))}
@@ -588,7 +668,9 @@ export function DocumentsWorkspace() {
                     <div className="project-code">{detail.documentNumber}</div>
                     <h2>{detail.name}</h2>
                     <p className="muted">
-                      {detail.project?.name ?? detail.projectId} · {detail.folder?.name ?? 'Sin carpeta'} · {detail.discipline?.name ?? 'Sin disciplina'}
+                      {detail.project?.name ?? detail.projectId} ·{' '}
+                      {detail.folder?.name ?? 'Sin carpeta'} ·{' '}
+                      {detail.discipline?.name ?? 'Sin disciplina'}
                     </p>
                   </div>
                   <div className="projects-actions">
@@ -596,7 +678,11 @@ export function DocumentsWorkspace() {
                       <History size={18} />
                       Subir nueva versión
                     </button>
-                    <button className="button secondary" type="button" onClick={() => runAction('request-approval')}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => runAction('request-approval')}
+                    >
                       <Send size={18} />
                       Solicitar aprobación
                     </button>
@@ -631,17 +717,28 @@ export function DocumentsWorkspace() {
                 <article className="card span-8">
                   <div className="panel-header">
                     <h2>Visor del archivo</h2>
-                    <span className="pill">{detail.currentVersion ? `Rev. ${detail.currentVersion.revision}` : 'Sin versión'}</span>
+                    <span className="pill">
+                      {detail.currentVersion
+                        ? `Rev. ${detail.currentVersion.revision}`
+                        : 'Sin versión'}
+                    </span>
                   </div>
                   {detail.preview.available && previewUrl ? (
                     detail.preview.mimeType?.startsWith('image/') ? (
                       <img alt={detail.name} className="document-preview-image" src={previewUrl} />
                     ) : (
-                      <iframe className="document-preview-frame" src={previewUrl} title={detail.name} />
+                      <iframe
+                        className="document-preview-frame"
+                        src={previewUrl}
+                        title={detail.name}
+                      />
                     )
                   ) : (
                     <div className="preview-empty">
-                      <p className="muted">No hay vista previa disponible para este formato. Puedes descargarlo o subir una nueva versión.</p>
+                      <p className="muted">
+                        No hay vista previa disponible para este formato. Puedes descargarlo o subir
+                        una nueva versión.
+                      </p>
                     </div>
                   )}
                   <div className="projects-actions" style={{ marginTop: 16 }}>
@@ -649,11 +746,19 @@ export function DocumentsWorkspace() {
                       <Download size={18} />
                       Descargar
                     </button>
-                    <button className="button secondary" type="button" onClick={() => runAction('print')}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => runAction('print')}
+                    >
                       <Printer size={18} />
                       Imprimir
                     </button>
-                    <button className="button secondary" type="button" onClick={() => updateStatus('published')}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => updateStatus('published')}
+                    >
                       <CheckCircle2 size={18} />
                       Publicar
                     </button>
@@ -695,7 +800,9 @@ export function DocumentsWorkspace() {
                       <div className="simple-document-item" key={version.id}>
                         <strong>Rev. {version.revision}</strong>
                         <span>{version.fileName}</span>
-                        <small>{version.notes ?? 'Sin notas'} · {formatSize(version.sizeBytes)}</small>
+                        <small>
+                          {version.notes ?? 'Sin notas'} · {formatSize(version.sizeBytes)}
+                        </small>
                       </div>
                     ))}
                   </div>
@@ -708,7 +815,11 @@ export function DocumentsWorkspace() {
                   </div>
                   <div className="field">
                     <label>Nuevo comentario</label>
-                    <textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Anota observaciones, acuerdos o pendientes." />
+                    <textarea
+                      value={comment}
+                      onChange={(event) => setComment(event.target.value)}
+                      placeholder="Anota observaciones, acuerdos o pendientes."
+                    />
                   </div>
                   <button className="button" type="button" onClick={saveComment}>
                     Guardar comentario
@@ -743,14 +854,46 @@ export function DocumentsWorkspace() {
               <article className="card" style={{ marginTop: 16 }}>
                 <div className="panel-header">
                   <h2>Cambios rápidos de estado</h2>
-                  <span className="pill">{detailLoading ? 'Actualizando' : normalizeLabel(detail.status)}</span>
+                  <span className="pill">
+                    {detailLoading ? 'Actualizando' : normalizeLabel(detail.status)}
+                  </span>
                 </div>
                 <div className="projects-actions">
-                  <button className="button secondary" type="button" onClick={() => updateStatus('draft')}>Borrador</button>
-                  <button className="button secondary" type="button" onClick={() => updateStatus('in_review')}>En revisión</button>
-                  <button className="button secondary" type="button" onClick={() => updateStatus('pending_approval')}>Pendiente de aprobación</button>
-                  <button className="button secondary" type="button" onClick={() => runAction('approve')}>Aprobar</button>
-                  <button className="button secondary" type="button" onClick={() => runAction('reject')}>Rechazar</button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => updateStatus('draft')}
+                  >
+                    Borrador
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => updateStatus('in_review')}
+                  >
+                    En revisión
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => updateStatus('pending_approval')}
+                  >
+                    Pendiente de aprobación
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => runAction('approve')}
+                  >
+                    Aprobar
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => runAction('reject')}
+                  >
+                    Rechazar
+                  </button>
                 </div>
               </article>
             </>
@@ -767,7 +910,11 @@ export function DocumentsWorkspace() {
           <div className="card">
             <div className="panel-header">
               <h2>{uploadMode === 'new' ? 'Cargar documento' : 'Subir nueva versión'}</h2>
-              <button className="button secondary" type="button" onClick={() => setShowUpload(false)}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => setShowUpload(false)}
+              >
                 Cerrar
               </button>
             </div>
@@ -777,81 +924,133 @@ export function DocumentsWorkspace() {
                   <SelectField
                     label="Proyecto"
                     value={uploadForm.projectId}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, projectId: value }))}
-                    options={projects.map((project) => ({ value: project.id, label: `${project.code} · ${project.name}` }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, projectId: value }))
+                    }
+                    options={projects.map((project) => ({
+                      value: project.id,
+                      label: `${project.code} · ${project.name}`,
+                    }))}
                   />
-                  <TextField label="Documento" value={uploadForm.name} onChange={(value) => setUploadForm((current) => ({ ...current, name: value }))} />
+                  <TextField
+                    label="Documento"
+                    value={uploadForm.name}
+                    onChange={(value) => setUploadForm((current) => ({ ...current, name: value }))}
+                  />
                   <TextField
                     label="Número documental"
                     value={uploadForm.documentNumber}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, documentNumber: value }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, documentNumber: value }))
+                    }
                   />
-                  <TextField label="Carpeta" value={uploadForm.folderId} onChange={(value) => setUploadForm((current) => ({ ...current, folderId: value }))} />
+                  <TextField
+                    label="Carpeta"
+                    value={uploadForm.folderId}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, folderId: value }))
+                    }
+                  />
                   <TextField
                     label="Disciplina"
                     value={uploadForm.disciplineId}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, disciplineId: value }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, disciplineId: value }))
+                    }
                   />
                   <TextField
                     label="Responsable"
                     value={uploadForm.responsibleUserId}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, responsibleUserId: value }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, responsibleUserId: value }))
+                    }
                   />
                   <SelectField
                     label="Confidencialidad"
                     value={uploadForm.confidentialityLevel}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, confidentialityLevel: value }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, confidentialityLevel: value }))
+                    }
                     options={[
                       { value: 'public', label: 'Público' },
                       { value: 'internal', label: 'Interno' },
                       { value: 'confidential', label: 'Confidencial' },
-                      { value: 'restricted', label: 'Restringido' }
+                      { value: 'restricted', label: 'Restringido' },
                     ]}
                   />
                   <SelectField
                     label="Estado inicial"
                     value={uploadForm.status}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, status: value }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, status: value }))
+                    }
                     options={[
                       { value: 'draft', label: 'Borrador' },
                       { value: 'pending_approval', label: 'Pendiente de aprobación' },
                       { value: 'in_review', label: 'En revisión' },
                       { value: 'approved', label: 'Aprobado' },
                       { value: 'published', label: 'Publicado' },
-                      { value: 'expired', label: 'Vencido' }
+                      { value: 'expired', label: 'Vencido' },
                     ]}
                   />
                   <TextField
                     label="Fecha de vencimiento"
                     type="date"
                     value={uploadForm.dueDate}
-                    onChange={(value) => setUploadForm((current) => ({ ...current, dueDate: value }))}
+                    onChange={(value) =>
+                      setUploadForm((current) => ({ ...current, dueDate: value }))
+                    }
                   />
                 </>
               ) : null}
-              <TextField label="Revisión" value={uploadForm.revision} onChange={(value) => setUploadForm((current) => ({ ...current, revision: value }))} />
+              <TextField
+                label="Revisión"
+                value={uploadForm.revision}
+                onChange={(value) => setUploadForm((current) => ({ ...current, revision: value }))}
+              />
               <div className="field">
                 <label>Archivo</label>
-                <input type="file" onChange={(event) => void handleFileChange(event.target.files)} />
+                <input
+                  type="file"
+                  onChange={(event) => void handleFileChange(event.target.files)}
+                />
               </div>
               <div className="field span-2">
                 <label>Notas</label>
-                <textarea value={uploadForm.notes} onChange={(event) => setUploadForm((current) => ({ ...current, notes: event.target.value }))} />
+                <textarea
+                  value={uploadForm.notes}
+                  onChange={(event) =>
+                    setUploadForm((current) => ({ ...current, notes: event.target.value }))
+                  }
+                />
               </div>
               <div className="field">
                 <label>Renovable</label>
                 <select
                   value={uploadForm.renewable ? 'yes' : 'no'}
-                  onChange={(event) => setUploadForm((current) => ({ ...current, renewable: event.target.value === 'yes' }))}
+                  onChange={(event) =>
+                    setUploadForm((current) => ({
+                      ...current,
+                      renewable: event.target.value === 'yes',
+                    }))
+                  }
                 >
                   <option value="no">No</option>
                   <option value="yes">Sí</option>
                 </select>
               </div>
             </div>
-            {uploadFile ? <p className="muted">Archivo seleccionado: {uploadFile.fileName} · {formatSize(uploadFile.sizeBytes)}</p> : null}
+            {uploadFile ? (
+              <p className="muted">
+                Archivo seleccionado: {uploadFile.fileName} · {formatSize(uploadFile.sizeBytes)}
+              </p>
+            ) : null}
             <div className="projects-actions">
-              <button className="button secondary" type="button" onClick={() => setShowUpload(false)}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => setShowUpload(false)}
+              >
                 Cancelar
               </button>
               <button className="button" type="button" onClick={submitUpload}>
@@ -869,7 +1068,7 @@ function TextField({
   label,
   value,
   onChange,
-  type = 'text'
+  type = 'text',
 }: {
   label: string;
   value: string;
@@ -888,7 +1087,7 @@ function SelectField({
   label,
   value,
   onChange,
-  options
+  options,
 }: {
   label: string;
   value: string;

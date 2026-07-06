@@ -5,7 +5,10 @@ import { PermissionKey } from '../../../../lib/permissions';
 export default function UserFormPage() {
   return (
     <RequirePermission permission={PermissionKey.UsersManage}>
-      <SectionHeader title="Formulario de usuario" description="Alta interna, perfil, estado y roles." />
+      <SectionHeader
+        title="Formulario de usuario"
+        description="Alta interna, perfil, estado y roles."
+      />
       <section className="grid">
         <form className="card span-6">
           <div className="field">

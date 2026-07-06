@@ -1,2 +1,1 @@
-export declare class RfisModule {
-}
+export declare class RfisModule {}

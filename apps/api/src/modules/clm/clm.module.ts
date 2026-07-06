@@ -29,10 +29,10 @@ import { DocumentVersion } from '../versions/document-version.entity';
       ContractComment,
       ContractAuditLog,
       DocumentRecord,
-      DocumentVersion
-    ])
+      DocumentVersion,
+    ]),
   ],
   controllers: [ClmController],
-  providers: [ClmService]
+  providers: [ClmService],
 })
 export class ClmModule {}

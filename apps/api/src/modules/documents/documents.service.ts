@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
@@ -27,7 +32,7 @@ const previewableMimeTypes = [
   'image/jpeg',
   'image/webp',
   'image/gif',
-  'text/plain'
+  'text/plain',
 ];
 
 @Injectable()
@@ -36,11 +41,13 @@ export class DocumentsService {
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
     @InjectRepository(DocumentVersion) private readonly versions: Repository<DocumentVersion>,
     @InjectRepository(ApprovalFlow) private readonly approvalFlows: Repository<ApprovalFlow>,
-    @InjectRepository(ApprovalRequest) private readonly approvalRequests: Repository<ApprovalRequest>,
+    @InjectRepository(ApprovalRequest)
+    private readonly approvalRequests: Repository<ApprovalRequest>,
     @InjectRepository(DocumentMetadata) private readonly metadata: Repository<DocumentMetadata>,
     @InjectRepository(DocumentAuditLog) private readonly auditLogs: Repository<DocumentAuditLog>,
     @InjectRepository(DocumentComment) private readonly comments: Repository<DocumentComment>,
-    @InjectRepository(DocumentPermission) private readonly permissions: Repository<DocumentPermission>,
+    @InjectRepository(DocumentPermission)
+    private readonly permissions: Repository<DocumentPermission>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(ProjectMember) private readonly members: Repository<ProjectMember>,
     @InjectRepository(Folder) private readonly folders: Repository<Folder>,
@@ -50,7 +57,9 @@ export class DocumentsService {
   ) {}
 
   async listVisible(userId: string, query: DocumentListQueryDto) {
-    const visibleProjectIds = query.projectId ? [] : await this.scope.visibleProjectIdsForUser(userId);
+    const visibleProjectIds = query.projectId
+      ? []
+      : await this.scope.visibleProjectIdsForUser(userId);
     if (query.projectId) {
       if (!(await this.scope.canAccessProject(userId, query.projectId))) {
         throw new ForbiddenException('No tienes acceso a este proyecto');
@@ -65,10 +74,15 @@ export class DocumentsService {
       .leftJoinAndSelect('document.folder', 'folder')
       .leftJoinAndSelect('document.discipline', 'discipline')
       .leftJoinAndSelect('document.responsibleUser', 'responsibleUser')
-      .where(query.projectId ? 'document.projectId = :projectId' : 'document.projectId IN (:...projectIds)', {
-        projectId: query.projectId,
-        projectIds: query.projectId ? undefined : visibleProjectIds
-      })
+      .where(
+        query.projectId
+          ? 'document.projectId = :projectId'
+          : 'document.projectId IN (:...projectIds)',
+        {
+          projectId: query.projectId,
+          projectIds: query.projectId ? undefined : visibleProjectIds,
+        }
+      )
       .orderBy('document.updatedAt', 'DESC');
 
     if (query.search) {
@@ -79,7 +93,11 @@ export class DocumentsService {
     }
 
     const rawItems = await builder.getMany();
-    const items = await this.filterDocumentsByPermissions(userId, query.projectId ? [query.projectId] : visibleProjectIds, rawItems);
+    const items = await this.filterDocumentsByPermissions(
+      userId,
+      query.projectId ? [query.projectId] : visibleProjectIds,
+      rawItems
+    );
     return items.map((item) => this.toListItem(item));
   }
 
@@ -101,12 +119,12 @@ export class DocumentsService {
         status: dto.status ?? 'draft',
         confidentialityLevel: dto.confidentialityLevel ?? 'internal',
         renewable: dto.renewable ?? false,
-        renewalFrequency: dto.renewable ? dto.renewalFrequency ?? null : null,
+        renewalFrequency: dto.renewable ? (dto.renewalFrequency ?? null) : null,
         dueDate: dto.dueDate,
         originalFileKey: stored.key,
         fileExtension: this.getExtension(dto.fileName),
         sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
-        uploadedById: userId
+        uploadedById: userId,
       })
     );
 
@@ -120,7 +138,7 @@ export class DocumentsService {
         mimeType: dto.mimeType,
         sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
         uploadedById: userId,
-        notes: dto.notes
+        notes: dto.notes,
       })
     );
 
@@ -134,7 +152,7 @@ export class DocumentsService {
             documentId: document.id,
             metaKey: item.key,
             metaValue: item.value,
-            valueType: item.type ?? 'string'
+            valueType: item.type ?? 'string',
           })
         )
       );
@@ -143,12 +161,15 @@ export class DocumentsService {
     await this.log(document.id, userId, 'upload_new_version', undefined, {
       versionId: version.id,
       revision: version.revision,
-      fileName: version.fileName
+      fileName: version.fileName,
     });
-    await this.notifyDocumentVersion(document.id, document.name, document.documentNumber, version.revision, [
-      document.responsibleUserId,
-      document.uploadedById
-    ]);
+    await this.notifyDocumentVersion(
+      document.id,
+      document.name,
+      document.documentNumber,
+      version.revision,
+      [document.responsibleUserId, document.uploadedById]
+    );
 
     return this.getDetail(userId, document.id, false);
   }
@@ -156,27 +177,39 @@ export class DocumentsService {
   async getDetail(userId: string, documentId: string, logView = true) {
     const document = await this.documents.findOne({
       where: { id: documentId },
-      relations: ['project', 'folder', 'discipline', 'responsibleUser', 'uploadedBy']
+      relations: ['project', 'folder', 'discipline', 'responsibleUser', 'uploadedBy'],
     });
     if (!document) {
       throw new NotFoundException('Documento no encontrado');
     }
-    if (!(await this.scope.canAccessProject(userId, document.projectId)) || !(await this.canAccessDocument(userId, document))) {
+    if (
+      !(await this.scope.canAccessProject(userId, document.projectId)) ||
+      !(await this.canAccessDocument(userId, document))
+    ) {
       throw new ForbiddenException('No tienes acceso a este documento');
     }
 
     const [versions, metadata, comments, audit] = await Promise.all([
-      this.versions.find({ where: { documentId }, relations: ['uploadedBy'], order: { createdAt: 'DESC' } }),
+      this.versions.find({
+        where: { documentId },
+        relations: ['uploadedBy'],
+        order: { createdAt: 'DESC' },
+      }),
       this.metadata.find({ where: { documentId } }),
-      this.comments.find({ where: { documentId }, relations: ['author'], order: { createdAt: 'DESC' } }),
-      this.auditLogs.find({ where: { documentId }, order: { createdAt: 'DESC' } })
+      this.comments.find({
+        where: { documentId },
+        relations: ['author'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.auditLogs.find({ where: { documentId }, order: { createdAt: 'DESC' } }),
     ]);
 
     if (logView) {
       await this.log(document.id, userId, 'visualization');
     }
 
-    const currentVersion = versions.find((version) => version.id === document.currentVersionId) ?? versions[0] ?? null;
+    const currentVersion =
+      versions.find((version) => version.id === document.currentVersionId) ?? versions[0] ?? null;
 
     return {
       ...this.toListItem(document),
@@ -190,7 +223,7 @@ export class DocumentsService {
         ? {
             available: previewableMimeTypes.includes(currentVersion.mimeType),
             mimeType: currentVersion.mimeType,
-            url: `/api/documents/${document.id}/content`
+            url: `/api/documents/${document.id}/content`,
           }
         : { available: false, mimeType: null, url: null },
       metadata,
@@ -199,9 +232,11 @@ export class DocumentsService {
         id: comment.id,
         body: comment.body,
         createdAt: comment.createdAt,
-        author: comment.author ? { id: comment.author.id, name: comment.author.name, email: comment.author.email } : null
+        author: comment.author
+          ? { id: comment.author.id, name: comment.author.name, email: comment.author.email }
+          : null,
       })),
-      audit
+      audit,
     };
   }
 
@@ -216,7 +251,7 @@ export class DocumentsService {
       renewable: document.renewable,
       renewalFrequency: document.renewalFrequency,
       dueDate: document.dueDate,
-      status: document.status
+      status: document.status,
     };
 
     if (dto.folderId !== undefined) {
@@ -231,7 +266,11 @@ export class DocumentsService {
     if (dto.status === 'published' && !(await this.canPublish(document.id, document.projectId))) {
       throw new ForbiddenException('Este documento requiere aprobación antes de publicarse');
     }
-    if (document.dueDate && new Date(`${document.dueDate}T00:00:00`).getTime() < new Date(new Date().toDateString()).getTime()) {
+    if (
+      document.dueDate &&
+      new Date(`${document.dueDate}T00:00:00`).getTime() <
+        new Date(new Date().toDateString()).getTime()
+    ) {
       document.status = 'expired';
     }
 
@@ -255,7 +294,7 @@ export class DocumentsService {
         mimeType: dto.mimeType,
         sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
         uploadedById: userId,
-        notes: dto.notes
+        notes: dto.notes,
       })
     );
 
@@ -267,11 +306,20 @@ export class DocumentsService {
     document.uploadedById = userId;
     await this.documents.save(document);
 
-    await this.log(document.id, userId, 'upload_new_version', { previousVersionId }, { versionId: version.id, revision: dto.revision });
-    await this.notifyDocumentVersion(document.id, document.name, document.documentNumber, version.revision, [
-      document.responsibleUserId,
-      document.uploadedById
-    ]);
+    await this.log(
+      document.id,
+      userId,
+      'upload_new_version',
+      { previousVersionId },
+      { versionId: version.id, revision: dto.revision }
+    );
+    await this.notifyDocumentVersion(
+      document.id,
+      document.name,
+      document.documentNumber,
+      version.revision,
+      [document.responsibleUserId, document.uploadedById]
+    );
     return this.getDetail(userId, documentId, false);
   }
 
@@ -281,7 +329,7 @@ export class DocumentsService {
       this.comments.create({
         documentId,
         authorId: userId,
-        body: dto.body
+        body: dto.body,
       })
     );
     await this.log(documentId, userId, 'comment', undefined, { commentId: comment.id });
@@ -293,7 +341,13 @@ export class DocumentsService {
     const beforeStatus = document.status;
     document.status = 'pending_approval';
     await this.documents.save(document);
-    await this.log(documentId, userId, 'request_approval', { status: beforeStatus }, { status: document.status });
+    await this.log(
+      documentId,
+      userId,
+      'request_approval',
+      { status: beforeStatus },
+      { status: document.status }
+    );
     return this.getDetail(userId, documentId, false);
   }
 
@@ -302,11 +356,20 @@ export class DocumentsService {
     const beforeStatus = document.status;
     document.status = 'approved';
     await this.documents.save(document);
-    await this.log(documentId, userId, 'approval', { status: beforeStatus }, { status: document.status });
-    await this.notifyDocumentDecision(document.id, document.name, document.documentNumber, 'approved', [
-      document.responsibleUserId,
-      document.uploadedById
-    ]);
+    await this.log(
+      documentId,
+      userId,
+      'approval',
+      { status: beforeStatus },
+      { status: document.status }
+    );
+    await this.notifyDocumentDecision(
+      document.id,
+      document.name,
+      document.documentNumber,
+      'approved',
+      [document.responsibleUserId, document.uploadedById]
+    );
     return this.getDetail(userId, documentId, false);
   }
 
@@ -315,11 +378,20 @@ export class DocumentsService {
     const beforeStatus = document.status;
     document.status = 'in_review';
     await this.documents.save(document);
-    await this.log(documentId, userId, 'rejection', { status: beforeStatus }, { status: document.status });
-    await this.notifyDocumentDecision(document.id, document.name, document.documentNumber, 'rejected', [
-      document.responsibleUserId,
-      document.uploadedById
-    ]);
+    await this.log(
+      documentId,
+      userId,
+      'rejection',
+      { status: beforeStatus },
+      { status: document.status }
+    );
+    await this.notifyDocumentDecision(
+      document.id,
+      document.name,
+      document.documentNumber,
+      'rejected',
+      [document.responsibleUserId, document.uploadedById]
+    );
     return this.getDetail(userId, documentId, false);
   }
 
@@ -356,7 +428,10 @@ export class DocumentsService {
     if (!document) {
       throw new NotFoundException('Documento no encontrado');
     }
-    if (!(await this.scope.canAccessProject(userId, document.projectId)) || !(await this.canAccessDocument(userId, document))) {
+    if (
+      !(await this.scope.canAccessProject(userId, document.projectId)) ||
+      !(await this.canAccessDocument(userId, document))
+    ) {
       throw new ForbiddenException('No tienes acceso a este documento');
     }
 
@@ -364,11 +439,19 @@ export class DocumentsService {
   }
 
   private async canAccessDocument(userId: string, document: DocumentRecord) {
-    const visible = await this.filterDocumentsByPermissions(userId, [document.projectId], [document]);
+    const visible = await this.filterDocumentsByPermissions(
+      userId,
+      [document.projectId],
+      [document]
+    );
     return visible.length > 0;
   }
 
-  private async filterDocumentsByPermissions(userId: string, projectIds: string[], rawDocuments: DocumentRecord[]) {
+  private async filterDocumentsByPermissions(
+    userId: string,
+    projectIds: string[],
+    rawDocuments: DocumentRecord[]
+  ) {
     if (!rawDocuments.length) {
       return [];
     }
@@ -379,12 +462,12 @@ export class DocumentsService {
     }
 
     const memberships = await this.members.find({
-      where: { userId, projectId: In(projectIds) }
+      where: { userId, projectId: In(projectIds) },
     });
     const roleIds = user.roles?.map((role) => role.id) ?? [];
     const projectUserIds = memberships.map((membership) => membership.id);
     const permissionRows = await this.permissions.find({
-      where: { documentId: In(rawDocuments.map((document) => document.id)), deletedAt: IsNull() }
+      where: { documentId: In(rawDocuments.map((document) => document.id)), deletedAt: IsNull() },
     });
 
     return rawDocuments.filter((document) => {
@@ -428,7 +511,12 @@ export class DocumentsService {
 
   private async readCurrentVersion(document: DocumentRecord, version: DocumentVersion) {
     const buffer = await this.storage.read(version.fileKey);
-    return { buffer, fileName: version.fileName, mimeType: version.mimeType, documentId: document.id };
+    return {
+      buffer,
+      fileName: version.fileName,
+      mimeType: version.mimeType,
+      documentId: document.id,
+    };
   }
 
   private getExtension(fileName: string) {
@@ -439,10 +527,22 @@ export class DocumentsService {
   private async canPublish(documentId: string, projectId: string) {
     const applicableFlow = await this.approvalFlows.findOne({
       where: [
-        { projectId, entityType: 'document', scopeType: 'document_specific', targetDocumentId: documentId, active: true },
-        { projectId, entityType: 'document', scopeType: 'global', targetDocumentId: IsNull(), active: true }
+        {
+          projectId,
+          entityType: 'document',
+          scopeType: 'document_specific',
+          targetDocumentId: documentId,
+          active: true,
+        },
+        {
+          projectId,
+          entityType: 'document',
+          scopeType: 'global',
+          targetDocumentId: IsNull(),
+          active: true,
+        },
       ],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
 
     if (!applicableFlow || !applicableFlow.requireForPublication) {
@@ -454,9 +554,9 @@ export class DocumentsService {
         entityId: documentId,
         entityType: 'document',
         workflowId: applicableFlow.id,
-        status: 'approved'
+        status: 'approved',
       },
-      order: { completedAt: 'DESC' }
+      order: { completedAt: 'DESC' },
     });
 
     return Boolean(approvedRequest);
@@ -484,7 +584,7 @@ export class DocumentsService {
       project: document.project,
       folder: document.folder,
       discipline: document.discipline,
-      responsibleUser: document.responsibleUser
+      responsibleUser: document.responsibleUser,
     };
   }
 
@@ -501,21 +601,29 @@ export class DocumentsService {
         actorId,
         action,
         beforeState,
-        afterState
+        afterState,
       })
     );
   }
 
-  private async notifyDocumentVersion(documentId: string, name: string, documentNumber: string, revision: string, userIds: Array<string | undefined>) {
+  private async notifyDocumentVersion(
+    documentId: string,
+    name: string,
+    documentNumber: string,
+    revision: string,
+    userIds: Array<string | undefined>
+  ) {
     await this.notifications.notify({
-      recipients: userIds.filter((userId): userId is string => Boolean(userId)).map((userId) => ({ userId })),
+      recipients: userIds
+        .filter((userId): userId is string => Boolean(userId))
+        .map((userId) => ({ userId })),
       notificationType: 'document_new_version',
       title: `Nueva versión de documento: ${name}`,
       body: `Se publicó la revisión ${revision} del documento ${documentNumber}.`,
       entityType: 'document',
       entityId: documentId,
       category: 'document',
-      meta: { route: '/documents' }
+      meta: { route: '/documents' },
     });
   }
 
@@ -528,14 +636,16 @@ export class DocumentsService {
   ) {
     const label = result === 'approved' ? 'aprobado' : 'rechazado';
     await this.notifications.notify({
-      recipients: userIds.filter((userId): userId is string => Boolean(userId)).map((userId) => ({ userId })),
+      recipients: userIds
+        .filter((userId): userId is string => Boolean(userId))
+        .map((userId) => ({ userId })),
       notificationType: 'document_approval_result',
       title: `Documento ${label}: ${name}`,
       body: `El documento ${documentNumber} fue ${label}.`,
       entityType: 'document',
       entityId: documentId,
       category: 'approval',
-      meta: { route: '/documents' }
+      meta: { route: '/documents' },
     });
   }
 }

@@ -7,7 +7,10 @@ const roles = ['Administrador', 'Gerente de proyecto', 'Consulta'];
 export default function PermissionMatrixPage() {
   return (
     <RequirePermission permission={PermissionKey.RolesManage}>
-      <SectionHeader title="Matriz de permisos" description="Permisos por accion para roles del sistema." />
+      <SectionHeader
+        title="Matriz de permisos"
+        description="Permisos por accion para roles del sistema."
+      />
       <div className="card">
         <table className="table">
           <thead>
@@ -26,7 +29,12 @@ export default function PermissionMatrixPage() {
                 <td>{permission.label}</td>
                 {roles.map((role, index) => (
                   <td key={role}>
-                    <input type="checkbox" defaultChecked={index === 0 || (index === 1 && permission.module !== 'Auditoria')} />
+                    <input
+                      type="checkbox"
+                      defaultChecked={
+                        index === 0 || (index === 1 && permission.module !== 'Auditoria')
+                      }
+                    />
                   </td>
                 ))}
               </tr>

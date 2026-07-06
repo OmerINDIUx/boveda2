@@ -30,7 +30,7 @@ const categoryLabels: Record<ProjectCatalogCategory, string> = {
   workType: 'Tipo de obra',
   currentStage: 'Etapa actual',
   priority: 'Prioridad',
-  status: 'Estado'
+  status: 'Estado',
 };
 
 function getToken() {
@@ -58,7 +58,10 @@ export function ProjectCatalogsListPage() {
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<CatalogOption[]>('/projects/catalog-options', getToken() ?? undefined);
+        const response = await apiGet<CatalogOption[]>(
+          '/projects/catalog-options',
+          getToken() ?? undefined
+        );
         if (!active) return;
         setItems(response);
       } catch (nextError) {
@@ -77,7 +80,11 @@ export function ProjectCatalogsListPage() {
 
   async function removeItem(item: CatalogOption) {
     try {
-      await apiPatch(`/projects/catalog-options/${item.id}/deactivate`, {}, getToken() ?? undefined);
+      await apiPatch(
+        `/projects/catalog-options/${item.id}/deactivate`,
+        {},
+        getToken() ?? undefined
+      );
       setItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
     } catch (nextError) {
       setError(getErrorMessage(nextError, 'No fue posible eliminar la opción.'));
@@ -95,14 +102,17 @@ export function ProjectCatalogsListPage() {
           <button className="button secondary" type="button" onClick={() => void removeItem(item)}>
             Eliminar
           </button>
-        </div>
+        </div>,
       ]),
     [items]
   );
 
   return (
     <>
-      <SectionHeader title="Catálogos de proyecto" description="Mantenimiento separado para tipo de obra, etapa, prioridad y estado." />
+      <SectionHeader
+        title="Catálogos de proyecto"
+        description="Mantenimiento separado para tipo de obra, etapa, prioridad y estado."
+      />
       <div className="projects-actions" style={{ marginBottom: 16 }}>
         <Link className="button" href="/admin/project-catalogs/new">
           Nueva opción
@@ -127,7 +137,7 @@ export function ProjectCatalogFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [form, setForm] = useState({
     category: 'workType' as ProjectCatalogCategory,
     value: '',
-    label: ''
+    label: '',
   });
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
@@ -141,7 +151,10 @@ export function ProjectCatalogFormPage({ mode }: { mode: 'create' | 'edit' }) {
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<CatalogOption[]>('/projects/catalog-options', getToken() ?? undefined);
+        const response = await apiGet<CatalogOption[]>(
+          '/projects/catalog-options',
+          getToken() ?? undefined
+        );
         if (!active) return;
         const item = response.find((entry) => entry.id === optionId);
         if (!item) {
@@ -152,7 +165,7 @@ export function ProjectCatalogFormPage({ mode }: { mode: 'create' | 'edit' }) {
         setForm({
           category: item.category,
           value: item.value,
-          label: item.label
+          label: item.label,
         });
       } catch (nextError) {
         if (!active) return;
@@ -208,7 +221,15 @@ export function ProjectCatalogFormPage({ mode }: { mode: 'create' | 'edit' }) {
             <div className="quick-filters-grid">
               <div className="field">
                 <label>Categoría</label>
-                <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as ProjectCatalogCategory }))}>
+                <select
+                  value={form.category}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      category: event.target.value as ProjectCatalogCategory,
+                    }))
+                  }
+                >
                   {Object.entries(categoryLabels).map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
@@ -218,11 +239,21 @@ export function ProjectCatalogFormPage({ mode }: { mode: 'create' | 'edit' }) {
               </div>
               <div className="field">
                 <label>Valor técnico</label>
-                <input value={form.value} onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))} />
+                <input
+                  value={form.value}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, value: event.target.value }))
+                  }
+                />
               </div>
               <div className="field">
                 <label>Etiqueta visible</label>
-                <input value={form.label} onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))} />
+                <input
+                  value={form.label}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, label: event.target.value }))
+                  }
+                />
               </div>
             </div>
             <div className="projects-actions">
@@ -252,7 +283,10 @@ export function ProjectDisciplinesListPage() {
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<DisciplineOption[]>('/folders/disciplines', getToken() ?? undefined);
+        const response = await apiGet<DisciplineOption[]>(
+          '/folders/disciplines',
+          getToken() ?? undefined
+        );
         if (!active) return;
         setItems(response);
       } catch (nextError) {
@@ -289,14 +323,17 @@ export function ProjectDisciplinesListPage() {
           <button className="button secondary" type="button" onClick={() => void removeItem(item)}>
             Eliminar
           </button>
-        </div>
+        </div>,
       ]),
     [items]
   );
 
   return (
     <>
-      <SectionHeader title="Disciplinas" description="Mantenimiento separado de disciplinas para los proyectos." />
+      <SectionHeader
+        title="Disciplinas"
+        description="Mantenimiento separado de disciplinas para los proyectos."
+      />
       <div className="projects-actions" style={{ marginBottom: 16 }}>
         <Link className="button" href="/admin/project-disciplines/new">
           Nueva disciplina
@@ -304,7 +341,11 @@ export function ProjectDisciplinesListPage() {
       </div>
       {error ? <div className="card muted">{error}</div> : null}
       <div className="card">
-        {loading ? <p className="muted">Cargando disciplinas...</p> : <ModuleTable columns={['Código', 'Nombre', 'Descripción', 'Acción']} rows={rows} />}
+        {loading ? (
+          <p className="muted">Cargando disciplinas...</p>
+        ) : (
+          <ModuleTable columns={['Código', 'Nombre', 'Descripción', 'Acción']} rows={rows} />
+        )}
       </div>
     </>
   );
@@ -327,7 +368,10 @@ export function ProjectDisciplineFormPage({ mode }: { mode: 'create' | 'edit' })
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<DisciplineOption[]>('/folders/disciplines', getToken() ?? undefined);
+        const response = await apiGet<DisciplineOption[]>(
+          '/folders/disciplines',
+          getToken() ?? undefined
+        );
         if (!active) return;
         const item = response.find((entry) => entry.id === disciplineId);
         if (!item) {
@@ -338,7 +382,7 @@ export function ProjectDisciplineFormPage({ mode }: { mode: 'create' | 'edit' })
         setForm({
           code: item.code,
           name: item.name,
-          description: item.description ?? ''
+          description: item.description ?? '',
         });
       } catch (nextError) {
         if (!active) return;
@@ -394,15 +438,30 @@ export function ProjectDisciplineFormPage({ mode }: { mode: 'create' | 'edit' })
             <div className="quick-filters-grid">
               <div className="field">
                 <label>Código</label>
-                <input value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} />
+                <input
+                  value={form.code}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
+                  }
+                />
               </div>
               <div className="field">
                 <label>Nombre</label>
-                <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+                <input
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                />
               </div>
               <div className="field span-2">
                 <label>Descripción</label>
-                <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+                <textarea
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                />
               </div>
             </div>
             <div className="projects-actions">

@@ -1,2 +1,1 @@
-export declare class ApprovalsModule {
-}
+export declare class ApprovalsModule {}

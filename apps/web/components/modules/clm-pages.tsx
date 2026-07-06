@@ -12,7 +12,7 @@ import {
   PencilLine,
   RefreshCcw,
   Send,
-  ShieldCheck
+  ShieldCheck,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { SectionHeader } from './section-header';
@@ -47,8 +47,20 @@ type ContractListItem = {
 };
 
 type ContractDetail = ContractListItem & {
-  versions: Array<{ id: string; versionLabel: string; fileName: string; changeSummary?: string; createdAt: string }>;
-  attachments: Array<{ id: string; name: string; fileName: string; notes?: string; createdAt: string }>;
+  versions: Array<{
+    id: string;
+    versionLabel: string;
+    fileName: string;
+    changeSummary?: string;
+    createdAt: string;
+  }>;
+  attachments: Array<{
+    id: string;
+    name: string;
+    fileName: string;
+    notes?: string;
+    createdAt: string;
+  }>;
   obligations: Array<{
     id: string;
     description: string;
@@ -134,7 +146,7 @@ const statusOptions = [
   { value: 'expiring_soon', label: 'Por vencer' },
   { value: 'expired', label: 'Vencido' },
   { value: 'renewed', label: 'Renovado' },
-  { value: 'closed', label: 'Cerrado' }
+  { value: 'closed', label: 'Cerrado' },
 ];
 
 const emptyContractForm: ContractFormState = {
@@ -152,38 +164,38 @@ const emptyContractForm: ContractFormState = {
   currency: 'MXN',
   responsibleUserId: '',
   renewalNoticeDays: '',
-  closeReason: ''
+  closeReason: '',
 };
 
 const emptyObligationForm: ObligationFormState = {
   description: '',
   commitmentDate: '',
-  comments: ''
+  comments: '',
 };
 
 const emptyMilestoneForm: MilestoneFormState = {
   name: '',
   milestoneDate: '',
-  notes: ''
+  notes: '',
 };
 
 const emptyCommentForm: CommentFormState = {
-  body: ''
+  body: '',
 };
 
 const emptyVersionForm: VersionFormState = {
   versionLabel: '',
-  changeSummary: ''
+  changeSummary: '',
 };
 
 const emptyAttachmentForm: AttachmentFormState = {
   name: '',
-  notes: ''
+  notes: '',
 };
 
 const fallbackProjects: Project[] = [
   { id: 'p1', name: 'Torre Ejecutiva Norte', code: 'HOL-PRJ-001' },
-  { id: 'p2', name: 'Planta Oriente', code: 'HOL-PRJ-014' }
+  { id: 'p2', name: 'Planta Oriente', code: 'HOL-PRJ-014' },
 ];
 
 const fallbackContracts: ContractListItem[] = [
@@ -201,8 +213,8 @@ const fallbackContracts: ContractListItem[] = [
     currency: 'MXN',
     amount: '1200000.00',
     project: fallbackProjects[0],
-    pendingObligations: 2
-  }
+    pendingObligations: 2,
+  },
 ];
 
 const fallbackDetail: ContractDetail = {
@@ -213,8 +225,8 @@ const fallbackDetail: ContractDetail = {
       versionLabel: 'Rev-A',
       fileName: 'Contrato-Marco-Rev-A.pdf',
       changeSummary: 'Versión contractual inicial aprobada para firma.',
-      createdAt: '2026-01-05T11:30:00.000Z'
-    }
+      createdAt: '2026-01-05T11:30:00.000Z',
+    },
   ],
   attachments: [
     {
@@ -222,8 +234,8 @@ const fallbackDetail: ContractDetail = {
       name: 'Alcance comercial',
       fileName: 'Anexo-Alcance.pdf',
       notes: 'Anexo con matriz de entregables.',
-      createdAt: '2026-01-06T10:00:00.000Z'
-    }
+      createdAt: '2026-01-06T10:00:00.000Z',
+    },
   ],
   obligations: [
     {
@@ -232,8 +244,8 @@ const fallbackDetail: ContractDetail = {
       commitmentDate: '2026-07-12',
       status: 'pending',
       comments: 'Pendiente de recepción por legal.',
-      responsibleUser: { name: 'Laura Méndez' }
-    }
+      responsibleUser: { name: 'Laura Méndez' },
+    },
   ],
   milestones: [
     {
@@ -242,24 +254,24 @@ const fallbackDetail: ContractDetail = {
       milestoneDate: '2026-07-15',
       status: 'scheduled',
       notes: 'Programar revisión con compras.',
-      responsibleUser: { name: 'Paola Cruz' }
-    }
+      responsibleUser: { name: 'Paola Cruz' },
+    },
   ],
   comments: [
     {
       id: 'cm1',
       body: 'El proveedor confirmó envío de documentación soporte.',
       createdAt: '2026-07-01T16:15:00.000Z',
-      author: { name: 'Legal Holocron' }
-    }
+      author: { name: 'Legal Holocron' },
+    },
   ],
   audit: [
     {
       id: 'au1',
       action: 'status_updated',
-      createdAt: '2026-07-01T12:00:00.000Z'
-    }
-  ]
+      createdAt: '2026-07-01T12:00:00.000Z',
+    },
+  ],
 };
 
 function getToken() {
@@ -279,7 +291,7 @@ async function fileToPayload(file: File): Promise<FilePayload> {
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
     base64Content,
-    sizeBytes: file.size
+    sizeBytes: file.size,
   };
 }
 
@@ -294,7 +306,7 @@ function formatCurrency(amount?: string, currency = 'MXN') {
   if (Number.isNaN(parsed)) return `${amount} ${currency}`;
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
-    currency
+    currency,
   }).format(parsed);
 }
 
@@ -334,7 +346,7 @@ function contractToForm(contract: ContractListItem): ContractFormState {
     currency: contract.currency ?? 'MXN',
     responsibleUserId: '',
     renewalNoticeDays: '',
-    closeReason: ''
+    closeReason: '',
   };
 }
 
@@ -343,11 +355,15 @@ function getProjectAutofill(project?: Project | null) {
     contractType: project?.workType ?? '',
     responsibleArea: project?.currentStage ?? '',
     endDate: project?.targetDate ?? '',
-    responsibleUserId: project?.responsible?.id ?? ''
+    responsibleUserId: project?.responsible?.id ?? '',
   } satisfies Partial<ContractFormState>;
 }
 
-function mergeProjectAutofill(form: ContractFormState, previousProject?: Project | null, nextProject?: Project | null): ContractFormState {
+function mergeProjectAutofill(
+  form: ContractFormState,
+  previousProject?: Project | null,
+  nextProject?: Project | null
+): ContractFormState {
   const previousAutofill = getProjectAutofill(previousProject);
   const nextAutofill = getProjectAutofill(nextProject);
   const nextForm = { ...form, projectId: nextProject?.id ?? '' };
@@ -382,7 +398,7 @@ function buildContractPayload(form: ContractFormState) {
       currency: form.currency.trim() || undefined,
       responsibleUserId: form.responsibleUserId.trim() || undefined,
       renewalNoticeDays: form.renewalNoticeDays.trim() || undefined,
-      closeReason: form.closeReason.trim() || undefined
+      closeReason: form.closeReason.trim() || undefined,
     }).filter(([, value]) => value !== undefined)
   );
 }
@@ -440,11 +456,14 @@ function ContractSummaryCard({ contract }: { contract: ContractListItem }) {
           <div className="project-code">{contract.project?.code ?? contract.projectId}</div>
           <h2>{contract.name}</h2>
           <p className="muted">
-            {contract.contractType ?? 'Sin tipo'} · {contract.supplierName ?? contract.clientName ?? 'Sin contraparte'}
+            {contract.contractType ?? 'Sin tipo'} ·{' '}
+            {contract.supplierName ?? contract.clientName ?? 'Sin contraparte'}
           </p>
         </div>
         <div className="projects-actions">
-          <span className={`pill ${getContractTone(contract.status)}`}>{normalizeLabel(contract.status)}</span>
+          <span className={`pill ${getContractTone(contract.status)}`}>
+            {normalizeLabel(contract.status)}
+          </span>
         </div>
       </div>
 
@@ -484,7 +503,7 @@ function ContractFormFields({
   form,
   projects,
   selectedProject,
-  onChange
+  onChange,
 }: {
   form: ContractFormState;
   projects: Project[];
@@ -495,7 +514,10 @@ function ContractFormFields({
     <div className="quick-filters-grid clm-form-grid">
       <div className="field">
         <label>Proyecto</label>
-        <select value={form.projectId} onChange={(event) => onChange('projectId', event.target.value)}>
+        <select
+          value={form.projectId}
+          onChange={(event) => onChange('projectId', event.target.value)}
+        >
           <option value="">Selecciona</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
@@ -510,10 +532,26 @@ function ContractFormFields({
         ) : null}
       </div>
       <TextField label="Contrato" value={form.name} onChange={(value) => onChange('name', value)} />
-      <TextField label="Proveedor" value={form.supplierName} onChange={(value) => onChange('supplierName', value)} />
-      <TextField label="Cliente" value={form.clientName} onChange={(value) => onChange('clientName', value)} />
-      <TextField label="Área responsable" value={form.responsibleArea} onChange={(value) => onChange('responsibleArea', value)} />
-      <TextField label="Tipo de contrato" value={form.contractType} onChange={(value) => onChange('contractType', value)} />
+      <TextField
+        label="Proveedor"
+        value={form.supplierName}
+        onChange={(value) => onChange('supplierName', value)}
+      />
+      <TextField
+        label="Cliente"
+        value={form.clientName}
+        onChange={(value) => onChange('clientName', value)}
+      />
+      <TextField
+        label="Área responsable"
+        value={form.responsibleArea}
+        onChange={(value) => onChange('responsibleArea', value)}
+      />
+      <TextField
+        label="Tipo de contrato"
+        value={form.contractType}
+        onChange={(value) => onChange('contractType', value)}
+      />
       <div className="field">
         <label>Estado</label>
         <select value={form.status} onChange={(event) => onChange('status', event.target.value)}>
@@ -524,23 +562,56 @@ function ContractFormFields({
           ))}
         </select>
       </div>
-      <TextField label="Inicio" type="date" value={form.startDate} onChange={(value) => onChange('startDate', value)} />
-      <TextField label="Vencimiento" type="date" value={form.endDate} onChange={(value) => onChange('endDate', value)} />
-      <TextField label="Renovación" type="date" value={form.renewalDate} onChange={(value) => onChange('renewalDate', value)} />
-      <TextField label="Monto" value={form.amount} onChange={(value) => onChange('amount', value)} />
-      <TextField label="Moneda" value={form.currency} onChange={(value) => onChange('currency', value)} />
-      <TextField label="Días de preaviso" value={form.renewalNoticeDays} onChange={(value) => onChange('renewalNoticeDays', value)} />
-      <TextField label="Responsable (id)" value={form.responsibleUserId} onChange={(value) => onChange('responsibleUserId', value)} />
+      <TextField
+        label="Inicio"
+        type="date"
+        value={form.startDate}
+        onChange={(value) => onChange('startDate', value)}
+      />
+      <TextField
+        label="Vencimiento"
+        type="date"
+        value={form.endDate}
+        onChange={(value) => onChange('endDate', value)}
+      />
+      <TextField
+        label="Renovación"
+        type="date"
+        value={form.renewalDate}
+        onChange={(value) => onChange('renewalDate', value)}
+      />
+      <TextField
+        label="Monto"
+        value={form.amount}
+        onChange={(value) => onChange('amount', value)}
+      />
+      <TextField
+        label="Moneda"
+        value={form.currency}
+        onChange={(value) => onChange('currency', value)}
+      />
+      <TextField
+        label="Días de preaviso"
+        value={form.renewalNoticeDays}
+        onChange={(value) => onChange('renewalNoticeDays', value)}
+      />
+      <TextField
+        label="Responsable (id)"
+        value={form.responsibleUserId}
+        onChange={(value) => onChange('responsibleUserId', value)}
+      />
       <div className="field span-3">
         <label>Motivo de cierre</label>
-        <textarea value={form.closeReason} onChange={(event) => onChange('closeReason', event.target.value)} />
+        <textarea
+          value={form.closeReason}
+          onChange={(event) => onChange('closeReason', event.target.value)}
+        />
       </div>
     </div>
   );
 }
 
 export function ClmWorkspacePage() {
-  const [projects, setProjects] = useState<Project[]>([]);
   const [contracts, setContracts] = useState<ContractListItem[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
@@ -552,22 +623,19 @@ export function ClmWorkspacePage() {
 
     async function load() {
       try {
-        const [projectsResponse, contractsResponse] = await Promise.all([
-          apiGet<Project[]>('/projects', getToken()),
-          apiGet<ContractListItem[]>('/clm/contracts', getToken())
-        ]);
+        const contractsResponse = await apiGet<ContractListItem[]>('/clm/contracts', getToken());
 
         if (!active) return;
         const items = contractsResponse.length ? contractsResponse : fallbackContracts;
-        setProjects(projectsResponse.length ? projectsResponse : fallbackProjects);
         setContracts(items);
         setSelectedId(items[0]?.id ?? '');
       } catch {
         if (!active) return;
-        setProjects(fallbackProjects);
         setContracts(fallbackContracts);
         setSelectedId(fallbackContracts[0]?.id ?? '');
-        setMessage('Se muestra una vista de respaldo mientras el CLM termina de responder desde la API.');
+        setMessage(
+          'Se muestra una vista de respaldo mientras el CLM termina de responder desde la API.'
+        );
       }
     }
 
@@ -580,7 +648,13 @@ export function ClmWorkspacePage() {
   const filtered = useMemo(
     () =>
       contracts.filter((item) => {
-        const searchable = [item.name, item.supplierName, item.clientName, item.contractType, item.project?.name]
+        const searchable = [
+          item.name,
+          item.supplierName,
+          item.clientName,
+          item.contractType,
+          item.project?.name,
+        ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -630,11 +704,18 @@ export function ClmWorkspacePage() {
           <div className="quick-filters-grid" style={{ marginBottom: 16 }}>
             <div className="field span-2">
               <label>Buscar</label>
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Contrato, proveedor, cliente..." />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Contrato, proveedor, cliente..."
+              />
             </div>
             <div className="field">
               <label>Estado</label>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+              >
                 <option value="">Todos</option>
                 {statusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -646,18 +727,28 @@ export function ClmWorkspacePage() {
           </div>
           <div className="project-list">
             {filtered.map((item) => (
-              <button className={`project-list-item ${item.id === selectedId ? 'active' : ''}`} key={item.id} type="button" onClick={() => setSelectedId(item.id)}>
+              <button
+                className={`project-list-item ${item.id === selectedId ? 'active' : ''}`}
+                key={item.id}
+                type="button"
+                onClick={() => setSelectedId(item.id)}
+              >
                 <div className="project-list-head">
                   <strong>{item.name}</strong>
-                  <span className={`pill ${getContractTone(item.status)}`}>{normalizeLabel(item.status)}</span>
+                  <span className={`pill ${getContractTone(item.status)}`}>
+                    {normalizeLabel(item.status)}
+                  </span>
                 </div>
                 <span>{item.supplierName ?? item.clientName ?? 'Sin contraparte'}</span>
                 <small className="muted">
-                  {item.project?.code ?? item.projectId} · {formatDate(item.endDate)} · {item.pendingObligations ?? 0} pendientes
+                  {item.project?.code ?? item.projectId} · {formatDate(item.endDate)} ·{' '}
+                  {item.pendingObligations ?? 0} pendientes
                 </small>
               </button>
             ))}
-            {!filtered.length ? <div className="simple-document-item">No hay contratos con ese filtro.</div> : null}
+            {!filtered.length ? (
+              <div className="simple-document-item">No hay contratos con ese filtro.</div>
+            ) : null}
           </div>
         </article>
 
@@ -682,7 +773,9 @@ export function ClmWorkspacePage() {
               </div>
               <div className="simple-document-item">
                 <strong>Detalle por expediente</strong>
-                <span>Cada contrato puede abrirse en su propia vista para seguimiento y trazabilidad.</span>
+                <span>
+                  Cada contrato puede abrirse en su propia vista para seguimiento y trazabilidad.
+                </span>
               </div>
               <div className="simple-document-item">
                 <strong>Edición aislada</strong>
@@ -705,7 +798,10 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const selectedProject = useMemo(() => projects.find((project) => project.id === form.projectId) ?? null, [projects, form.projectId]);
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === form.projectId) ?? null,
+    [projects, form.projectId]
+  );
 
   useEffect(() => {
     let active = true;
@@ -740,9 +836,12 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
         setForm(contractToForm(response));
       } catch {
         if (!active) return;
-        const fallback = fallbackContracts.find((item) => item.id === contractId) ?? fallbackContracts[0];
+        const fallback =
+          fallbackContracts.find((item) => item.id === contractId) ?? fallbackContracts[0];
         setForm(contractToForm(fallback));
-        setError('No fue posible cargar el contrato desde la API; se abrió un respaldo local para edición.');
+        setError(
+          'No fue posible cargar el contrato desde la API; se abrió un respaldo local para edición.'
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -777,11 +876,19 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
         return;
       }
 
-      const updated = await apiPatch<ContractDetail>(`/clm/contracts/${contractId}`, payload, getToken());
+      const updated = await apiPatch<ContractDetail>(
+        `/clm/contracts/${contractId}`,
+        payload,
+        getToken()
+      );
       router.push(`/clm/${updated.id}`);
       router.refresh();
     } catch {
-      setError(mode === 'create' ? 'No fue posible crear el contrato.' : 'No fue posible actualizar el contrato.');
+      setError(
+        mode === 'create'
+          ? 'No fue posible crear el contrato.'
+          : 'No fue posible actualizar el contrato.'
+      );
     } finally {
       setSaving(false);
     }
@@ -799,7 +906,10 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </p>
         </div>
         <div className="projects-actions">
-          <Link className="button secondary" href={mode === 'create' ? '/clm' : `/clm/${contractId}`}>
+          <Link
+            className="button secondary"
+            href={mode === 'create' ? '/clm' : `/clm/${contractId}`}
+          >
             Cancelar
           </Link>
         </div>
@@ -826,7 +936,8 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     return { ...current, [key]: value };
                   }
 
-                  const previousProject = projects.find((project) => project.id === current.projectId) ?? null;
+                  const previousProject =
+                    projects.find((project) => project.id === current.projectId) ?? null;
                   const nextProject = projects.find((project) => project.id === value) ?? null;
 
                   if (mode !== 'create') {
@@ -842,8 +953,11 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 <div className="simple-document-item">
                   <strong>Datos sugeridos del proyecto</strong>
                   <span>
-                    {selectedProject.workType ?? 'Sin tipo de obra'} · {selectedProject.currentStage ?? 'Sin etapa'} ·{' '}
-                    {selectedProject.targetDate ? formatDate(selectedProject.targetDate) : 'Sin fecha objetivo'}
+                    {selectedProject.workType ?? 'Sin tipo de obra'} ·{' '}
+                    {selectedProject.currentStage ?? 'Sin etapa'} ·{' '}
+                    {selectedProject.targetDate
+                      ? formatDate(selectedProject.targetDate)
+                      : 'Sin fecha objetivo'}
                   </span>
                   <small>{selectedProject.responsible?.name ?? 'Sin responsable asignado'}</small>
                 </div>
@@ -899,7 +1013,11 @@ export function ContractDetailPage() {
   async function updateStatus(status: string) {
     if (!detail) return;
     try {
-      const response = await apiPatch<ContractDetail>(`/clm/contracts/${detail.id}`, { status }, getToken());
+      const response = await apiPatch<ContractDetail>(
+        `/clm/contracts/${detail.id}`,
+        { status },
+        getToken()
+      );
       setDetail(response);
     } catch {
       setMessage('No fue posible actualizar el estado del contrato.');
@@ -909,7 +1027,11 @@ export function ContractDetailPage() {
   async function runClose() {
     if (!detail) return;
     try {
-      const response = await apiPost<ContractDetail>(`/clm/contracts/${detail.id}/close`, { closeReason: 'Cierre manual desde CLM' }, getToken());
+      const response = await apiPost<ContractDetail>(
+        `/clm/contracts/${detail.id}/close`,
+        { closeReason: 'Cierre manual desde CLM' },
+        getToken()
+      );
       setDetail(response);
     } catch {
       setMessage('No fue posible cerrar el contrato.');
@@ -933,7 +1055,11 @@ export function ContractDetailPage() {
   async function askContract() {
     if (!detail || !askQuestion.trim()) return;
     try {
-      const response = await apiPost<AskResponse>(`/clm/contracts/${detail.id}/ask`, { question: askQuestion }, getToken());
+      const response = await apiPost<AskResponse>(
+        `/clm/contracts/${detail.id}/ask`,
+        { question: askQuestion },
+        getToken()
+      );
       setAskResult(response);
     } catch {
       setMessage('No fue posible consultar el contrato con IA.');
@@ -965,7 +1091,9 @@ export function ContractDetailPage() {
       <div className="topbar">
         <div>
           <h1>{detail.name}</h1>
-          <p className="muted">Expediente contractual con historial, seguimiento operativo y trazabilidad.</p>
+          <p className="muted">
+            Expediente contractual con historial, seguimiento operativo y trazabilidad.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href="/clm">
@@ -995,15 +1123,24 @@ export function ContractDetailPage() {
             <div className="project-code">{detail.project?.code ?? detail.projectId}</div>
             <h2>{detail.name}</h2>
             <p className="muted">
-              {detail.contractType ?? 'Sin tipo'} · {detail.supplierName ?? 'Sin proveedor'} · {detail.clientName ?? 'Sin cliente'}
+              {detail.contractType ?? 'Sin tipo'} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
+              {detail.clientName ?? 'Sin cliente'}
             </p>
           </div>
           <div className="projects-actions">
-            <button className="button secondary" type="button" onClick={() => updateStatus('approved')}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => updateStatus('approved')}
+            >
               <ShieldCheck size={18} />
               Aprobar
             </button>
-            <button className="button secondary" type="button" onClick={() => updateStatus('active')}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => updateStatus('active')}
+            >
               <Landmark size={18} />
               Vigente
             </button>
@@ -1053,7 +1190,10 @@ export function ContractDetailPage() {
             {detail.obligations.map((item) => (
               <div className="simple-document-item" key={item.id}>
                 <strong>{item.description}</strong>
-                <small>{item.responsibleUser?.name ?? 'Sin responsable'} · {formatDate(item.commitmentDate)} · {normalizeLabel(item.status)}</small>
+                <small>
+                  {item.responsibleUser?.name ?? 'Sin responsable'} ·{' '}
+                  {formatDate(item.commitmentDate)} · {normalizeLabel(item.status)}
+                </small>
                 <span>{item.comments ?? 'Sin comentarios'}</span>
               </div>
             ))}
@@ -1074,7 +1214,10 @@ export function ContractDetailPage() {
             {detail.milestones.map((item) => (
               <div className="simple-document-item" key={item.id}>
                 <strong>{item.name}</strong>
-                <small>{item.responsibleUser?.name ?? 'Sin responsable'} · {formatDate(item.milestoneDate)} · {normalizeLabel(item.status)}</small>
+                <small>
+                  {item.responsibleUser?.name ?? 'Sin responsable'} ·{' '}
+                  {formatDate(item.milestoneDate)} · {normalizeLabel(item.status)}
+                </small>
                 <span>{item.notes ?? 'Sin notas'}</span>
               </div>
             ))}
@@ -1247,7 +1390,7 @@ export function ContractVersionCreatePage() {
           versionLabel: form.versionLabel || `Rev-${Date.now()}`,
           changeSummary: form.changeSummary,
           ...file,
-          sizeBytes: String(file.sizeBytes)
+          sizeBytes: String(file.sizeBytes),
         },
         getToken()
       );
@@ -1284,10 +1427,19 @@ export function ContractVersionCreatePage() {
         ) : (
           <>
             <div className="quick-filters-grid">
-              <TextField label="Etiqueta de versión" value={form.versionLabel} onChange={(value) => setForm((current) => ({ ...current, versionLabel: value }))} />
+              <TextField
+                label="Etiqueta de versión"
+                value={form.versionLabel}
+                onChange={(value) => setForm((current) => ({ ...current, versionLabel: value }))}
+              />
               <div className="field span-2">
                 <label>Resumen de cambios</label>
-                <input value={form.changeSummary} onChange={(event) => setForm((current) => ({ ...current, changeSummary: event.target.value }))} />
+                <input
+                  value={form.changeSummary}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, changeSummary: event.target.value }))
+                  }
+                />
               </div>
             </div>
             <div className="field">
@@ -1359,7 +1511,7 @@ export function ContractAttachmentCreatePage() {
           name: form.name || file.fileName,
           notes: form.notes,
           ...file,
-          sizeBytes: String(file.sizeBytes)
+          sizeBytes: String(file.sizeBytes),
         },
         getToken()
       );
@@ -1396,10 +1548,19 @@ export function ContractAttachmentCreatePage() {
         ) : (
           <>
             <div className="quick-filters-grid">
-              <TextField label="Nombre del anexo" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+              <TextField
+                label="Nombre del anexo"
+                value={form.name}
+                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+              />
               <div className="field span-2">
                 <label>Notas</label>
-                <input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+                <input
+                  value={form.notes}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, notes: event.target.value }))
+                  }
+                />
               </div>
             </div>
             <div className="field">
@@ -1486,7 +1647,12 @@ export function ContractObligationCreatePage() {
           <>
             <div className="field">
               <label>Descripción</label>
-              <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+              <textarea
+                value={form.description}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, description: event.target.value }))
+                }
+              />
             </div>
             <div className="quick-filters-grid">
               <TextField
@@ -1497,7 +1663,12 @@ export function ContractObligationCreatePage() {
               />
               <div className="field span-2">
                 <label>Comentarios</label>
-                <input value={form.comments} onChange={(event) => setForm((current) => ({ ...current, comments: event.target.value }))} />
+                <input
+                  value={form.comments}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, comments: event.target.value }))
+                  }
+                />
               </div>
             </div>
             <div className="projects-actions">
@@ -1579,14 +1750,22 @@ export function ContractMilestoneCreatePage() {
         ) : (
           <>
             <div className="quick-filters-grid">
-              <TextField label="Nombre" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+              <TextField
+                label="Nombre"
+                value={form.name}
+                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+              />
               <TextField
                 label="Fecha"
                 type="date"
                 value={form.milestoneDate}
                 onChange={(value) => setForm((current) => ({ ...current, milestoneDate: value }))}
               />
-              <TextField label="Notas" value={form.notes} onChange={(value) => setForm((current) => ({ ...current, notes: value }))} />
+              <TextField
+                label="Notas"
+                value={form.notes}
+                onChange={(value) => setForm((current) => ({ ...current, notes: value }))}
+              />
             </div>
             <div className="projects-actions">
               <button className="button" type="button" onClick={submit} disabled={saving}>
@@ -1648,7 +1827,9 @@ export function ContractCommentCreatePage() {
       <div className="topbar">
         <div>
           <h1>Nuevo comentario</h1>
-          <p className="muted">Pantalla dedicada para alta de comentarios del expediente contractual.</p>
+          <p className="muted">
+            Pantalla dedicada para alta de comentarios del expediente contractual.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href={contractId ? `/clm/${contractId}` : '/clm'}>
@@ -1668,7 +1849,10 @@ export function ContractCommentCreatePage() {
           <>
             <div className="field">
               <label>Comentario</label>
-              <textarea value={form.body} onChange={(event) => setForm({ body: event.target.value })} />
+              <textarea
+                value={form.body}
+                onChange={(event) => setForm({ body: event.target.value })}
+              />
             </div>
             <div className="projects-actions">
               <button className="button" type="button" onClick={submit} disabled={saving}>
@@ -1686,7 +1870,7 @@ function TextField({
   label,
   value,
   onChange,
-  type = 'text'
+  type = 'text',
 }: {
   label: string;
   value: string;

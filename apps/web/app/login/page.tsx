@@ -40,11 +40,20 @@ export default function LoginPage() {
         <form>
           <div className="field">
             <label>Correo</label>
-            <input type="email" placeholder="usuario@empresa.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+            <input
+              type="email"
+              placeholder="usuario@empresa.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
           </div>
           <div className="field">
             <label>Contrasena</label>
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
           </div>
           {error ? <p style={{ color: 'var(--danger)' }}>{error}</p> : null}
           <button className="button" type="button" onClick={submit}>

@@ -13,7 +13,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: config.get<string>('JWT_SECRET') ?? 'change-me'
+      secretOrKey: config.get<string>('JWT_SECRET') ?? 'change-me',
     });
   }
 
@@ -24,7 +24,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const roles = user.roles?.map((role) => role.key) ?? [];
-    const permissions = user.roles?.flatMap((role) => role.permissions?.map((permission) => permission.key) ?? []) ?? [];
-    return { id: user.id, name: user.name, email: user.email, active: user.active, roles, permissions };
+    const permissions =
+      user.roles?.flatMap((role) => role.permissions?.map((permission) => permission.key) ?? []) ??
+      [];
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      active: user.active,
+      roles,
+      permissions,
+    };
   }
 }

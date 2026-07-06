@@ -1,2 +1,1 @@
-export declare class DocumentsModule {
-}
+export declare class DocumentsModule {}

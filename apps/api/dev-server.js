@@ -14,7 +14,7 @@ const db = mysql.createPool({
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD || '',
   waitForConnections: true,
-  connectionLimit: 10
+  connectionLimit: 10,
 });
 
 function send(res, status, data) {
@@ -22,7 +22,7 @@ function send(res, status, data) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': webOrigin,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   });
   res.end(JSON.stringify(data));
 }
@@ -44,9 +44,10 @@ function readJson(req) {
 }
 
 async function loadUserByEmail(email) {
-  const [users] = await db.query('SELECT id, name, email, password_hash, active FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1', [
-    email
-  ]);
+  const [users] = await db.query(
+    'SELECT id, name, email, password_hash, active FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1',
+    [email]
+  );
   const user = users[0];
   if (!user) return null;
 
@@ -75,7 +76,7 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     roles: user.roles.map((role) => role.key),
-    permissions: user.permissions
+    permissions: user.permissions,
   };
 }
 
@@ -101,7 +102,10 @@ async function handle(req, res) {
     }
 
     const payload = publicUser(user);
-    return send(res, 200, { accessToken: jwt.sign(payload, jwtSecret, { expiresIn: '8h' }), user: payload });
+    return send(res, 200, {
+      accessToken: jwt.sign(payload, jwtSecret, { expiresIn: '8h' }),
+      user: payload,
+    });
   }
 
   if (req.method === 'POST' && req.url === '/api/auth/logout') {

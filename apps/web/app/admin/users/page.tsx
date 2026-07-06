@@ -16,8 +16,20 @@ export default function UsersPage() {
         <ModuleTable
           columns={['Nombre', 'Correo', 'Estado', 'Roles', 'Accion']}
           rows={[
-            ['Admin Holocron', 'admin@empresa.com', <span className="pill">Activo</span>, 'Administrador', <Link href="/admin/users/new">Editar</Link>],
-            ['Consulta Legal', 'legal@empresa.com', <span className="pill">Activo</span>, 'Consulta', <Link href="/admin/users/new">Editar</Link>]
+            [
+              'Admin Holocron',
+              'admin@empresa.com',
+              <span className="pill">Activo</span>,
+              'Administrador',
+              <Link href="/admin/users/new">Editar</Link>,
+            ],
+            [
+              'Consulta Legal',
+              'legal@empresa.com',
+              <span className="pill">Activo</span>,
+              'Consulta',
+              <Link href="/admin/users/new">Editar</Link>,
+            ],
           ]}
         />
       </div>

@@ -1,4 +1,4 @@
 export declare class DocumentListQueryDto {
-    projectId?: string;
-    search?: string;
+  projectId?: string;
+  search?: string;
 }

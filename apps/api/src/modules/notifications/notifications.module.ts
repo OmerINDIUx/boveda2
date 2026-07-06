@@ -27,11 +27,11 @@ import { SmtpMailService } from './smtp-mail.service';
       ApprovalStep,
       Contract,
       ContractObligation,
-      Rfi
-    ])
+      Rfi,
+    ]),
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, SmtpMailService, NotificationsScheduler],
-  exports: [NotificationsService]
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}

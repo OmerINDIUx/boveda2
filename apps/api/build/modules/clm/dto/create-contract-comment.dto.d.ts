@@ -1,3 +1,3 @@
 export declare class CreateContractCommentDto {
-    body: string;
+  body: string;
 }

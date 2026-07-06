@@ -1,23 +1,5 @@
-export const PermissionKey = {
-  UsersRead: 'users.read',
-  UsersManage: 'users.manage',
-  RolesRead: 'roles.read',
-  RolesManage: 'roles.manage',
-  ProjectsView: 'projects.view',
-  ProjectsManage: 'projects.manage',
-  DocumentsCreate: 'documents.create',
-  DocumentsView: 'documents.view',
-  DocumentsEdit: 'documents.edit',
-  DocumentsDownload: 'documents.download',
-  DocumentsPrint: 'documents.print',
-  DocumentsApprove: 'documents.approve',
-  DocumentsDelete: 'documents.delete',
-  RfisManage: 'rfis.manage',
-  ApprovalsManage: 'approvals.manage',
-  AuditView: 'audit.view',
-  ContractsManage: 'contracts.manage',
-  AiQuery: 'ai.query'
-} as const;
+import { PermissionKey } from '@holocron/shared';
+export { PermissionKey } from '@holocron/shared';
 
 export const permissionCatalog = [
   { key: PermissionKey.ProjectsView, label: 'Ver proyecto', module: 'Proyectos' },
@@ -32,5 +14,5 @@ export const permissionCatalog = [
   { key: PermissionKey.ApprovalsManage, label: 'Gestionar aprobaciones', module: 'Aprobaciones' },
   { key: PermissionKey.AuditView, label: 'Ver auditoria', module: 'Auditoria' },
   { key: PermissionKey.ContractsManage, label: 'Administrar contratos', module: 'CLM' },
-  { key: PermissionKey.AiQuery, label: 'Consultar IA documental', module: 'IA' }
+  { key: PermissionKey.AiQuery, label: 'Consultar IA documental', module: 'IA' },
 ];

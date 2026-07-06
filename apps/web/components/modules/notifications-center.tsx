@@ -32,7 +32,7 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   approval_assigned: 'Aprobacion',
   approval_stalled: 'Seguimiento',
   contract_expired: 'Contrato vencido',
-  contract_expiring_soon: 'Contrato por vencer'
+  contract_expiring_soon: 'Contrato por vencer',
 };
 
 function getNotificationTypeLabel(type: string) {
@@ -53,7 +53,7 @@ export function NotificationsCenter() {
     try {
       const [notifications, prefs] = await Promise.all([
         apiGet<NotificationItem[]>('/notifications', token),
-        apiGet<NotificationPreference[]>('/notifications/preferences', token)
+        apiGet<NotificationPreference[]>('/notifications/preferences', token),
       ]);
       setItems(notifications);
       setPreferences(prefs);
@@ -73,14 +73,20 @@ export function NotificationsCenter() {
     const token = window.localStorage.getItem('holocron_token') ?? undefined;
     if (!token) return;
     await apiPatch(`/notifications/${id}/read`, {}, token);
-    setItems((current) => current.map((item) => (item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item)));
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item
+      )
+    );
   };
 
   const markAllAsRead = async () => {
     const token = window.localStorage.getItem('holocron_token') ?? undefined;
     if (!token) return;
     await apiPatch('/notifications/read-all', {}, token);
-    setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
+    setItems((current) =>
+      current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
+    );
   };
 
   const savePreferences = async () => {
@@ -88,7 +94,11 @@ export function NotificationsCenter() {
     if (!token) return;
     setSaving(true);
     try {
-      const result = await apiPost<NotificationPreference[]>('/notifications/preferences', { items: preferences }, token);
+      const result = await apiPost<NotificationPreference[]>(
+        '/notifications/preferences',
+        { items: preferences },
+        token
+      );
       setPreferences(result);
       setMessage('Preferencias guardadas.');
     } catch {
@@ -107,7 +117,11 @@ export function NotificationsCenter() {
         title="Notificaciones"
         description="Vista completa para revisar alertas, abrir el detalle y mantener tus avisos realmente legibles."
       />
-      {message ? <div className="card"><span>{message}</span></div> : null}
+      {message ? (
+        <div className="card">
+          <span>{message}</span>
+        </div>
+      ) : null}
 
       <div className="notifications-summary-grid">
         <div className="card notification-summary-card">
@@ -118,7 +132,9 @@ export function NotificationsCenter() {
         <div className="card notification-summary-card attention">
           <span>Sin leer</span>
           <strong>{unread}</strong>
-          <small className="muted">{unread ? 'Requieren tu atencion.' : 'No tienes pendientes.'}</small>
+          <small className="muted">
+            {unread ? 'Requieren tu atencion.' : 'No tienes pendientes.'}
+          </small>
         </div>
         <div className="card notification-summary-card">
           <span>Leidas</span>
@@ -154,9 +170,14 @@ export function NotificationsCenter() {
                 </div>
               ) : items.length ? (
                 items.map((item) => (
-                  <article className={`notification-card ${item.readAt ? '' : 'unread'}`} key={item.id}>
+                  <article
+                    className={`notification-card ${item.readAt ? '' : 'unread'}`}
+                    key={item.id}
+                  >
                     <div className="notification-card-top">
-                      <span className="notification-type-pill">{getNotificationTypeLabel(item.notificationType)}</span>
+                      <span className="notification-type-pill">
+                        {getNotificationTypeLabel(item.notificationType)}
+                      </span>
                       <small>{new Date(item.createdAt).toLocaleString('es-MX')}</small>
                     </div>
 
@@ -167,7 +188,9 @@ export function NotificationsCenter() {
 
                     <div className="notification-card-footer">
                       <div className="notification-card-state">
-                        <span className={`notification-state-dot ${item.readAt ? 'read' : 'unread'}`} />
+                        <span
+                          className={`notification-state-dot ${item.readAt ? 'read' : 'unread'}`}
+                        />
                         <small>{item.readAt ? 'Leida' : 'Pendiente de lectura'}</small>
                       </div>
 
@@ -177,7 +200,12 @@ export function NotificationsCenter() {
                             Ver detalle
                           </Link>
                         ) : null}
-                        <button className="button" type="button" disabled={Boolean(item.readAt)} onClick={() => markAsRead(item.id)}>
+                        <button
+                          className="button"
+                          type="button"
+                          disabled={Boolean(item.readAt)}
+                          onClick={() => markAsRead(item.id)}
+                        >
                           {item.readAt ? 'Leida' : 'Marcar como leida'}
                         </button>
                       </div>
@@ -216,7 +244,9 @@ export function NotificationsCenter() {
                       onChange={(event) =>
                         setPreferences((current) =>
                           current.map((row, rowIndex) =>
-                            rowIndex === index ? { ...row, inAppEnabled: event.target.checked } : row
+                            rowIndex === index
+                              ? { ...row, inAppEnabled: event.target.checked }
+                              : row
                           )
                         )
                       }
@@ -231,7 +261,9 @@ export function NotificationsCenter() {
                       onChange={(event) =>
                         setPreferences((current) =>
                           current.map((row, rowIndex) =>
-                            rowIndex === index ? { ...row, emailEnabled: event.target.checked } : row
+                            rowIndex === index
+                              ? { ...row, emailEnabled: event.target.checked }
+                              : row
                           )
                         )
                       }
@@ -241,7 +273,12 @@ export function NotificationsCenter() {
                 </div>
               </div>
             ))}
-            <button className="button" disabled={saving} type="button" onClick={() => savePreferences()}>
+            <button
+              className="button"
+              disabled={saving}
+              type="button"
+              onClick={() => savePreferences()}
+            >
               {saving ? 'Guardando...' : 'Guardar preferencias'}
             </button>
           </div>

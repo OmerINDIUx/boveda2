@@ -35,5 +35,6 @@ export class UpdateDocumentDto {
 
   @IsOptional()
   @IsString()
-  status?: 'draft' | 'pending_approval' | 'in_review' | 'approved' | 'published' | 'expired' | 'archived';
+  status?:
+    'draft' | 'pending_approval' | 'in_review' | 'approved' | 'published' | 'expired' | 'archived';
 }

@@ -8,18 +8,21 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run build -w packages/shared && npm run dev --workspaces --if-present",
+    "build": "npm run build -w packages/shared && npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css,sql}\"",
-    "test": "node --test tests/*.test.mjs",
-    "test:types": "C:\\laragon\\www\\boveda2\\node_modules\\.bin\\tsc.cmd -p apps/api/tsconfig.json --noEmit --incremental false && C:\\laragon\\www\\boveda2\\node_modules\\.bin\\tsc.cmd -p apps/web/tsconfig.json --noEmit --incremental false"
+    "test": "npm run test -w apps/api && npm run test -w apps/web && node --test tests/*.test.mjs",
+    "test:types": "tsc -p apps/api/tsconfig.json --noEmit --incremental false && tsc -p apps/web/tsconfig.json --noEmit --incremental false",
+    "prepare": "husky"
   },
   "dependencies": {
     "@nestjs/platform-express": "^11.1.27",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "husky": "^9.1.6",
+    "lint-staged": "^15.3.0",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4"
   },

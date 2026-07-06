@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export function ModuleTable({
   columns,
-  rows
+  rows,
 }: {
   columns: string[];
   rows: Array<Array<string | number | ReactNode>>;

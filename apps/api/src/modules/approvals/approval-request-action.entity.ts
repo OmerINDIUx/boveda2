@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { User } from '../users/user.entity';
 import { ApprovalRequest } from './approval-request.entity';
 import { ApprovalStep } from './approval-step.entity';
@@ -30,7 +37,8 @@ export class ApprovalRequestAction {
   actor!: User;
 
   @Column({ length: 60 })
-  action!: 'submitted' | 'approved' | 'rejected' | 'changes_requested' | 'comment' | 'stopped' | 'expired';
+  action!:
+    'submitted' | 'approved' | 'rejected' | 'changes_requested' | 'comment' | 'stopped' | 'expired';
 
   @Column({ type: 'text', nullable: true })
   comment?: string;

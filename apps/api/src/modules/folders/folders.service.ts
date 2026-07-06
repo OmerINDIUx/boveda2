@@ -29,13 +29,15 @@ export class FoldersService {
     if (!(await this.scope.canAccessProject(userId, dto.projectId))) {
       throw new ForbiddenException('No tienes acceso a este proyecto');
     }
-    const parent = dto.parentId ? await this.folders.findOne({ where: { id: dto.parentId, projectId: dto.projectId } }) : null;
+    const parent = dto.parentId
+      ? await this.folders.findOne({ where: { id: dto.parentId, projectId: dto.projectId } })
+      : null;
     const path = parent ? `${parent.path}/${dto.name}` : dto.name;
     const saved = await this.folders.save(
       this.folders.create({
         ...dto,
         path,
-        createdById: userId
+        createdById: userId,
       })
     );
     await this.audit.record({
@@ -43,7 +45,7 @@ export class FoldersService {
       action: 'folder.create',
       entityType: 'folder',
       entityId: saved.id,
-      metadata: { projectId: dto.projectId, path }
+      metadata: { projectId: dto.projectId, path },
     });
     return saved;
   }
@@ -57,7 +59,7 @@ export class FoldersService {
       this.disciplines.create({
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
-        description: dto.description?.trim()
+        description: dto.description?.trim(),
       })
     );
     await this.audit.record({
@@ -65,7 +67,7 @@ export class FoldersService {
       action: 'discipline.create',
       entityType: 'discipline',
       entityId: saved.id,
-      metadata: { code: saved.code, name: saved.name }
+      metadata: { code: saved.code, name: saved.name },
     });
     return saved;
   }
@@ -86,7 +88,7 @@ export class FoldersService {
       action: 'discipline.update',
       entityType: 'discipline',
       entityId: id,
-      metadata: { ...dto }
+      metadata: { ...dto },
     });
     return saved;
   }
@@ -102,7 +104,7 @@ export class FoldersService {
       actorId: userId,
       action: 'discipline.deactivate',
       entityType: 'discipline',
-      entityId: id
+      entityId: id,
     });
     return { ok: true, id };
   }
