@@ -68,7 +68,11 @@ async function request<T>(
       throw new Error(await readApiError(response, method, path));
     }
 
-    return response.json() as Promise<T>;
+    const text = await response.text();
+    if (!text) {
+      return undefined as T;
+    }
+    return JSON.parse(text) as T;
   } finally {
     clearTimeout(timer);
   }
@@ -103,4 +107,8 @@ export async function apiPut<T>(
   signal?: AbortSignal
 ): Promise<T> {
   return request<T>('PUT', path, { body, token, signal });
+}
+
+export async function apiDelete<T>(path: string, token?: string, signal?: AbortSignal): Promise<T> {
+  return request<T>('DELETE', path, { token, signal });
 }

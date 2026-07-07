@@ -210,10 +210,10 @@ function ProjectUsersWorkspace() {
                 }))
               }
             >
-              <option value="viewer">viewer</option>
-              <option value="contributor">contributor</option>
-              <option value="manager">manager</option>
-              <option value="owner">owner</option>
+              <option value="viewer">Visor</option>
+              <option value="contributor">Colaborador</option>
+              <option value="manager">Gestor</option>
+              <option value="owner">Propietario</option>
             </select>
           </div>
           <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>

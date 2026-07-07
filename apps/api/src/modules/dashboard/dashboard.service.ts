@@ -329,7 +329,7 @@ export class DashboardService {
     const labels: Record<string, string> = {
       draft: 'Borrador',
       pending_approval: 'Por aprobar',
-      in_review: 'En revision',
+      in_review: 'En revisión',
       approved: 'Aprobado',
       published: 'Publicado',
       expired: 'Vencido',
@@ -392,8 +392,10 @@ export class DashboardService {
   private buildRfisByStatus(rfis: Rfi[]): ChartPoint[] {
     const labels: Record<string, string> = {
       open: 'Abierto',
+      in_progress: 'En proceso',
       answered: 'Respondido',
       closed: 'Cerrado',
+      overdue: 'Vencido',
     };
 
     return this.countByLabel(
@@ -405,10 +407,10 @@ export class DashboardService {
   private buildContractsByStatus(contracts: Contract[]): ChartPoint[] {
     const labels: Record<string, string> = {
       draft: 'Borrador',
-      in_review: 'En revision',
+      in_review: 'En revisión',
       approved: 'Aprobado',
       active: 'Vigente',
-      expiring_soon: 'Proximo a vencer',
+      expiring_soon: 'Próximo a vencer',
       expired: 'Vencido',
       renewed: 'Renovado',
       closed: 'Cerrado',
@@ -584,7 +586,37 @@ export class DashboardService {
   }
 
   private toLabel(value: string) {
-    return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const map: Record<string, string> = {
+      draft: 'Borrador',
+      in_review: 'En revisión',
+      pending_approval: 'Pendiente de aprobación',
+      approved: 'Aprobado',
+      rejected: 'Rechazado',
+      published: 'Publicado',
+      expired: 'Vencido',
+      expiring_soon: 'Por vencer',
+      active: 'Vigente',
+      closed: 'Cerrado',
+      renewed: 'Renovado',
+      open: 'Abierto',
+      in_progress: 'En proceso',
+      answered: 'Respondido',
+      overdue: 'Vencido',
+      stopped: 'Detenido',
+      pending: 'Pendiente',
+      cancelled: 'Cancelado',
+      terminated: 'Terminado',
+      superseded: 'Reemplazado',
+      archived: 'Archivado',
+      signed: 'Firmado',
+      low: 'Baja',
+      normal: 'Normal',
+      high: 'Alta',
+      urgent: 'Urgente',
+    };
+    return (
+      map[value] ?? value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+    );
   }
 
   private mergeNullable(current: number | null, next: number | null) {

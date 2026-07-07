@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { User } from '../users/user.entity';
 import { DocumentRecord } from './document.entity';
 
 @Entity('document_audit_logs')
@@ -22,6 +23,10 @@ export class DocumentAuditLog {
 
   @Column({ name: 'actor_id', nullable: true })
   actorId?: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'actor_id' })
+  actor?: User;
 
   @Column({ length: 100 })
   action!: string;

@@ -25,7 +25,9 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Holocron API')
-    .setDescription('API REST para boveda documental empresarial, RFIs, IA documental y CLM.')
+    .setDescription(
+      'API REST para bóveda documental empresarial, consultas, IA documental y contratos.'
+    )
     .setVersion('0.1.0')
     .addBearerAuth()
     .build();

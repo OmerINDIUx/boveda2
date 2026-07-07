@@ -1,10 +1,13 @@
 'use client';
 
-import { CheckCheck, Mail, Monitor, RefreshCcw } from 'lucide-react';
+import { RefreshCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 import { SectionHeader } from './section-header';
+import { Badge } from '../ui/badge';
+import { Skeleton } from '../ui/skeleton';
+import { Button } from '../ui/button';
 
 type NotificationItem = {
   id: string;
@@ -29,7 +32,7 @@ type NotificationPreference = {
 const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   document_expired: 'Documento vencido',
   document_expiring_soon: 'Documento por vencer',
-  approval_assigned: 'Aprobacion',
+  approval_assigned: 'Aprobación',
   approval_stalled: 'Seguimiento',
   contract_expired: 'Contrato vencido',
   contract_expiring_soon: 'Contrato por vencer',
@@ -44,246 +47,217 @@ export function NotificationsCenter() {
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
   const load = async () => {
     const token = window.localStorage.getItem('holocron_token') ?? undefined;
-    if (!token) return;
-    setLoading(true);
     try {
       const [notifications, prefs] = await Promise.all([
-        apiGet<NotificationItem[]>('/notifications', token),
+        apiGet<{ items: NotificationItem[] }>('/notifications', token),
         apiGet<NotificationPreference[]>('/notifications/preferences', token),
       ]);
-      setItems(notifications);
+      setItems(
+        notifications.items.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      );
       setPreferences(prefs);
-      setMessage(null);
     } catch {
-      setMessage('No fue posible cargar las notificaciones.');
+      // Silently fail
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load().catch(() => undefined);
+    void load();
   }, []);
 
-  const markAsRead = async (id: string) => {
-    const token = window.localStorage.getItem('holocron_token') ?? undefined;
-    if (!token) return;
-    await apiPatch(`/notifications/${id}/read`, {}, token);
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item
-      )
-    );
-  };
+  const unreadCount = items.filter((n) => !n.readAt).length;
 
-  const markAllAsRead = async () => {
+  const markAllRead = async () => {
     const token = window.localStorage.getItem('holocron_token') ?? undefined;
-    if (!token) return;
-    await apiPatch('/notifications/read-all', {}, token);
-    setItems((current) =>
-      current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
-    );
-  };
-
-  const savePreferences = async () => {
-    const token = window.localStorage.getItem('holocron_token') ?? undefined;
-    if (!token) return;
-    setSaving(true);
     try {
-      const result = await apiPost<NotificationPreference[]>(
+      await apiPatch('/notifications/read-all', undefined, token);
+      await load();
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const togglePreference = async (
+    type: string,
+    channel: 'inAppEnabled' | 'emailEnabled',
+    current: boolean
+  ) => {
+    setSaving(true);
+    const token = window.localStorage.getItem('holocron_token') ?? undefined;
+    try {
+      await apiPost(
         '/notifications/preferences',
-        { items: preferences },
+        { notificationType: type, [channel]: !current },
         token
       );
-      setPreferences(result);
-      setMessage('Preferencias guardadas.');
+      await load();
     } catch {
-      setMessage('No fue posible guardar las preferencias.');
+      // Silently fail
     } finally {
       setSaving(false);
     }
   };
 
-  const unread = items.filter((item) => !item.readAt).length;
-  const read = items.length - unread;
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Hace ${diffHours}h`;
+    return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  };
 
   return (
-    <>
+    <section>
       <SectionHeader
         title="Notificaciones"
-        description="Vista completa para revisar alertas, abrir el detalle y mantener tus avisos realmente legibles."
+        description={`${unreadCount} sin leer`}
+        action="Marcar todas como leídas"
+        onAction={markAllRead}
       />
-      {message ? (
-        <div className="card">
-          <span>{message}</span>
-        </div>
-      ) : null}
 
-      <div className="notifications-summary-grid">
-        <div className="card notification-summary-card">
-          <span>Total</span>
-          <strong>{items.length}</strong>
-          <small className="muted">Alertas registradas en tu centro.</small>
-        </div>
-        <div className="card notification-summary-card attention">
-          <span>Sin leer</span>
-          <strong>{unread}</strong>
-          <small className="muted">
-            {unread ? 'Requieren tu atencion.' : 'No tienes pendientes.'}
-          </small>
-        </div>
-        <div className="card notification-summary-card">
-          <span>Leidas</span>
-          <strong>{read}</strong>
-          <small className="muted">Ya revisadas en la plataforma.</small>
-        </div>
-      </div>
-
-      <div className="grid notifications-page-grid">
-        <section className="span-8 notifications-feed">
-          <div className="card notifications-list-shell">
-            <div className="panel-header notifications-page-header">
-              <div>
-                <h2>Bandeja</h2>
-                <small className="muted">{unread ? `${unread} sin leer` : 'Todo al dia'}</small>
+      <div className="notifications-grid grid">
+        <div className="card notifications-feed span-8">
+          <div className="notifications-list-shell" style={{ padding: 'var(--space-2)' }}>
+            <div
+              className="notifications-page-header"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 'var(--space-4)',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '1.125rem', margin: 0 }}>Bandeja de entrada</h2>
+                <Badge variant={unreadCount > 0 ? 'primary' : 'default'}>
+                  {unreadCount} sin leer
+                </Badge>
               </div>
-              <div className="notifications-actions">
-                <button className="button secondary" type="button" onClick={() => load()}>
-                  <RefreshCcw size={16} />
-                  Actualizar
-                </button>
-                <button className="button" type="button" onClick={() => markAllAsRead()}>
-                  <CheckCheck size={16} />
-                  Marcar todas
-                </button>
-              </div>
+              <Button variant="ghost" size="sm" onClick={load}>
+                <RefreshCcw size={16} />
+              </Button>
             </div>
 
-            <div className="notifications-list">
-              {loading ? (
-                <div className="preview-empty">
-                  <p>Cargando notificaciones...</p>
-                </div>
-              ) : items.length ? (
-                items.map((item) => (
-                  <article
-                    className={`notification-card ${item.readAt ? '' : 'unread'}`}
-                    key={item.id}
+            {loading ? (
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-lg)',
+                    }}
                   >
+                    <Skeleton variant="title" width="40%" />
+                    <Skeleton variant="text" count={2} />
+                  </div>
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <p>No hay notificaciones.</p>
+              </div>
+            ) : (
+              <div className="notifications-feed">
+                {items.map((item) => (
+                  <div key={item.id} className={`notification-card${item.readAt ? '' : ' unread'}`}>
                     <div className="notification-card-top">
-                      <span className="notification-type-pill">
-                        {getNotificationTypeLabel(item.notificationType)}
-                      </span>
-                      <small>{new Date(item.createdAt).toLocaleString('es-MX')}</small>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span className="notification-type-pill">
+                          {getNotificationTypeLabel(item.notificationType)}
+                        </span>
+                        <span
+                          className={`notification-state-dot ${item.readAt ? 'read' : 'unread'}`}
+                        />
+                      </div>
+                      <small style={{ color: 'var(--text-tertiary)' }}>
+                        {formatDate(item.createdAt)}
+                      </small>
                     </div>
-
                     <div className="notification-card-body">
                       <strong>{item.title}</strong>
                       <p>{item.body}</p>
                     </div>
-
-                    <div className="notification-card-footer">
-                      <div className="notification-card-state">
-                        <span
-                          className={`notification-state-dot ${item.readAt ? 'read' : 'unread'}`}
-                        />
-                        <small>{item.readAt ? 'Leida' : 'Pendiente de lectura'}</small>
-                      </div>
-
-                      <div className="notifications-actions">
-                        {item.meta?.route ? (
-                          <Link className="button secondary" href={item.meta.route}>
-                            Ver detalle
-                          </Link>
-                        ) : null}
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={Boolean(item.readAt)}
-                          onClick={() => markAsRead(item.id)}
-                        >
-                          {item.readAt ? 'Leida' : 'Marcar como leida'}
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="preview-empty">
-                  <p>No hay notificaciones registradas todavia.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <aside className="card span-4 notifications-sidebar-card">
-          <div className="panel-header notifications-page-header">
-            <div>
-              <h2>Preferencias</h2>
-              <small className="muted">Activa o desactiva avisos por canal.</small>
-            </div>
-          </div>
-          <div className="notification-preferences">
-            {preferences.map((item, index) => (
-              <div className="notification-preference-card" key={item.notificationType}>
-                <div className="notification-preference-copy">
-                  <strong>{item.label}</strong>
-                  <small className="muted">Configura como quieres recibir esta alerta.</small>
-                </div>
-                <div className="notification-channel-grid">
-                  <label className="notification-toggle">
-                    <Monitor size={16} />
-                    <span>Plataforma</span>
-                    <input
-                      checked={item.inAppEnabled}
-                      onChange={(event) =>
-                        setPreferences((current) =>
-                          current.map((row, rowIndex) =>
-                            rowIndex === index
-                              ? { ...row, inAppEnabled: event.target.checked }
-                              : row
-                          )
-                        )
-                      }
-                      type="checkbox"
-                    />
-                  </label>
-                  <label className="notification-toggle">
-                    <Mail size={16} />
-                    <span>Correo</span>
-                    <input
-                      checked={item.emailEnabled}
-                      onChange={(event) =>
-                        setPreferences((current) =>
-                          current.map((row, rowIndex) =>
-                            rowIndex === index
-                              ? { ...row, emailEnabled: event.target.checked }
-                              : row
-                          )
-                        )
-                      }
-                      type="checkbox"
-                    />
-                  </label>
-                </div>
+                    {item.meta?.route && (
+                      <Link
+                        href={item.meta.route}
+                        style={{
+                          color: 'var(--color-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        Ver detalle →
+                      </Link>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-            <button
-              className="button"
-              disabled={saving}
-              type="button"
-              onClick={() => savePreferences()}
-            >
-              {saving ? 'Guardando...' : 'Guardar preferencias'}
-            </button>
+            )}
           </div>
-        </aside>
+        </div>
+
+        {/* Preferences */}
+        <div className="card notifications-sidebar-card span-4">
+          <h2 style={{ fontSize: '1.125rem', margin: '0 0 var(--space-4)' }}>Preferencias</h2>
+          {loading ? (
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} variant="card" />
+              ))}
+            </div>
+          ) : (
+            <div className="notification-preferences" style={{ display: 'grid', gap: '0.75rem' }}>
+              {preferences.map((pref) => (
+                <div key={pref.notificationType} className="notification-preference-card">
+                  <div className="notification-preference-copy">
+                    <strong style={{ fontSize: '0.875rem' }}>{pref.label}</strong>
+                  </div>
+                  <div
+                    className="notification-channel-grid"
+                    style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}
+                  >
+                    <label className="notification-toggle">
+                      <input
+                        type="checkbox"
+                        checked={pref.inAppEnabled}
+                        disabled={saving}
+                        onChange={() =>
+                          togglePreference(pref.notificationType, 'inAppEnabled', pref.inAppEnabled)
+                        }
+                      />
+                      En la app
+                    </label>
+                    <label className="notification-toggle">
+                      <input
+                        type="checkbox"
+                        checked={pref.emailEnabled}
+                        disabled={saving}
+                        onChange={() =>
+                          togglePreference(pref.notificationType, 'emailEnabled', pref.emailEnabled)
+                        }
+                      />
+                      Correo
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </>
+    </section>
   );
 }

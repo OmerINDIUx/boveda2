@@ -7,13 +7,17 @@ import {
   CheckCircle2,
   Clock3,
   FilePlus2,
+  Mail,
   MessageSquare,
   Plus,
   Search,
   Send,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { normalizeLabel } from '../../lib/labels';
 
 type ProjectOption = { id: string; name: string; code: string };
 type ProjectMemberOption = { id: string; name: string; email: string; role: string };
@@ -32,10 +36,12 @@ type RfiListItem = {
   closedAt?: string;
   createdAt: string;
   updatedAt: string;
+  replyToAddress?: string;
   requester: { id: string; name: string; email: string } | null;
   assignedTo: { id: string; name: string; email: string } | null;
   project: { id: string; name: string; code: string } | null;
   document: { id: string; name: string; documentNumber: string } | null;
+  template: { id: string; name: string } | null;
   commentsCount: number;
   attachmentsCount: number;
 };
@@ -53,9 +59,11 @@ type RfiDetail = RfiListItem & {
   comments: Array<{
     id: string;
     body: string;
-    type: 'comment' | 'response' | 'system';
+    type: 'comment' | 'response' | 'system' | 'email';
     createdAt: string;
     author: { id: string; name: string; email: string } | null;
+    emailMessageId?: string;
+    emailInReplyTo?: string;
     attachments: RfiAttachment[];
   }>;
   attachments: RfiAttachment[];
@@ -119,7 +127,7 @@ const emptyCreateForm: CreateRfiForm = {
 
 const priorityOptions = [
   { value: 'low', label: 'Baja' },
-  { value: 'normal', label: 'Normal' },
+  { value: 'normal', label: 'Media' },
   { value: 'high', label: 'Alta' },
   { value: 'urgent', label: 'Urgente' },
 ] as const;
@@ -135,11 +143,6 @@ const statusOptions = [
 function getToken() {
   if (typeof window === 'undefined') return undefined;
   return window.localStorage.getItem('holocron_token') ?? undefined;
-}
-
-function normalizeLabel(value?: string | null) {
-  if (!value) return 'Sin definir';
-  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDate(value?: string) {
@@ -218,7 +221,7 @@ function RfiSummaryCard({ detail }: { detail: RfiDetail }) {
     <article className="card">
       <div className="project-hero">
         <div>
-          <div className="project-code">{detail.project?.code ?? 'RFI'}</div>
+          <div className="project-code">{detail.project?.code ?? '—'}</div>
           <h2>{detail.title}</h2>
           <p className="muted">{detail.description}</p>
         </div>
@@ -247,6 +250,45 @@ function RfiSummaryCard({ detail }: { detail: RfiDetail }) {
           <strong>{formatDate(detail.dueDate)}</strong>
         </div>
       </div>
+
+      {detail.template ? (
+        <div
+          className="card"
+          style={{
+            marginTop: 8,
+            background: 'var(--color-accent-light)',
+            borderColor: 'var(--color-accent)',
+            padding: '0.5rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <Sparkles size={14} color="var(--color-accent)" />
+          <small>
+            Plantilla: <strong>{detail.template.name}</strong>
+          </small>
+        </div>
+      ) : null}
+      {detail.replyToAddress ? (
+        <div
+          className="card"
+          style={{
+            marginTop: 8,
+            background: 'var(--color-info-light)',
+            borderColor: 'var(--color-info)',
+            padding: '0.5rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <Mail size={14} color="var(--color-info)" />
+          <small>
+            Responder por correo: <strong>{detail.replyToAddress}</strong>
+          </small>
+        </div>
+      ) : null}
 
       <div className="grid" style={{ marginTop: 16 }}>
         <div className="card span-6 status-card neutral">
@@ -441,6 +483,18 @@ export function RfisWorkspace() {
           </p>
         </div>
         <div className="projects-actions">
+          <Link
+            className="button secondary"
+            href="/rfis/just-go"
+            style={{
+              background: 'var(--color-accent-light)',
+              borderColor: 'var(--color-accent)',
+              color: 'var(--color-accent)',
+            }}
+          >
+            <Zap size={18} />
+            RFI Rápido
+          </Link>
           <Link className="button" href="/rfis/new">
             <Plus size={18} />
             Nuevo RFI
@@ -873,6 +927,11 @@ export function RfiDetailPage() {
               <div className="simple-document-item" key={comment.id}>
                 <strong>
                   {comment.author?.name ?? 'Usuario'} · {normalizeLabel(comment.type)}
+                  {comment.type === 'email' ? (
+                    <span className="pill info" style={{ marginLeft: 8 }}>
+                      <Mail size={12} /> Correo
+                    </span>
+                  ) : null}
                 </strong>
                 <span>{comment.body}</span>
                 <small>{formatDateTime(comment.createdAt)}</small>

@@ -23,4 +23,7 @@ export class CreateContractObligationDto {
   @IsOptional()
   @IsString()
   comments?: string;
+
+  @IsOptional()
+  alertDaysBefore?: number;
 }

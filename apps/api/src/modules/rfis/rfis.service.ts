@@ -1,5 +1,7 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { createHash, randomBytes } from 'node:crypto';
 import { In, LessThan, Not, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { PermissionKey } from '../../common/permissions';
@@ -9,26 +11,36 @@ import { DocumentRecord } from '../documents/document.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectMember } from '../projects/project-member.entity';
 import { Project } from '../projects/project.entity';
+import { User } from '../users/user.entity';
 import { CreateRfiCommentDto } from './dto/create-rfi-comment.dto';
 import { CreateRfiDto, RfiAttachmentInputDto } from './dto/create-rfi.dto';
+import { CreateRfiTemplateDto } from './dto/create-rfi-template.dto';
+import { InboundEmailDto } from './dto/inbound-email.dto';
 import { RespondRfiDto } from './dto/respond-rfi.dto';
 import { RfiListQueryDto } from './dto/rfi-list-query.dto';
 import { UpdateRfiStatusDto } from './dto/update-rfi-status.dto';
+import { UpdateRfiTemplateDto } from './dto/update-rfi-template.dto';
 import { RfiAttachment } from './rfi-attachment.entity';
 import { RfiComment } from './rfi-comment.entity';
 import { RfiHistory } from './rfi-history.entity';
+import { RfiTemplate } from './rfi-template.entity';
 import { Rfi } from './rfi.entity';
 
 @Injectable()
 export class RfisService {
+  private readonly logger = new Logger(RfisService.name);
+
   constructor(
     @InjectRepository(Rfi) private readonly rfis: Repository<Rfi>,
     @InjectRepository(RfiComment) private readonly comments: Repository<RfiComment>,
     @InjectRepository(RfiAttachment) private readonly attachments: Repository<RfiAttachment>,
     @InjectRepository(RfiHistory) private readonly history: Repository<RfiHistory>,
+    @InjectRepository(RfiTemplate) private readonly templates: Repository<RfiTemplate>,
     @InjectRepository(Project) private readonly projects: Repository<Project>,
     @InjectRepository(ProjectMember) private readonly members: Repository<ProjectMember>,
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
+    @InjectRepository(User) private readonly users: Repository<User>,
+    private readonly config: ConfigService,
     private readonly scope: AccessScopeService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService
@@ -144,19 +156,42 @@ export class RfisService {
     await this.assertAssignment(dto.projectId, dto.assignedToId);
     await this.assertDocument(dto.projectId, dto.documentId);
 
+    let assignedToId = dto.assignedToId;
+    const templateId = dto.templateId;
+    let dueDate = dto.dueDate;
+    const priority = dto.priority ?? 'normal';
+
+    if (dto.templateId && !assignedToId) {
+      const template = await this.templates.findOne({
+        where: { id: dto.templateId, isActive: true },
+      });
+      if (template) {
+        if (!dueDate && template.defaultDueDays) {
+          dueDate = new Date(Date.now() + template.defaultDueDays * 86_400_000)
+            .toISOString()
+            .slice(0, 10);
+        }
+        assignedToId = await this.resolveAutoAssign(template, dto.projectId);
+      }
+    }
+
     const rfi = await this.rfis.save(
       this.rfis.create({
         projectId: dto.projectId,
         documentId: dto.documentId,
         title: dto.title,
         description: dto.description,
-        priority: dto.priority ?? 'normal',
-        dueDate: dto.dueDate,
-        assignedToId: dto.assignedToId,
+        priority,
+        templateId,
+        dueDate,
+        assignedToId,
         createdById: user.id,
         status: 'open',
       })
     );
+
+    rfi.replyToAddress = this.generateReplyToAddress(rfi.id);
+    await this.rfis.save(rfi);
 
     if (dto.attachments?.length) {
       await this.createAttachments(rfi.id, user.id, dto.attachments);
@@ -169,17 +204,23 @@ export class RfisService {
       dueDate: rfi.dueDate,
     });
 
+    const notifyRecipients: Array<{ userId: string; email?: string; name?: string }> = [];
+
     if (rfi.assignedToId && rfi.assignedToId !== user.id) {
+      notifyRecipients.push({ userId: rfi.assignedToId });
+    }
+
+    if (notifyRecipients.length) {
       await this.notifications.notify({
-        recipients: [{ userId: rfi.assignedToId }],
+        recipients: notifyRecipients,
         notificationType: 'rfi_assigned',
         title: 'Nuevo RFI asignado',
-        body: `Se te asignó el RFI "${rfi.title}".`,
+        body: `Se te asignó el RFI "${rfi.title}". Puedes responder desde este correo o en Holocron.`,
         entityType: 'rfi',
         entityId: rfi.id,
         category: 'rfi',
-        meta: { route: '/rfis' },
-        dedupeKey: `rfi-assigned:${rfi.id}:${rfi.assignedToId}`,
+        meta: { route: '/rfis', replyTo: rfi.replyToAddress },
+        dedupeKey: `rfi-assigned:${rfi.id}:${notifyRecipients.map((r) => r.userId).join(',')}`,
       });
     }
 
@@ -202,7 +243,22 @@ export class RfisService {
     }
 
     await this.logHistory(rfiId, user.id, 'comment_added', undefined, { body: dto.body });
-    await this.notifyAssignedOnActivity(rfi, user.id, `Nuevo comentario en el RFI "${rfi.title}".`);
+
+    if (rfi.assignedToId && rfi.assignedToId !== user.id) {
+      await this.notifications.notify({
+        recipients: [{ userId: rfi.assignedToId }],
+        notificationType: 'rfi_commented',
+        title: 'Nuevo comentario en RFI',
+        body: `${user.name} comentó en el RFI "${rfi.title}": ${dto.body}`,
+        entityType: 'rfi',
+        entityId: rfi.id,
+        category: 'rfi',
+        meta: {
+          route: '/rfis',
+          replyTo: rfi.replyToAddress,
+        },
+      });
+    }
 
     return this.getDetail(user, rfiId);
   }
@@ -237,13 +293,16 @@ export class RfisService {
     if (rfi.createdById !== user.id) {
       await this.notifications.notify({
         recipients: [{ userId: rfi.createdById }],
-        notificationType: 'rfi_assigned',
+        notificationType: 'rfi_responded',
         title: 'RFI respondido',
-        body: `El RFI "${rfi.title}" recibió una respuesta.`,
+        body: `El RFI "${rfi.title}" recibió una respuesta: ${dto.answer}`,
         entityType: 'rfi',
         entityId: rfi.id,
         category: 'rfi',
-        meta: { route: '/rfis' },
+        meta: {
+          route: '/rfis',
+          replyTo: rfi.replyToAddress,
+        },
       });
     }
 
@@ -285,6 +344,208 @@ export class RfisService {
 
   async close(user: RequestUser, rfiId: string, note?: string) {
     return this.updateStatus(user, rfiId, { status: 'closed', note });
+  }
+
+  // ─── Template CRUD ───────────────────────────────────────────────
+
+  async listTemplates(user: RequestUser, projectId?: string) {
+    const where: Record<string, unknown> = {};
+    if (projectId) {
+      where.projectId = projectId;
+    }
+    return this.templates.find({
+      where,
+      relations: { project: true, createdBy: true },
+      order: { name: 'ASC' },
+    });
+  }
+
+  async getTemplate(user: RequestUser, id: string) {
+    const template = await this.templates.findOne({
+      where: { id },
+      relations: { project: true, createdBy: true },
+    });
+    if (!template) {
+      throw new NotFoundException('Plantilla no encontrada');
+    }
+    return template;
+  }
+
+  async createTemplate(user: RequestUser, dto: CreateRfiTemplateDto) {
+    return this.templates.save(
+      this.templates.create({
+        ...dto,
+        createdById: user.id,
+        autoAssignRule: dto.autoAssignRule as unknown as RfiTemplate['autoAssignRule'],
+      })
+    );
+  }
+
+  async updateTemplate(user: RequestUser, id: string, dto: UpdateRfiTemplateDto) {
+    const template = await this.templates.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('Plantilla no encontrada');
+    }
+    Object.assign(template, dto);
+    return this.templates.save(template);
+  }
+
+  async deleteTemplate(user: RequestUser, id: string) {
+    const template = await this.templates.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('Plantilla no encontrada');
+    }
+    await this.templates.softRemove(template);
+    return { ok: true };
+  }
+
+  // ─── Just Go: evaluate template and auto-assign ──────────────────
+
+  async evaluateTemplate(user: RequestUser, templateId: string, projectId: string) {
+    const template = await this.templates.findOne({ where: { id: templateId, isActive: true } });
+    if (!template) {
+      throw new NotFoundException('Plantilla no encontrada');
+    }
+
+    const dueDate = template.defaultDueDays
+      ? new Date(Date.now() + template.defaultDueDays * 86_400_000).toISOString().slice(0, 10)
+      : undefined;
+
+    const assignedToId = await this.resolveAutoAssign(template, projectId);
+
+    const [members, projectDocs] = await Promise.all([
+      this.members.find({
+        where: { projectId },
+        relations: ['user'],
+      }),
+      this.documents.find({ where: { projectId }, order: { updatedAt: 'DESC' } }),
+    ]);
+
+    return {
+      template,
+      projectId,
+      title: template.titleTemplate,
+      description: template.descriptionTemplate,
+      priority: template.defaultPriority,
+      dueDate,
+      assignedToId,
+      assignedToName: assignedToId
+        ? (members.find((m) => m.userId === assignedToId)?.user?.name ?? null)
+        : null,
+      projectMembers: members
+        .filter((m) => m.user)
+        .map((m) => ({ id: m.user.id, name: m.user.name, email: m.user.email, role: m.role })),
+      documents: projectDocs.map((d) => ({
+        id: d.id,
+        name: d.name,
+        documentNumber: d.documentNumber,
+      })),
+    };
+  }
+
+  private async resolveAutoAssign(
+    template: RfiTemplate,
+    projectId: string
+  ): Promise<string | undefined> {
+    const rule = template.autoAssignRule;
+    if (!rule) return undefined;
+
+    if (rule.type === 'specific_user' && rule.userId) {
+      return rule.userId;
+    }
+
+    if (rule.type === 'project_role' && rule.projectRole) {
+      const member = await this.members.findOne({
+        where: { projectId, role: rule.projectRole! },
+        order: { createdAt: 'ASC' },
+      });
+      if (member) return member.userId;
+    }
+
+    if (rule.type === 'discipline_lead' && rule.disciplineId) {
+      const project = await this.projects.findOne({ where: { id: projectId } });
+      if (project?.responsibleUserId) return project.responsibleUserId;
+    }
+
+    if (rule.type === 'document_uploader') {
+      const doc = await this.documents.findOne({
+        where: { projectId },
+        order: { updatedAt: 'DESC' },
+      });
+      if (doc?.uploadedById) return doc.uploadedById;
+    }
+
+    if (rule.fallbackUserId) return rule.fallbackUserId;
+    return undefined;
+  }
+
+  // ─── Reply-To address generation ───────────────────────────────────
+
+  private generateReplyToAddress(rfiId: string): string {
+    const domain = this.config.get<string>('INBOUND_EMAIL_DOMAIN') ?? 'holocron.local';
+    const hash = createHash('sha256')
+      .update(rfiId + randomBytes(8).toString('hex'))
+      .digest('hex')
+      .slice(0, 16);
+    return `rfi-${hash}@${domain}`;
+  }
+
+  // ─── Inbound email processing ──────────────────────────────────────
+
+  async processInboundEmail(dto: InboundEmailDto) {
+    const match = dto.to.match(/rfi-([a-f0-9]+)@/);
+    if (!match) {
+      this.logger.warn(`Correo entrante no corresponde a ningún RFI: ${dto.to}`);
+      return { ok: false, reason: 'Destino no reconocido' };
+    }
+
+    const rfi = await this.rfis.findOne({
+      where: { replyToAddress: dto.to },
+      relations: ['project'],
+    });
+    if (!rfi) {
+      this.logger.warn(`RFI no encontrado para dirección: ${dto.to}`);
+      return { ok: false, reason: 'RFI no encontrado' };
+    }
+
+    const sender = await this.users.findOne({ where: { email: dto.from } });
+    if (!sender) {
+      this.logger.warn(`Usuario no encontrado para email: ${dto.from}`);
+      return { ok: false, reason: 'Remitente no registrado en Holocron' };
+    }
+
+    await this.assertAccess(sender.id, rfi.projectId);
+
+    const comment = await this.comments.save(
+      this.comments.create({
+        rfiId: rfi.id,
+        userId: sender.id,
+        body: dto.body,
+        type: 'email',
+        emailMessageId: dto.messageId,
+        emailInReplyTo: dto.inReplyTo,
+      })
+    );
+
+    await this.logHistory(rfi.id, sender.id, 'email_received', undefined, {
+      commentId: comment.id,
+      subject: dto.subject,
+    });
+
+    if (rfi.assignedToId && rfi.assignedToId !== sender.id) {
+      await this.notifications.notify({
+        recipients: [{ userId: rfi.assignedToId }],
+        notificationType: 'rfi_assigned',
+        title: 'Respuesta por correo recibida',
+        body: `${sender.name} respondió al RFI "${rfi.title}" desde el correo.`,
+        entityType: 'rfi',
+        entityId: rfi.id,
+        category: 'rfi',
+        meta: { route: '/rfis' },
+      });
+    }
+
+    return { ok: true, commentId: comment.id };
   }
 
   private async assertAccess(userId: string, projectId: string) {
@@ -340,6 +601,7 @@ export class RfisService {
         document: true,
         requester: true,
         assignedTo: true,
+        template: true,
         attachments: { uploadedBy: true },
         comments: { author: true, attachments: { uploadedBy: true } },
         history: { actor: true },
@@ -363,6 +625,7 @@ export class RfisService {
       closedAt: rfi.closedAt,
       createdAt: rfi.createdAt,
       updatedAt: rfi.updatedAt,
+      replyToAddress: rfi.replyToAddress,
       requester: rfi.requester
         ? { id: rfi.requester.id, name: rfi.requester.name, email: rfi.requester.email }
         : null,
@@ -380,6 +643,7 @@ export class RfisService {
               documentNumber: rfi.document.documentNumber,
             }
           : null,
+      template: rfi.template ? { id: rfi.template.id, name: rfi.template.name } : null,
       commentsCount,
       attachmentsCount,
     };
@@ -398,6 +662,8 @@ export class RfisService {
           author: comment.author
             ? { id: comment.author.id, name: comment.author.name, email: comment.author.email }
             : null,
+          emailMessageId: comment.emailMessageId,
+          emailInReplyTo: comment.emailInReplyTo,
           attachments: (comment.attachments ?? []).map((attachment) =>
             this.serializeAttachment(attachment)
           ),

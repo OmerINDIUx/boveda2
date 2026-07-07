@@ -10,9 +10,9 @@ export const permissionCatalog = [
   { key: PermissionKey.DocumentsPrint, label: 'Imprimir documento', module: 'Documentos' },
   { key: PermissionKey.DocumentsApprove, label: 'Aprobar documento', module: 'Documentos' },
   { key: PermissionKey.DocumentsDelete, label: 'Eliminar documento', module: 'Documentos' },
-  { key: PermissionKey.RfisManage, label: 'Gestionar RFIs', module: 'RFIs' },
+  { key: PermissionKey.RfisManage, label: 'Gestionar consultas', module: 'Consultas' },
   { key: PermissionKey.ApprovalsManage, label: 'Gestionar aprobaciones', module: 'Aprobaciones' },
   { key: PermissionKey.AuditView, label: 'Ver auditoria', module: 'Auditoria' },
-  { key: PermissionKey.ContractsManage, label: 'Administrar contratos', module: 'CLM' },
+  { key: PermissionKey.ContractsManage, label: 'Administrar contratos', module: 'Contratos' },
   { key: PermissionKey.AiQuery, label: 'Consultar IA documental', module: 'IA' },
 ];

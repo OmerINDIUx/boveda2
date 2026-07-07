@@ -22,4 +22,7 @@ export class CreateContractMilestoneDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  alertDaysBefore?: number;
 }

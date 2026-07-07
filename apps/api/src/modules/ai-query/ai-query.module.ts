@@ -12,10 +12,12 @@ import { StorageModule } from '../../storage/storage.module';
 import { User } from '../users/user.entity';
 import { DocumentVersion } from '../versions/document-version.entity';
 import { AiQueryController } from './ai-query.controller';
+import { AiQueryScheduler } from './ai-query.scheduler';
 import { DocumentIndexingService } from './document-indexing.service';
 import { DocumentQueryHistory } from './document-query-history.entity';
 import { AiQueryService } from './ai-query.service';
 import { OllamaChatService } from './ollama-chat.service';
+import { ConversationSession } from './conversation-session.entity';
 
 @Module({
   imports: [
@@ -30,11 +32,12 @@ import { OllamaChatService } from './ollama-chat.service';
       DocumentEmbedding,
       DocumentPermission,
       DocumentQueryHistory,
+      ConversationSession,
       User,
       ProjectMember,
     ]),
   ],
   controllers: [AiQueryController],
-  providers: [AiQueryService, DocumentIndexingService, OllamaChatService],
+  providers: [AiQueryService, AiQueryScheduler, DocumentIndexingService, OllamaChatService],
 })
 export class AiQueryModule {}

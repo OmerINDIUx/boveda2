@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getSessionUser } from '../../lib/auth';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 import { PermissionKey } from '../../lib/permissions';
+import { normalizeLabel } from '../../lib/labels';
 
 type ProjectSummary = {
   id: string;
@@ -332,11 +333,6 @@ for (const key of Object.keys(fallbackDetail)) {
 function getToken() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem('holocron_token');
-}
-
-function normalizeLabel(value?: string | null) {
-  if (!value) return 'Sin definir';
-  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function buildQuery(filters: Filters) {

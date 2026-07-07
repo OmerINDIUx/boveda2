@@ -2,7 +2,7 @@ import { RequirePermission } from '../../../../components/auth/require-permissio
 import { ContractFormPage } from '../../../../components/modules/clm-pages';
 import { PermissionKey } from '../../../../lib/permissions';
 
-export default function EditContractPage() {
+export default function Page() {
   return (
     <RequirePermission permission={PermissionKey.ContractsManage}>
       <ContractFormPage mode="edit" />

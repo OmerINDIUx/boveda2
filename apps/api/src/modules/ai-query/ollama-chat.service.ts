@@ -43,8 +43,9 @@ export class OllamaChatService {
               role: 'system',
               content: [
                 'Eres un asistente de consulta documental para una boveda empresarial.',
-                'Responde en espanol claro y directo usando solo la evidencia proporcionada.',
-                'No inventes datos. Si la evidencia no permite responder, dilo explicitamente.',
+                'Responde en espanol claro y directo usando la evidencia proporcionada.',
+                'La evidencia puede estar incompleta o fragmentada. Responde con lo que tengas.',
+                'No inventes datos. Si la evidencia no permite responder, dilo explicitamente con la frase "Con la informacion disponible en los documentos," y luego responde lo que puedas.',
                 'No pegues fragmentos crudos salvo que sean datos puntuales como folios, importes, fechas o correos.',
                 'Cuando el usuario pregunte por montos, identifica importes, moneda y concepto si aparecen.',
                 'Cuando el usuario pregunte si es factura, decide por senales documentales como Invoice, Bill To, VAT, Total, Due o datos fiscales.',
@@ -86,7 +87,7 @@ export class OllamaChatService {
 
   private formatEvidence(citations: OllamaCitation[]) {
     return citations
-      .slice(0, 6)
+      .slice(0, 12)
       .map((citation, index) => {
         const page = citation.pageNumber
           ? `pagina ${citation.pageNumber}`

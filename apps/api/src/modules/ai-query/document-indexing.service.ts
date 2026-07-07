@@ -1,8 +1,12 @@
 import { createHash } from 'crypto';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { spawn } from 'child_process';
 import { inflateSync } from 'zlib';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { Repository } from 'typeorm';
 import { StorageService } from '../../storage/storage.service';
 import { DocumentChunk } from '../documents/document-chunk.entity';
@@ -30,9 +34,12 @@ type IndexedChunk = {
 const EMBEDDING_DIMENSIONS = 256;
 const EMBEDDING_PROVIDER = 'local';
 const EMBEDDING_MODEL = 'holocron-hash-v1';
-const EXTRACTION_PIPELINE_VERSION = 'pdf-v3';
-const MAX_CHUNK_LENGTH = 1200;
-const CHUNK_OVERLAP = 180;
+const OLLAMA_EMBEDDING_PROVIDER = 'ollama';
+const OLLAMA_EMBEDDING_MODEL = 'nomic-embed-text';
+const OLLAMA_EMBEDDING_DIMENSIONS = 768;
+const EXTRACTION_PIPELINE_VERSION = 'pdf-v4';
+const MAX_CHUNK_LENGTH = 2000;
+const CHUNK_OVERLAP = 250;
 
 @Injectable()
 export class DocumentIndexingService {
@@ -40,7 +47,8 @@ export class DocumentIndexingService {
     @InjectRepository(DocumentVersion) private readonly versions: Repository<DocumentVersion>,
     @InjectRepository(DocumentChunk) private readonly chunks: Repository<DocumentChunk>,
     @InjectRepository(DocumentEmbedding) private readonly embeddings: Repository<DocumentEmbedding>,
-    private readonly storage: StorageService
+    private readonly storage: StorageService,
+    private readonly config: ConfigService
   ) {}
 
   async ensureVersionIndexed(document: DocumentRecord, version: DocumentVersion) {
@@ -94,18 +102,33 @@ export class DocumentIndexingService {
           )
         );
 
-        await this.embeddings.save(
-          savedChunks.map((chunk) =>
+        const embeddingData = [];
+        for (const chunk of savedChunks) {
+          const ollamaEmbedding = await this.createOllamaEmbedding(chunk.content).catch(() => null);
+          if (ollamaEmbedding) {
+            embeddingData.push(
+              this.embeddings.create({
+                chunkId: chunk.id,
+                provider: OLLAMA_EMBEDDING_PROVIDER,
+                model: OLLAMA_EMBEDDING_MODEL,
+                dimensions: OLLAMA_EMBEDDING_DIMENSIONS,
+                embedding: ollamaEmbedding,
+                contentHash: createHash('sha256').update(chunk.content).digest('hex'),
+              })
+            );
+          }
+          embeddingData.push(
             this.embeddings.create({
               chunkId: chunk.id,
               provider: EMBEDDING_PROVIDER,
               model: EMBEDDING_MODEL,
               dimensions: EMBEDDING_DIMENSIONS,
-              embedding: this.createEmbedding(chunk.content),
+              embedding: this.createHashEmbedding(chunk.content),
               contentHash: createHash('sha256').update(chunk.content).digest('hex'),
             })
-          )
-        );
+          );
+        }
+        await this.embeddings.save(embeddingData);
       }
 
       version.contentHash = contentHash;
@@ -125,26 +148,42 @@ export class DocumentIndexingService {
   async searchVisibleChunks(
     documentIds: string[],
     question: string,
-    limit = 8
+    limit = 20
   ): Promise<IndexedChunk[]> {
     if (!documentIds.length) {
       return [];
     }
 
-    const rows = await this.embeddings
+    const ollamaRows = await this.embeddings
       .createQueryBuilder('embedding')
       .innerJoinAndSelect('embedding.chunk', 'chunk')
       .where('chunk.documentId IN (:...documentIds)', { documentIds })
-      .andWhere('embedding.provider = :provider', { provider: EMBEDDING_PROVIDER })
-      .andWhere('embedding.model = :model', { model: EMBEDDING_MODEL })
+      .andWhere('embedding.provider = :provider', { provider: OLLAMA_EMBEDDING_PROVIDER })
+      .andWhere('embedding.model = :model', { model: OLLAMA_EMBEDDING_MODEL })
       .getMany();
 
+    const useOllama = ollamaRows.length > 0;
+
+    let rows: typeof ollamaRows;
+    let queryEmbedding: number[];
+
+    if (useOllama) {
+      rows = ollamaRows;
+      queryEmbedding = await this.createOllamaEmbedding(question).catch(() =>
+        this.createHashEmbedding(question)
+      );
+    } else {
+      rows = await this.embeddings
+        .createQueryBuilder('embedding')
+        .innerJoinAndSelect('embedding.chunk', 'chunk')
+        .where('chunk.documentId IN (:...documentIds)', { documentIds })
+        .andWhere('embedding.provider = :provider', { provider: EMBEDDING_PROVIDER })
+        .andWhere('embedding.model = :model', { model: EMBEDDING_MODEL })
+        .getMany();
+      queryEmbedding = this.createHashEmbedding(question);
+    }
+
     const expandedQuestion = this.expandQuestion(question);
-    const queryEmbedding = this.createEmbedding(expandedQuestion);
-    const allowSemanticOnly =
-      this.isBroadDocumentQuestion(question) ||
-      this.isInvoiceQuestion(question) ||
-      this.isAmountQuestion(question);
     return rows
       .map((embedding) => {
         const semanticScore = this.cosineSimilarity(queryEmbedding, embedding.embedding);
@@ -157,8 +196,6 @@ export class DocumentIndexingService {
           keywordMatches,
         };
       })
-      .filter((item) => item.score > 0.02 || item.keywordMatches > 0)
-      .filter((item) => allowSemanticOnly || item.keywordMatches > 0)
       .sort((left, right) => right.score - left.score)
       .slice(0, limit);
   }
@@ -176,6 +213,11 @@ export class DocumentIndexingService {
     }
 
     if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+      const pdftotext = await this.extractWithPdftotext(buffer).catch(() => null);
+      if (pdftotext?.segments.length) {
+        return pdftotext;
+      }
+
       const extracted = this.extractPdfText(buffer);
       if (extracted.segments.length) {
         return extracted;
@@ -291,6 +333,60 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
       child.stdin.write(stdin);
       child.stdin.end();
     });
+  }
+
+  private async extractWithPdftotext(buffer: Buffer): Promise<ExtractedDocument> {
+    const segments: ExtractedSegment[] = [];
+    const tmpDir = this.config.get<string>('TMP_DIR') ?? os.tmpdir();
+    const tmpInput = path.join(tmpDir, `holocron_pdf_${Date.now()}.pdf`);
+    const tmpOutput = path.join(tmpDir, `holocron_pdf_${Date.now()}.txt`);
+
+    try {
+      await fs.promises.writeFile(tmpInput, buffer);
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn('pdftotext', ['-layout', tmpInput, tmpOutput]);
+        let stderr = '';
+        proc.stderr?.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
+        proc.on('close', (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(stderr || `pdftotext exit code ${code}`));
+        });
+        proc.on('error', (err) => reject(err));
+      });
+
+      const text = await fs.promises.readFile(tmpOutput, 'utf8');
+      const pages = text.split(/\f/).filter((p) => p.trim().length > 0);
+
+      for (let i = 0; i < pages.length; i++) {
+        const lines = pages[i].split('\n').filter((l) => l.trim().length > 0);
+        if (!lines.length) continue;
+
+        const combined = lines.join('\n');
+        if (combined.trim().length < 20) continue;
+
+        segments.push({
+          text: combined.trim(),
+          pageNumber: i + 1,
+        });
+      }
+    } catch {
+      return { contentType: 'pdf', segments: [] };
+    } finally {
+      try {
+        await fs.promises.unlink(tmpInput);
+      } catch {
+        /* ignore */
+      }
+      try {
+        await fs.promises.unlink(tmpOutput);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return { contentType: 'pdf', segments };
   }
 
   private extractPdfText(buffer: Buffer): ExtractedDocument {
@@ -590,9 +686,16 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
       }
 
       for (const piece of this.splitLongText(normalized)) {
+        const prefixed = this.prefixChunkMetadata(
+          piece,
+          document.name,
+          version.revision,
+          segment.pageNumber,
+          segment.sectionLabel
+        );
         segments.push({
-          content: piece,
-          tokenCount: this.estimateTokenCount(piece),
+          content: prefixed,
+          tokenCount: this.estimateTokenCount(prefixed),
           pageNumber: segment.pageNumber,
           sectionLabel: segment.sectionLabel,
         });
@@ -629,32 +732,66 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
   }
 
   private splitLongText(text: string) {
-    if (text.length <= MAX_CHUNK_LENGTH) {
-      return [text];
+    const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+    if (paragraphs.length <= 1) {
+      if (text.length <= MAX_CHUNK_LENGTH) {
+        return [text];
+      }
+
+      const chunks: string[] = [];
+      let start = 0;
+      while (start < text.length) {
+        let end = Math.min(start + MAX_CHUNK_LENGTH, text.length);
+        if (end < text.length) {
+          const breakAt = Math.max(text.lastIndexOf('. ', end), text.lastIndexOf(' ', end));
+          if (breakAt > start + 300) {
+            end = breakAt + 1;
+          }
+        }
+
+        const slice = text.slice(start, end).trim();
+        if (slice) {
+          chunks.push(slice);
+        }
+        start = Math.max(end - CHUNK_OVERLAP, start + 1);
+      }
+
+      return chunks;
     }
 
     const chunks: string[] = [];
-    let start = 0;
-    while (start < text.length) {
-      let end = Math.min(start + MAX_CHUNK_LENGTH, text.length);
-      if (end < text.length) {
-        const breakAt = Math.max(text.lastIndexOf('. ', end), text.lastIndexOf(' ', end));
-        if (breakAt > start + 300) {
-          end = breakAt + 1;
-        }
+    let current = '';
+    for (const paragraph of paragraphs) {
+      if ((current + '\n\n' + paragraph).length > MAX_CHUNK_LENGTH && current.length > 0) {
+        chunks.push(current.trim());
+        current = paragraph;
+      } else {
+        current = current ? current + '\n\n' + paragraph : paragraph;
       }
-
-      const slice = text.slice(start, end).trim();
-      if (slice) {
-        chunks.push(slice);
-      }
-      start = Math.max(end - CHUNK_OVERLAP, start + 1);
+    }
+    if (current.trim()) {
+      chunks.push(current.trim());
     }
 
-    return chunks;
+    return chunks.length ? chunks : [text];
   }
 
-  private createEmbedding(text: string) {
+  private prefixChunkMetadata(
+    content: string,
+    documentName: string,
+    versionLabel: string,
+    pageNumber?: number,
+    sectionLabel?: string
+  ) {
+    const parts: string[] = [];
+    parts.push(`[Documento: ${documentName}]`);
+    parts.push(`[Version: ${versionLabel}]`);
+    if (pageNumber) parts.push(`[Pagina: ${pageNumber}]`);
+    if (sectionLabel) parts.push(`[Seccion: ${sectionLabel}]`);
+    return `${parts.join(' ')}\n${content}`;
+  }
+
+  private createHashEmbedding(text: string) {
     const vector = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
     const tokens = this.tokenize(text);
     for (const token of tokens) {
@@ -666,6 +803,38 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
 
     const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
     return vector.map((value) => Number((value / magnitude).toFixed(6)));
+  }
+
+  private async createOllamaEmbedding(text: string): Promise<number[]> {
+    const baseUrl = this.config.get<string>('OLLAMA_BASE_URL') ?? 'http://127.0.0.1:11434';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/embed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: OLLAMA_EMBEDDING_MODEL,
+          input: text.slice(0, 8000),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama embedding error: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as { embeddings?: number[][] };
+      const embedding = payload.embeddings?.[0];
+      if (!embedding || !embedding.length) {
+        throw new Error('Ollama returned empty embedding');
+      }
+
+      return embedding;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private cosineSimilarity(left: number[], right: number[]) {

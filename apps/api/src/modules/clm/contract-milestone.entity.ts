@@ -24,7 +24,7 @@ export class ContractMilestone {
   @JoinColumn({ name: 'contract_id' })
   contract!: Contract;
 
-  @Column({ name: 'name', length: 180 })
+  @Column({ length: 180 })
   name!: string;
 
   @Column({ name: 'milestone_date', type: 'date' })
@@ -37,8 +37,8 @@ export class ContractMilestone {
   @JoinColumn({ name: 'responsible_user_id' })
   responsibleUser?: User;
 
-  @Column({ default: 'pending' })
-  status!: 'pending' | 'in_progress' | 'completed' | 'delayed' | 'cancelled';
+  @Column({ length: 40, default: 'pending' })
+  status!: string;
 
   @Column({ name: 'completed_at', type: 'datetime', nullable: true })
   completedAt?: Date;
@@ -52,6 +52,9 @@ export class ContractMilestone {
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
+
+  @Column({ name: 'alert_days_before', nullable: true, default: 7 })
+  alertDaysBefore?: number;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

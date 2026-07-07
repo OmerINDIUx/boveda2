@@ -36,7 +36,13 @@ export class RfiComment {
   body!: string;
 
   @Column({ name: 'comment_type', default: 'comment' })
-  type!: 'comment' | 'response' | 'system';
+  type!: 'comment' | 'response' | 'system' | 'email';
+
+  @Column({ name: 'email_message_id', length: 255, nullable: true })
+  emailMessageId?: string;
+
+  @Column({ name: 'email_in_reply_to', length: 255, nullable: true })
+  emailInReplyTo?: string;
 
   @OneToMany(() => RfiAttachment, (attachment) => attachment.comment)
   attachments!: RfiAttachment[];

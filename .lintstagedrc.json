@@ -1,4 +1,11 @@
 {
-  "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
+  "apps/api/**/*.{ts,tsx,js,jsx}": [
+    "eslint --config apps/api/eslint.config.js --fix",
+    "prettier --write"
+  ],
+  "apps/web/**/*.{ts,tsx,js,jsx}": [
+    "eslint --config apps/web/eslint.config.mjs --fix",
+    "prettier --write"
+  ],
   "*.{json,css,md,sql}": ["prettier --write"]
 }

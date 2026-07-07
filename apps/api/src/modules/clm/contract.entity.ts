@@ -4,6 +4,8 @@ import {
   DeleteDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -12,12 +14,17 @@ import {
 import { DocumentRecord } from '../documents/document.entity';
 import { Project } from '../projects/project.entity';
 import { User } from '../users/user.entity';
+import { ContractAmendment } from './entities/contract-amendment.entity';
 import { ContractAttachment } from './contract-attachment.entity';
 import { ContractAuditLog } from './contract-audit-log.entity';
 import { ContractComment } from './contract-comment.entity';
 import { ContractMilestone } from './contract-milestone.entity';
+import { ContractNegotiation } from './entities/contract-negotiation.entity';
 import { ContractObligation } from './contract-obligation.entity';
+import { ContractPayment } from './entities/contract-payment.entity';
+import { ContractSignatureRequest } from './entities/contract-signature-request.entity';
 import { ContractVersion } from './contract-version.entity';
+import { Tag } from './entities/tag.entity';
 
 @Entity('contracts')
 export class Contract {
@@ -95,6 +102,16 @@ export class Contract {
   @Column({ name: 'renewal_notice_days', nullable: true })
   renewalNoticeDays?: number;
 
+  @Column({ name: 'alert_days_before', nullable: true, default: 30 })
+  alertDaysBefore?: number;
+
+  @Column({ name: 'parent_contract_id', nullable: true })
+  parentContractId?: string;
+
+  @ManyToOne(() => Contract, { nullable: true })
+  @JoinColumn({ name: 'parent_contract_id' })
+  parentContract?: Contract;
+
   @Column({ name: 'closed_at', type: 'datetime', nullable: true })
   closedAt?: Date;
 
@@ -125,6 +142,26 @@ export class Contract {
 
   @OneToMany(() => ContractAuditLog, (log) => log.contract)
   auditLogs!: ContractAuditLog[];
+
+  @OneToMany(() => ContractAmendment, (amendment) => amendment.contract)
+  amendments!: ContractAmendment[];
+
+  @OneToMany(() => ContractPayment, (payment) => payment.contract)
+  payments!: ContractPayment[];
+
+  @OneToMany(() => ContractSignatureRequest, (sr) => sr.contract)
+  signatureRequests!: ContractSignatureRequest[];
+
+  @OneToMany(() => ContractNegotiation, (neg) => neg.contract)
+  negotiations!: ContractNegotiation[];
+
+  @ManyToMany(() => Tag)
+  @JoinTable({
+    name: 'contract_tags',
+    joinColumn: { name: 'contract_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
+  })
+  tags!: Tag[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

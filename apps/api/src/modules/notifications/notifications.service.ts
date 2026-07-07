@@ -221,6 +221,7 @@ export class NotificationsService {
             subject: payload.title,
             text: `${payload.title}\n\n${payload.body}`,
             html: this.buildEmailHtml(user.name, payload),
+            replyTo: typeof payload.meta?.replyTo === 'string' ? payload.meta.replyTo : undefined,
           });
           if (result.status === 'skipped') {
             await this.updateDeliveryStatus(

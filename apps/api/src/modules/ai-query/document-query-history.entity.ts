@@ -28,6 +28,9 @@ export class DocumentQueryHistory {
   @JoinColumn({ name: 'project_id' })
   project?: Project;
 
+  @Column({ name: 'session_id', type: 'char', length: 36, nullable: true })
+  sessionId?: string;
+
   @Column({ name: 'document_id', nullable: true })
   documentId?: string;
 

@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
+  Bot,
   Building2,
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   Clock3,
   Download,
@@ -34,6 +37,8 @@ import {
   Trash2,
   Undo2,
   Upload,
+  Users,
+  CalendarDays,
   X,
   UserCircle2,
 } from 'lucide-react';
@@ -41,6 +46,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasPermission } from '../../lib/auth';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 import { PermissionKey } from '../../lib/permissions';
+import { normalizeLabel } from '../../lib/labels';
 
 type ProjectOption = { id: string; name: string; code: string };
 type DisciplineOption = { id: string; name: string; code: string };
@@ -127,6 +133,7 @@ type DocumentDetail = DocumentListItem & {
     action: string;
     createdAt: string;
     actorId?: string;
+    actor?: { id: string; name: string; email: string } | null;
     beforeState?: unknown;
     afterState?: unknown;
   }>;
@@ -265,11 +272,6 @@ function buildAnnotationSignature(items: ReviewAnnotation[]) {
 function getToken() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem('holocron_token');
-}
-
-function normalizeLabel(value?: string | null) {
-  if (!value) return 'Sin definir';
-  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatSize(size?: number) {
@@ -452,13 +454,15 @@ function QuickMetric({
   icon: Icon,
   label,
   value,
+  highlight,
 }: {
   icon: typeof FilePlus2;
   label: string;
-  value: number;
+  value: React.ReactNode;
+  highlight?: boolean;
 }) {
   return (
-    <article className="card span-3 project-metric info">
+    <article className={`card span-3 project-metric ${highlight ? 'metric-highlight' : 'info'}`}>
       <Icon size={20} />
       <strong>{value}</strong>
       <span>{label}</span>
@@ -773,10 +777,6 @@ export function DocumentsListPage() {
     [documents, projects, selectedProjectId]
   );
 
-  const projectCount = useMemo(
-    () => new Set(documents.map((item) => item.projectId)).size,
-    [documents]
-  );
   const rootFolders = useMemo(
     () =>
       [...(folderChildrenMap.root ?? [])].sort((left, right) =>
@@ -937,198 +937,438 @@ export function DocumentsListPage() {
     }
   }
 
+  const [folderExpanded, setFolderExpanded] = useState(true);
+
   return (
-    <section className="projects-workspace">
-      <div className="topbar">
+    <section>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          marginBottom: '1.25rem',
+          flexWrap: 'wrap',
+        }}
+      >
         <div>
-          <h1>
-            {selectedProject ? `Drive documental de ${selectedProject.name}` : 'Drive documental'}
+          <h1 style={{ fontSize: '1.375rem', fontWeight: 700, margin: 0 }}>
+            {selectedProject ? `Drive · ${selectedProject.name}` : 'Drive documental'}
           </h1>
-          <p className="muted">
-            Explora por proyecto, navega carpetas, detecta pendientes y entra al archivo correcto
-            sin perder contexto.
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: '#6b7280' }}>
+            Explora archivos por carpeta, disciplina y estado
           </p>
         </div>
-        <div className="projects-actions">
-          {selectedProjectId ? (
-            <Link className="button secondary" href={`/projects/${selectedProjectId}`}>
-              Ver proyecto
-            </Link>
-          ) : null}
-          {canManageFolders ? (
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => setShowCreateFolder((current) => !current)}
-              disabled={!selectedProjectId}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowProjectPicker(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              minHeight: '2.25rem',
+              padding: '0 0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+              background: '#fff',
+              color: '#374151',
+              cursor: 'pointer',
+              fontSize: '0.8125rem',
+              transition: 'background 120ms ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+          >
+            <Search size={15} />
+            {selectedProject ? 'Cambiar proyecto' : 'Abrir proyecto'}
+          </button>
+          {selectedProjectId && (
+            <Link
+              href={`/projects/${selectedProjectId}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                minHeight: '2.25rem',
+                padding: '0 0.75rem',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                background: '#fff',
+                color: '#374151',
+                textDecoration: 'none',
+                fontSize: '0.8125rem',
+              }}
             >
-              <FolderPlus size={18} />
+              <Building2 size={15} />
+              Proyecto
+            </Link>
+          )}
+          {canManageFolders && selectedProjectId && (
+            <button
+              type="button"
+              onClick={() => setShowCreateFolder(!showCreateFolder)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                minHeight: '2.25rem',
+                padding: '0 0.75rem',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                background: '#fff',
+                color: '#374151',
+                cursor: 'pointer',
+                fontSize: '0.8125rem',
+              }}
+            >
+              <FolderPlus size={15} />
               Nueva carpeta
             </button>
-          ) : null}
+          )}
           <Link
-            className="button"
             href={
               selectedProjectId ? `/documents/new?projectId=${selectedProjectId}` : '/documents/new'
             }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              minHeight: '2.25rem',
+              padding: '0 0.75rem',
+              borderRadius: '6px',
+              border: 'none',
+              background: '#0f766e',
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+            }}
           >
-            <Upload size={18} />
-            Nuevo documento
+            <Upload size={15} />
+            Subir documento
           </Link>
         </div>
       </div>
 
-      {error ? <div className="card muted">{error}</div> : null}
-
-      <article className="card document-drive-shell" style={{ marginTop: 16 }}>
-        <div className="document-drive-toolbar">
-          <div className="document-drive-hero">
-            <div className="document-drive-project-card">
-              <div className="document-preview-badge">
-                <Building2 size={16} />
-                {selectedProject?.code ?? `${projectCount} proyectos`}
-              </div>
-              <div>
-                <strong>
-                  {selectedProject?.name ?? 'Selecciona un proyecto para entrar a su drive'}
-                </strong>
-                <p className="muted">
-                  {selectedProject
-                    ? 'Carpetas, archivos y acciones viven dentro del proyecto. Cambiar de proyecto debe ser una búsqueda, no un dropdown eterno.'
-                    : 'Usa el selector compacto para abrir un proyecto específico.'}
-                </p>
-              </div>
-            </div>
-            <div className="projects-actions">
-              <button
-                className="button secondary"
-                type="button"
-                onClick={() => setShowProjectPicker(true)}
-              >
-                <Search size={18} />
-                {selectedProject ? 'Cambiar proyecto' : 'Abrir proyecto'}
-              </button>
-              {selectedProjectId ? (
-                <Link className="button secondary" href={`/projects/${selectedProjectId}`}>
-                  Ver proyecto
-                </Link>
-              ) : null}
-              {canManageFolders ? (
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={() => setShowCreateFolder((current) => !current)}
-                  disabled={!selectedProjectId}
-                >
-                  <FolderPlus size={18} />
-                  Nueva carpeta
-                </button>
-              ) : null}
-              <Link
-                className="button"
-                href={
-                  selectedProjectId
-                    ? `/documents/new?projectId=${selectedProjectId}`
-                    : '/documents/new'
-                }
-              >
-                <Upload size={18} />
-                Nuevo documento
-              </Link>
-            </div>
-          </div>
-
-          <div className="document-drive-toolbar-main">
-            <div className="field">
-              <label>Buscar en el drive</label>
-              <div className="search-input">
-                <Search size={16} />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Nombre, número, carpeta, disciplina o responsable"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="document-drive-breadcrumbs">
-            <button
-              className={`document-breadcrumb ${!selectedFolderId ? 'active' : ''}`}
-              type="button"
-              onClick={() => setSelectedFolderId('')}
-            >
-              <Building2 size={14} />
-              {selectedProject?.code ?? 'Proyecto'}
-            </button>
-            {folderBreadcrumbs.map((folder) => (
-              <button
-                className={`document-breadcrumb ${folder.id === selectedFolderId ? 'active' : ''}`}
-                key={folder.id}
-                type="button"
-                onClick={() => setSelectedFolderId(folder.id)}
-              >
-                <ArrowRight size={14} />
-                {folder.name}
-              </button>
-            ))}
-          </div>
+      {error ? (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            background: '#fef2f2',
+            border: '1px solid #fee2e2',
+            borderRadius: '6px',
+            color: '#dc2626',
+            fontSize: '0.8125rem',
+            marginBottom: '1rem',
+          }}
+        >
+          {error}
         </div>
+      ) : null}
 
-        <div className="document-drive-layout">
-          <aside className="document-drive-sidebar">
-            <div className="document-drive-sidebar-section">
-              <div className="panel-header">
-                <h2>Accesos rápidos</h2>
-                <span className="pill">
-                  {smartPresets.find((preset) => preset.id === selectedPreset)?.count ?? 0}
+      {/* Search bar */}
+      <div style={{ marginBottom: '0.75rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            minHeight: '2.5rem',
+            padding: '0 0.75rem',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            background: '#fff',
+            maxWidth: 480,
+          }}
+        >
+          <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, número, carpeta..."
+            style={{
+              flex: 1,
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontSize: '0.875rem',
+              minHeight: '2.25rem',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Breadcrumbs */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.375rem',
+          flexWrap: 'wrap',
+          marginBottom: '1rem',
+          alignItems: 'center',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setSelectedFolderId('')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            minHeight: '2rem',
+            padding: '0 0.75rem',
+            borderRadius: '999px',
+            border: '1px solid',
+            borderColor: !selectedFolderId ? '#0f766e' : '#e5e7eb',
+            background: !selectedFolderId ? '#f0fdfa' : '#fff',
+            color: !selectedFolderId ? '#0f766e' : '#6b7280',
+            cursor: 'pointer',
+            fontSize: '0.75rem',
+            fontWeight: !selectedFolderId ? 600 : 400,
+          }}
+        >
+          <Building2 size={12} />
+          {selectedProject?.code ?? 'Proyecto'}
+        </button>
+        {folderBreadcrumbs.map((folder) => (
+          <button
+            key={folder.id}
+            type="button"
+            onClick={() => setSelectedFolderId(folder.id)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              minHeight: '2rem',
+              padding: '0 0.75rem',
+              borderRadius: '999px',
+              border: '1px solid',
+              borderColor: folder.id === selectedFolderId ? '#0f766e' : '#e5e7eb',
+              background: folder.id === selectedFolderId ? '#f0fdfa' : '#fff',
+              color: folder.id === selectedFolderId ? '#0f766e' : '#6b7280',
+              cursor: 'pointer',
+              fontSize: '0.75rem',
+              fontWeight: folder.id === selectedFolderId ? 600 : 400,
+            }}
+          >
+            <span style={{ marginRight: '0.125rem', color: '#d1d5db' }}>/</span>
+            {folder.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Main layout: sidebar + content */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '240px 1fr 300px',
+          gap: '1rem',
+          alignItems: 'start',
+        }}
+      >
+        {/* Left sidebar: Presets + Folders */}
+        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {/* Presets */}
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '10px',
+              padding: '0.75rem',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#9ca3af',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginBottom: '0.5rem',
+              }}
+            >
+              Filtros rápidos
+            </div>
+            <div style={{ display: 'grid', gap: '2px' }}>
+              {smartPresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setSelectedPreset(preset.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.375rem 0.5rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: selectedPreset === preset.id ? '#f0fdfa' : 'transparent',
+                    color: selectedPreset === preset.id ? '#0f766e' : '#374151',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: selectedPreset === preset.id ? 600 : 400,
+                    width: '100%',
+                    textAlign: 'left',
+                    transition: 'background 120ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedPreset !== preset.id) e.currentTarget.style.background = '#f9fafb';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedPreset !== preset.id)
+                      e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <span>{preset.label}</span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '1.25rem',
+                      height: '1.25rem',
+                      borderRadius: '999px',
+                      background: selectedPreset === preset.id ? '#ccfbf1' : '#f3f4f6',
+                      fontSize: '0.6875rem',
+                      fontWeight: 700,
+                      color: selectedPreset === preset.id ? '#0f766e' : '#6b7280',
+                    }}
+                  >
+                    {preset.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div
+              style={{
+                borderTop: '1px solid #f3f4f6',
+                marginTop: '0.5rem',
+                paddingTop: '0.5rem',
+                display: 'grid',
+                gap: '0.375rem',
+              }}
+            >
+              {projectStats.map((metric) => {
+                const Icon = metric.icon;
+                return (
+                  <div
+                    key={metric.label}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                    }}
+                  >
+                    <Icon size={14} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{metric.label}</span>
+                    <strong style={{ color: '#374151' }}>{metric.value}</strong>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Folders */}
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '10px',
+              padding: '0.75rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: '#9ca3af',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Carpetas
+              </div>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setFolderExpanded(!folderExpanded)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#9ca3af',
+                    padding: '2px',
+                    display: 'flex',
+                  }}
+                >
+                  {folderExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '1.25rem',
+                    height: '1.25rem',
+                    borderRadius: '999px',
+                    background: '#f3f4f6',
+                    fontSize: '0.6875rem',
+                    fontWeight: 700,
+                    color: '#6b7280',
+                  }}
+                >
+                  {folders.length}
                 </span>
               </div>
-              <div className="document-preset-list">
-                {smartPresets.map((preset) => (
-                  <button
-                    className={`document-preset-card ${selectedPreset === preset.id ? 'active' : ''}`}
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setSelectedPreset(preset.id)}
-                  >
-                    <strong>{preset.label}</strong>
-                    <span>{preset.hint}</span>
-                    <small>{preset.count} elementos</small>
-                  </button>
-                ))}
-              </div>
-              <div className="document-project-stats">
-                {projectStats.map((metric) => {
-                  const Icon = metric.icon;
-                  return (
-                    <div className="document-project-stat" key={metric.label}>
-                      <Icon size={16} />
-                      <div>
-                        <strong>{metric.value}</strong>
-                        <small>{metric.label}</small>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
 
-            <div className="document-drive-sidebar-section">
-              <div className="panel-header">
-                <h2>Carpetas</h2>
-                <span className="pill">{folders.length}</span>
-              </div>
-              <div className="folder-tree">
+            {folderExpanded && (
+              <div>
+                {/* Root folder button */}
                 <button
-                  className={`folder-tree-node ${!selectedFolderId ? 'active' : ''}`}
                   type="button"
                   onClick={() => setSelectedFolderId('')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    width: '100%',
+                    padding: '0.5rem 0.5rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: !selectedFolderId ? '#f0fdfa' : 'transparent',
+                    color: !selectedFolderId ? '#0f766e' : '#374151',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: !selectedFolderId ? 600 : 400,
+                    textAlign: 'left',
+                    transition: 'background 120ms ease',
+                    marginBottom: '2px',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedFolderId) e.currentTarget.style.background = '#f9fafb';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedFolderId) e.currentTarget.style.background = 'transparent';
+                  }}
                 >
-                  <div>
-                    <strong>Raíz del proyecto</strong>
-                    <small>Todo lo que cuelga directamente del proyecto</small>
-                  </div>
+                  <FolderOpen size={15} style={{ flexShrink: 0 }} />
+                  <span>Raíz</span>
                 </button>
+
+                {/* Folder tree */}
                 {rootFolders.map((folder) => (
                   <FolderTreeButton
                     childrenMap={folderChildrenMap}
@@ -1138,234 +1378,500 @@ export function DocumentsListPage() {
                     onSelect={setSelectedFolderId}
                   />
                 ))}
-                {!loading && !rootFolders.length ? (
-                  <p className="muted">Todavía no hay carpetas creadas en este proyecto.</p>
-                ) : null}
-              </div>
-            </div>
-          </aside>
 
-          <div className="document-drive-main">
-            {showCreateFolder ? (
-              <div className="document-folder-creator">
-                <div className="panel-header">
-                  <h2>Crear carpeta</h2>
-                  <span className="pill">
-                    {selectedFolderId ? 'Dentro de carpeta actual' : 'Nivel raíz'}
-                  </span>
-                </div>
-                <div className="quick-filters-grid">
-                  <TextField
-                    label="Nombre"
-                    value={folderDraft.name}
-                    onChange={(value) => setFolderDraft((current) => ({ ...current, name: value }))}
-                    placeholder="Ej. ARC_Planos emitidos"
-                  />
-                  <SelectField
-                    label="Disciplina"
-                    value={folderDraft.disciplineId}
-                    onChange={(value) =>
-                      setFolderDraft((current) => ({ ...current, disciplineId: value }))
-                    }
-                    options={disciplines.map((discipline) => ({
-                      value: discipline.id,
-                      label: `${discipline.code} · ${discipline.name}`,
-                    }))}
-                    placeholder="Sin disciplina fija"
-                  />
-                </div>
-                <div className="document-folder-rules">
-                  <div className="simple-document-item">
-                    <strong>Ruta resultante</strong>
-                    <small>{folderPathPreview}</small>
-                  </div>
-                  <div className="simple-document-item">
-                    <strong>Reglas</strong>
-                    <small>Solo letras, números, espacios, guion y guion bajo.</small>
-                    <small>Máximo 36 caracteres para no romper la lectura del árbol.</small>
-                    <small>No se permiten nombres repetidos en el mismo nivel.</small>
-                  </div>
-                </div>
-                {folderRuleError ? <p className="muted">{folderRuleError}</p> : null}
-                {!folderRuleError && folderDuplicateError ? (
-                  <p className="muted">{folderDuplicateError}</p>
-                ) : null}
-                <div className="projects-actions">
-                  <button
-                    className="button secondary"
-                    type="button"
-                    onClick={() => setShowCreateFolder(false)}
+                {!loading && !rootFolders.length && (
+                  <p
+                    style={{ fontSize: '0.75rem', color: '#9ca3af', padding: '0.5rem', margin: 0 }}
                   >
-                    Cancelar
-                  </button>
-                  <button
-                    className="button"
-                    type="button"
-                    onClick={() => void createFolder()}
-                    disabled={
+                    Sin carpetas en este proyecto
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Center: File list */}
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            overflow: 'hidden',
+          }}
+        >
+          {/* File header */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              borderBottom: '1px solid #f3f4f6',
+            }}
+          >
+            <h2 style={{ fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>
+              {selectedFolderId
+                ? (folderBreadcrumbs[folderBreadcrumbs.length - 1]?.name ?? 'Carpeta')
+                : 'Todos los archivos'}
+            </h2>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '1.375rem',
+                padding: '0 0.5rem',
+                borderRadius: '999px',
+                background: '#f3f4f6',
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                fontWeight: 600,
+              }}
+            >
+              {loading ? '...' : `${filteredDocuments.length} archivos`}
+            </span>
+          </div>
+
+          {/* Create folder card */}
+          {showCreateFolder && (
+            <div
+              style={{ padding: '1rem', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}
+            >
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 600,
+                      marginBottom: '0.25rem',
+                    }}
+                  >
+                    Nombre
+                  </label>
+                  <input
+                    value={folderDraft.name}
+                    onChange={(e) => setFolderDraft((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Ej. ARC_Planos"
+                    style={{
+                      width: '100%',
+                      minHeight: '2.25rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      padding: '0 0.625rem',
+                      fontSize: '0.8125rem',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: 600,
+                      marginBottom: '0.25rem',
+                    }}
+                  >
+                    Disciplina
+                  </label>
+                  <select
+                    value={folderDraft.disciplineId}
+                    onChange={(e) =>
+                      setFolderDraft((prev) => ({ ...prev, disciplineId: e.target.value }))
+                    }
+                    style={{
+                      width: '100%',
+                      minHeight: '2.25rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      padding: '0 0.625rem',
+                      fontSize: '0.8125rem',
+                      outline: 'none',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="">Sin disciplina</option>
+                    {disciplines.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.code} · {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
+                Ruta: {folderPathPreview}
+              </div>
+              {folderRuleError && (
+                <div style={{ fontSize: '0.75rem', color: '#dc2626', marginBottom: '0.5rem' }}>
+                  {folderRuleError}
+                </div>
+              )}
+              {folderDuplicateError && (
+                <div style={{ fontSize: '0.75rem', color: '#d97706', marginBottom: '0.5rem' }}>
+                  {folderDuplicateError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateFolder(false)}
+                  style={{
+                    minHeight: '2.25rem',
+                    padding: '0 0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    color: '#374151',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createFolder()}
+                  disabled={
+                    folderSaving ||
+                    Boolean(folderRuleError) ||
+                    Boolean(folderDuplicateError) ||
+                    !selectedProjectId
+                  }
+                  style={{
+                    minHeight: '2.25rem',
+                    padding: '0 0.75rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background:
                       folderSaving ||
                       Boolean(folderRuleError) ||
                       Boolean(folderDuplicateError) ||
                       !selectedProjectId
-                    }
-                  >
-                    {folderSaving ? 'Creando...' : 'Guardar carpeta'}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="document-file-grid">
-              <div className="panel-header">
-                <h2>
-                  {selectedFolderId
-                    ? `Contenido de ${folderBreadcrumbs[folderBreadcrumbs.length - 1]?.name ?? 'carpeta'}`
-                    : 'Archivos del proyecto'}
-                </h2>
-                <span className="pill">
-                  {loading ? 'Cargando' : `${filteredDocuments.length} visibles`}
-                </span>
-              </div>
-              <div className="document-file-list">
-                {filteredDocuments.map((document) => (
-                  <button
-                    className={`document-file-card ${selectedDocument?.id === document.id ? 'active' : ''}`}
-                    key={document.id}
-                    type="button"
-                    onClick={() => setSelectedDocumentId(document.id)}
-                    onDoubleClick={() => openDocument(document.id)}
-                  >
-                    <div className="document-file-card-head">
-                      <div className="document-file-card-title">
-                        <FileText size={18} />
-                        <div>
-                          <strong>{document.name}</strong>
-                          <small>{document.documentNumber}</small>
-                        </div>
-                      </div>
-                      <StatusPill status={document.status} />
-                    </div>
-                    <div className="document-file-meta">
-                      <span>{document.folder?.name ?? 'Sin carpeta'}</span>
-                      <span>{document.discipline?.code ?? 'GEN'}</span>
-                      <span>{formatSize(document.sizeBytes)}</span>
-                    </div>
-                    <div className="document-file-meta">
-                      <span>{document.responsibleUser?.name ?? 'Sin responsable'}</span>
-                      <span>{new Date(document.updatedAt).toLocaleDateString()}</span>
-                    </div>
-                    <small className="document-file-card-hint">
-                      Click para previsualizar. Doble click para abrir.
-                    </small>
-                  </button>
-                ))}
-                {!loading && !filteredDocuments.length ? (
-                  <div className="preview-empty">
-                    <p className="muted">
-                      No hay archivos para esta combinación de proyecto, carpeta y filtro rápido.
-                    </p>
-                  </div>
-                ) : null}
+                        ? '#9ca3af'
+                        : '#0f766e',
+                    color: '#fff',
+                    cursor:
+                      folderSaving ||
+                      Boolean(folderRuleError) ||
+                      Boolean(folderDuplicateError) ||
+                      !selectedProjectId
+                        ? 'not-allowed'
+                        : 'pointer',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {folderSaving ? 'Creando...' : 'Guardar carpeta'}
+                </button>
               </div>
             </div>
-          </div>
+          )}
 
-          <aside className="document-drive-preview">
-            {selectedDocument ? (
-              <>
-                <div className="document-preview-hero">
-                  <div className="document-preview-badge">
-                    <FolderOpen size={16} />
-                    {selectedDocument.folder?.name ?? 'Sin carpeta'}
-                  </div>
-                  <h2>{selectedDocument.name}</h2>
-                  <p className="muted">
-                    {selectedDocument.documentNumber} ·{' '}
-                    {selectedDocument.project?.code ?? selectedDocument.projectId}
-                  </p>
-                </div>
-
-                <div className="document-preview-summary">
-                  <div className="state-card">
-                    <span>Estado</span>
-                    <strong>{normalizeLabel(selectedDocument.status)}</strong>
-                  </div>
-                  <div className="state-card">
-                    <span>Disciplina</span>
-                    <strong>{selectedDocument.discipline?.name ?? 'Sin disciplina'}</strong>
-                  </div>
-                  <div className="state-card">
-                    <span>Responsable</span>
-                    <strong>{selectedDocument.responsibleUser?.name ?? 'Sin responsable'}</strong>
-                  </div>
-                  <div className="state-card">
-                    <span>Tamaño</span>
-                    <strong>{formatSize(selectedDocument.sizeBytes)}</strong>
-                  </div>
-                </div>
-
-                <div className="document-preview-actions">
-                  <Link className="button" href={`/documents/${selectedDocument.id}`}>
-                    <Eye size={16} />
-                    Abrir documento
-                  </Link>
-                </div>
-
-                <div className="document-preview-insights">
-                  <div className="simple-document-item">
-                    <strong>Ubicación</strong>
-                    <small>
-                      {selectedDocument.folder?.name
-                        ? `${selectedDocument.project?.name ?? 'Proyecto'} / ${selectedDocument.folder.name}`
-                        : 'Aún no se asigna a una carpeta'}
-                    </small>
-                  </div>
-                  <div className="simple-document-item">
-                    <strong>Movimiento recomendado</strong>
-                    <small>
-                      {selectedDocument.status === 'pending_approval'
-                        ? 'Empújalo a revisión o aprobación para que no se quede atascado.'
-                        : selectedDocument.renewable
-                          ? 'Tiene ciclo renovable: conviene vigilar su próxima actualización.'
-                          : 'Está listo para abrirse o seguir su flujo normal.'}
-                    </small>
-                  </div>
-                  <div className="simple-document-item">
-                    <strong>Lectura rápida</strong>
-                    <small>
-                      {selectedDocument.confidentialityLevel
-                        ? `Nivel ${normalizeLabel(selectedDocument.confidentialityLevel)}`
-                        : 'Sin clasificación'}
-                    </small>
-                    <small>
-                      {selectedDocument.dueDate
-                        ? `Vence el ${formatDate(selectedDocument.dueDate)}`
-                        : 'Sin fecha de vencimiento definida'}
-                    </small>
-                  </div>
-                  <div className="simple-document-item">
-                    <strong>Acciones</strong>
-                    <div className="document-inline-links">
-                      <Link href={`/documents/${selectedDocument.id}/review`}>Revisar</Link>
-                      <Link href={`/documents/${selectedDocument.id}/version`}>Nueva versión</Link>
-                      <Link href={`/documents/${selectedDocument.id}/approval`}>
-                        Solicitar aprobación
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </>
+          {/* File list */}
+          <div style={{ maxHeight: 'calc(100vh - 320px)', overflow: 'auto' }}>
+            {loading ? (
+              <div
+                style={{
+                  padding: '2rem',
+                  textAlign: 'center',
+                  color: '#9ca3af',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Cargando...
+              </div>
+            ) : filteredDocuments.length === 0 ? (
+              <div
+                style={{
+                  padding: '3rem 2rem',
+                  textAlign: 'center',
+                  color: '#9ca3af',
+                  fontSize: '0.875rem',
+                }}
+              >
+                No hay archivos en esta ubicación
+              </div>
             ) : (
-              <div className="preview-empty">
-                <Sparkles size={18} />
-                <p className="muted">
-                  Selecciona un archivo para ver su ficha rápida y abrirlo en el visor completo.
-                </p>
+              <div style={{ display: 'grid' }}>
+                {filteredDocuments.map((doc) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => setSelectedDocumentId(doc.id)}
+                    onDoubleClick={() => openDocument(doc.id)}
+                    style={{
+                      display: 'grid',
+                      gap: '0.375rem',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      width: '100%',
+                      border: 'none',
+                      borderBottom: '1px solid #f3f4f6',
+                      background: selectedDocument?.id === doc.id ? '#f0fdfa' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'background 120ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedDocument?.id !== doc.id)
+                        e.currentTarget.style.background = '#f9fafb';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedDocument?.id !== doc.id)
+                        e.currentTarget.style.background = '#fff';
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <FileText size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>
+                            {doc.name}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                            {doc.documentNumber}
+                          </div>
+                        </div>
+                      </div>
+                      <StatusPill status={doc.status} />
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.75rem',
+                        fontSize: '0.75rem',
+                        color: '#9ca3af',
+                        flexWrap: 'wrap',
+                        marginLeft: '1.5rem',
+                      }}
+                    >
+                      <span>{doc.folder?.name ?? '—'}</span>
+                      <span>{doc.discipline?.code ?? 'GEN'}</span>
+                      <span>{formatSize(doc.sizeBytes)}</span>
+                      <span>{doc.responsibleUser?.name ?? '—'}</span>
+                      <span>{new Date(doc.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
-          </aside>
+          </div>
         </div>
-      </article>
+
+        {/* Right: Preview pane */}
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            padding: '1rem',
+            position: 'sticky',
+            top: '5rem',
+            maxHeight: 'calc(100vh - 160px)',
+            overflow: 'auto',
+          }}
+        >
+          {selectedDocument ? (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {/* Document header */}
+              <div>
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: '#0f766e',
+                    fontWeight: 600,
+                    marginBottom: '0.25rem',
+                  }}
+                >
+                  {selectedDocument.folder?.name ?? 'Sin carpeta'}
+                </div>
+                <h2
+                  style={{
+                    fontSize: '1.125rem',
+                    fontWeight: 700,
+                    margin: '0 0 0.25rem',
+                    color: '#111827',
+                  }}
+                >
+                  {selectedDocument.name}
+                </h2>
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                  {selectedDocument.documentNumber} · {selectedDocument.project?.code ?? ''}
+                </div>
+              </div>
+
+              {/* Info grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                {[
+                  { label: 'Estado', value: normalizeLabel(selectedDocument.status) },
+                  { label: 'Disciplina', value: selectedDocument.discipline?.name ?? '—' },
+                  { label: 'Responsable', value: selectedDocument.responsibleUser?.name ?? '—' },
+                  { label: 'Tamaño', value: formatSize(selectedDocument.sizeBytes) },
+                ].map((info) => (
+                  <div
+                    key={info.label}
+                    style={{
+                      background: '#f9fafb',
+                      borderRadius: '6px',
+                      padding: '0.5rem 0.625rem',
+                    }}
+                  >
+                    <div
+                      style={{ fontSize: '0.6875rem', color: '#9ca3af', marginBottom: '0.125rem' }}
+                    >
+                      {info.label}
+                    </div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>
+                      {info.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Link
+                  href={`/documents/${selectedDocument.id}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    minHeight: '2.25rem',
+                    padding: '0 0.75rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#0f766e',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  <Eye size={15} />
+                  Abrir
+                </Link>
+                <Link
+                  href={`/documents/${selectedDocument.id}/review`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    minHeight: '2.25rem',
+                    padding: '0 0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    color: '#374151',
+                    textDecoration: 'none',
+                    fontSize: '0.8125rem',
+                    background: '#fff',
+                  }}
+                >
+                  Revisar
+                </Link>
+                <Link
+                  href={`/documents/${selectedDocument.id}/version`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    minHeight: '2.25rem',
+                    padding: '0 0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    color: '#374151',
+                    textDecoration: 'none',
+                    fontSize: '0.8125rem',
+                    background: '#fff',
+                  }}
+                >
+                  Versión
+                </Link>
+                <Link
+                  href={`/ai-query?documentId=${selectedDocument.id}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    minHeight: '2.25rem',
+                    padding: '0 0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    color: '#374151',
+                    textDecoration: 'none',
+                    fontSize: '0.8125rem',
+                    background: '#fff',
+                  }}
+                >
+                  <Bot size={15} />
+                  Consultar con IA
+                </Link>
+              </div>
+
+              {/* Details */}
+              <div
+                style={{
+                  borderTop: '1px solid #f3f4f6',
+                  paddingTop: '0.75rem',
+                  display: 'grid',
+                  gap: '0.625rem',
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                }}
+              >
+                <div>
+                  <strong style={{ color: '#374151' }}>Ubicación:</strong>{' '}
+                  {selectedDocument.folder?.name
+                    ? `${selectedDocument.project?.name ?? 'Proyecto'} / ${selectedDocument.folder.name}`
+                    : 'Sin carpeta'}
+                </div>
+                <div>
+                  <strong style={{ color: '#374151' }}>Confidencialidad:</strong>{' '}
+                  {selectedDocument.confidentialityLevel
+                    ? normalizeLabel(selectedDocument.confidentialityLevel)
+                    : 'Sin clasificación'}
+                </div>
+                <div>
+                  <strong style={{ color: '#374151' }}>Vencimiento:</strong>{' '}
+                  {selectedDocument.dueDate ? formatDate(selectedDocument.dueDate) : 'Sin fecha'}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: '2rem',
+                textAlign: 'center',
+                color: '#9ca3af',
+                fontSize: '0.8125rem',
+              }}
+            >
+              <FileText
+                size={24}
+                style={{ color: '#d1d5db', margin: '0 auto 0.5rem', display: 'block' }}
+              />
+              Selecciona un archivo para ver detalles
+            </div>
+          )}
+        </div>
+      </div>
 
       {showProjectPicker ? (
         <div className="document-project-picker">
@@ -1989,14 +2495,6 @@ export function DocumentDetailPage() {
     };
   }, [detail?.id, detail?.preview.available]);
 
-  async function refreshDetail() {
-    const response = await apiGet<DocumentDetail>(
-      `/documents/${params.id}`,
-      getToken() ?? undefined
-    );
-    setDetail(response);
-  }
-
   async function saveComment() {
     if (!comment.trim()) return;
     try {
@@ -2047,7 +2545,33 @@ export function DocumentDetailPage() {
   if (loading) {
     return (
       <section className="projects-workspace">
-        <article className="card muted">Cargando documento...</article>
+        <div className="grid">
+          <div className="card span-12">
+            <div className="skeleton skeleton-title" />
+            <div className="skeleton skeleton-text" />
+            <div className="skeleton skeleton-text short" />
+          </div>
+        </div>
+        <div className="grid" style={{ marginTop: 16 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div className="card span-3" key={i}>
+              <div className="skeleton skeleton-icon" />
+              <div className="skeleton skeleton-value" />
+              <div className="skeleton skeleton-label" />
+            </div>
+          ))}
+        </div>
+        <div className="grid" style={{ marginTop: 16 }}>
+          <div className="card span-7">
+            <div className="skeleton skeleton-block" style={{ height: 400 }} />
+          </div>
+          <div className="card span-5">
+            <div className="skeleton skeleton-title" />
+            {[1, 2, 3, 4].map((i) => (
+              <div className="skeleton skeleton-text" key={i} />
+            ))}
+          </div>
+        </div>
       </section>
     );
   }
@@ -2055,13 +2579,31 @@ export function DocumentDetailPage() {
   if (!detail) {
     return (
       <section className="projects-workspace">
-        <article className="card muted">{error || 'Documento no disponible.'}</article>
+        <article className="card alert-error">
+          <p>{error || 'Documento no disponible.'}</p>
+        </article>
       </section>
     );
   }
 
   return (
     <section className="projects-workspace">
+      <nav className="breadcrumbs" style={{ marginBottom: 8 }}>
+        <Link href="/documents">Documentos</Link>
+        {detail.project ? (
+          <>
+            <span className="breadcrumb-sep">/</span>
+            <span>{detail.project.name}</span>
+          </>
+        ) : null}
+        {detail.folder ? (
+          <>
+            <span className="breadcrumb-sep">/</span>
+            <span>{detail.folder.name}</span>
+          </>
+        ) : null}
+      </nav>
+
       <div className="topbar">
         <div>
           <h1>{detail.documentNumber}</h1>
@@ -2086,24 +2628,33 @@ export function DocumentDetailPage() {
               Solicitar aprobación
             </Link>
           ) : null}
+          <Link className="button secondary" href={`/ai-query?documentId=${detail.id}`}>
+            <Bot size={18} />
+            Consultar con IA
+          </Link>
         </div>
       </div>
 
-      {error ? <div className="card muted">{error}</div> : null}
+      {error ? <div className="card alert-error">{error}</div> : null}
 
       <div className="grid">
-        <QuickMetric icon={FolderTree} label="Proyecto" value={1} />
+        <QuickMetric
+          icon={FolderTree}
+          label="Proyecto"
+          value={detail.project?.name ?? 'Sin proyecto'}
+          highlight
+        />
         <QuickMetric
           icon={UserCircle2}
           label="Responsable"
-          value={detail.responsibleUser ? 1 : 0}
+          value={detail.responsibleUser?.name ?? 'Sin responsable'}
         />
         <QuickMetric icon={Clock3} label="Versiones" value={detail.versions.length} />
         <QuickMetric icon={CheckCircle2} label="Solicitudes" value={approvalHistory.length} />
       </div>
 
       <div className="grid" style={{ marginTop: 16 }}>
-        <article className="card span-8">
+        <article className="card span-7">
           <div className="panel-header">
             <h2>Archivo actual</h2>
             <StatusPill status={detail.status} />
@@ -2120,10 +2671,21 @@ export function DocumentDetailPage() {
             )
           ) : (
             <div className="preview-empty">
+              <FileText size={48} color="var(--muted)" />
               <p className="muted">
                 {previewError ||
                   'No hay vista previa para este formato. Puedes descargarlo o subir una nueva versión.'}
               </p>
+              {canCreate ? (
+                <Link
+                  className="button secondary"
+                  href={`/documents/${detail.id}/version`}
+                  style={{ marginTop: 8 }}
+                >
+                  <Upload size={16} />
+                  Subir nueva versión
+                </Link>
+              ) : null}
             </div>
           )}
           <div className="projects-actions" style={{ marginTop: 16 }}>
@@ -2158,41 +2720,64 @@ export function DocumentDetailPage() {
           </div>
         </article>
 
-        <article className="card span-4">
+        <article className="card span-5">
           <div className="panel-header">
-            <h2>Ficha</h2>
+            <h2>Ficha del documento</h2>
             <Eye size={18} color="var(--primary)" />
           </div>
-          <div className="simple-document-list">
-            <div className="simple-document-item">
-              <strong>Responsable</strong>
-              <small>{detail.responsibleUser?.name ?? 'Sin responsable'}</small>
-            </div>
-            <div className="simple-document-item">
-              <strong>Disciplina</strong>
-              <small>{detail.discipline?.name ?? 'Sin disciplina'}</small>
-            </div>
-            <div className="simple-document-item">
-              <strong>Vencimiento</strong>
-              <small>{formatDate(detail.dueDate)}</small>
-            </div>
-            <div className="simple-document-item">
-              <strong>Renovable</strong>
-              <small>{detail.renewable ? 'Sí' : 'No'}</small>
-            </div>
-            {detail.renewable ? (
-              <div className="simple-document-item">
-                <strong>Frecuencia de renovación</strong>
-                <small>{renewalFrequencyLabel(detail.renewalFrequency)}</small>
+          <div className="ficha-sections">
+            <div className="ficha-section">
+              <h3 className="ficha-section-title">Responsabilidad</h3>
+              <div className="ficha-grid">
+                <div className="ficha-field">
+                  <span className="ficha-label">Responsable</span>
+                  <span className="ficha-value">
+                    {detail.responsibleUser?.name ?? 'Sin responsable'}
+                  </span>
+                </div>
+                <div className="ficha-field">
+                  <span className="ficha-label">Disciplina</span>
+                  <span className="ficha-value">{detail.discipline?.name ?? 'Sin disciplina'}</span>
+                </div>
               </div>
-            ) : null}
-            <div className="simple-document-item">
-              <strong>Formato</strong>
-              <small>{detail.currentVersion?.mimeType ?? 'Sin archivo'}</small>
             </div>
-            <div className="simple-document-item">
-              <strong>Tamaño</strong>
-              <small>{formatSize(detail.currentVersion?.sizeBytes)}</small>
+            <div className="ficha-section">
+              <h3 className="ficha-section-title">Vigencia</h3>
+              <div className="ficha-grid">
+                <div className="ficha-field">
+                  <span className="ficha-label">Vencimiento</span>
+                  <span className="ficha-value">{formatDate(detail.dueDate)}</span>
+                </div>
+                <div className="ficha-field">
+                  <span className="ficha-label">Renovable</span>
+                  <span className="ficha-value">{detail.renewable ? 'Sí' : 'No'}</span>
+                </div>
+                {detail.renewable ? (
+                  <div className="ficha-field">
+                    <span className="ficha-label">Frecuencia</span>
+                    <span className="ficha-value">
+                      {renewalFrequencyLabel(detail.renewalFrequency)}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="ficha-section">
+              <h3 className="ficha-section-title">Archivo</h3>
+              <div className="ficha-grid">
+                <div className="ficha-field">
+                  <span className="ficha-label">Formato</span>
+                  <span className="ficha-value">
+                    {detail.currentVersion?.mimeType ?? 'Sin archivo'}
+                  </span>
+                </div>
+                <div className="ficha-field">
+                  <span className="ficha-label">Tamaño</span>
+                  <span className="ficha-value">
+                    {formatSize(detail.currentVersion?.sizeBytes)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -2205,15 +2790,54 @@ export function DocumentDetailPage() {
             <History size={18} color="var(--primary)" />
           </div>
           <div className="simple-document-list">
-            {detail.versions.map((version) => (
-              <div className="simple-document-item" key={version.id}>
-                <strong>Rev. {version.revision}</strong>
-                <span>{version.fileName}</span>
-                <small>
-                  {version.notes ?? 'Sin notas'} · {formatSize(version.sizeBytes)}
-                </small>
+            {detail.versions.length === 0 ? (
+              <div className="simple-document-item">
+                <small className="muted">Sin versiones registradas</small>
               </div>
-            ))}
+            ) : (
+              detail.versions.map((version) => {
+                const isCurrent = detail.currentVersionId === version.id;
+                return (
+                  <div
+                    className={`simple-document-item ${isCurrent ? 'version-current' : ''}`}
+                    key={version.id}
+                  >
+                    <div className="version-head">
+                      <strong>
+                        Rev. {version.revision}
+                        {isCurrent ? <span className="version-badge">Actual</span> : null}
+                      </strong>
+                      {canDownload ? (
+                        <button
+                          className="button-icon"
+                          type="button"
+                          title="Descargar esta versión"
+                          onClick={() => {
+                            fetchProtectedBlob(`/documents/${detail.id}/download`).then((blob) => {
+                              const url = URL.createObjectURL(blob);
+                              const anchor = document.createElement('a');
+                              anchor.href = url;
+                              anchor.download = version.fileName;
+                              anchor.click();
+                              URL.revokeObjectURL(url);
+                            });
+                          }}
+                        >
+                          <Download size={14} />
+                        </button>
+                      ) : null}
+                    </div>
+                    <span>{version.fileName}</span>
+                    <small>
+                      {version.uploadedBy?.name ?? 'Usuario'} ·{' '}
+                      {new Date(version.createdAt).toLocaleString()} ·{' '}
+                      {formatSize(version.sizeBytes)}
+                    </small>
+                    {version.notes ? <small className="muted">{version.notes}</small> : null}
+                  </div>
+                );
+              })
+            )}
           </div>
         </article>
 
@@ -2234,13 +2858,35 @@ export function DocumentDetailPage() {
             Guardar comentario
           </button>
           <div className="simple-document-list" style={{ marginTop: 16 }}>
-            {detail.comments.map((item) => (
-              <div className="simple-document-item" key={item.id}>
-                <strong>{item.author?.name ?? 'Usuario'}</strong>
-                <span>{item.body}</span>
-                <small>{new Date(item.createdAt).toLocaleString()}</small>
-              </div>
-            ))}
+            {detail.comments.flatMap((item) => {
+              if (item.body.startsWith('[ANNOTATION_SET]')) {
+                const parsed = parseAnnotationComment(item.body);
+                if (!parsed) return [];
+                return parsed.annotations
+                  .filter((a) => a.kind === 'comment' || a.kind === 'text')
+                  .map((a) => (
+                    <div className="simple-document-item" key={a.id}>
+                      <strong>{item.author?.name ?? 'Usuario'}</strong>
+                      <span>{a.text ?? '(sin texto)'}</span>
+                      {a.replies && a.replies.length > 0 && (
+                        <div style={{ marginLeft: 16, fontSize: '0.9em', opacity: 0.8 }}>
+                          {a.replies.map((r) => (
+                            <div key={r.id}>↳ {r.text}</div>
+                          ))}
+                        </div>
+                      )}
+                      <small>{new Date(a.createdAt).toLocaleString()}</small>
+                    </div>
+                  ));
+              }
+              return (
+                <div className="simple-document-item" key={item.id}>
+                  <strong>{item.author?.name ?? 'Usuario'}</strong>
+                  <span>{item.body}</span>
+                  <small>{new Date(item.createdAt).toLocaleString()}</small>
+                </div>
+              );
+            })}
           </div>
         </article>
         <article className="card span-4">
@@ -2248,27 +2894,27 @@ export function DocumentDetailPage() {
             <h2>Auditoría y aprobaciones</h2>
             <History size={18} color="var(--accent)" />
           </div>
-          <div className="simple-document-list">
-            {detail.audit.map((item) => (
-              <div className="simple-document-item" key={item.id}>
-                <strong>{normalizeLabel(item.action)}</strong>
-                <small>{new Date(item.createdAt).toLocaleString()}</small>
-              </div>
-            ))}
-            {approvalHistory.map((item) => (
-              <div className="simple-document-item" key={item.id}>
-                <strong>Solicitud {normalizeLabel(item.status)}</strong>
-                <small>
-                  {item.currentStep?.name ?? 'Sin paso actual'} ·{' '}
-                  {new Date(item.requestedAt).toLocaleString()}
-                </small>
-              </div>
-            ))}
-          </div>
+          {detail.audit.length > 0 ? (
+            <div className="simple-document-list">
+              {detail.audit.slice(0, 5).map((event) => (
+                <div className="simple-document-item" key={event.id}>
+                  <div className="version-head">
+                    <span className="audit-action-badge">{normalizeLabel(event.action)}</span>
+                    <small>{new Date(event.createdAt).toLocaleString()}</small>
+                  </div>
+                  <small className="muted">{event.actor?.name ?? 'Sistema'}</small>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted" style={{ marginTop: 8 }}>
+              Sin eventos registrados
+            </p>
+          )}
           <div className="projects-actions" style={{ marginTop: 12 }}>
-            <button className="button secondary" type="button" onClick={() => void refreshDetail()}>
-              Actualizar
-            </button>
+            <Link className="button secondary" href={`/documents/${params.id}/audit`}>
+              Ver historial completo
+            </Link>
           </div>
         </article>
       </div>
@@ -3900,6 +4546,310 @@ export function DocumentApprovalPage() {
             Ir a aprobaciones
           </Link>
         </div>
+      </article>
+    </section>
+  );
+}
+
+export function DocumentAuditPage() {
+  const params = useParams<{ id: string }>();
+  const [detail, setDetail] = useState<DocumentDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [actorFilter, setActorFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(25);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      setLoading(true);
+      try {
+        const response = await apiGet<DocumentDetail>(
+          `/documents/${params.id}`,
+          getToken() ?? undefined
+        );
+        if (!active) return;
+        setDetail(response);
+      } catch {
+        if (!active) return;
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [params.id]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, actionFilter, actorFilter, dateFrom, dateTo]);
+
+  const actions = useMemo(() => {
+    if (!detail) return [];
+    const values = new Set(detail.audit.map((a) => a.action));
+    return Array.from(values).sort();
+  }, [detail]);
+
+  const actors = useMemo(() => {
+    if (!detail) return [];
+    const map = new Map<string, string>();
+    for (const a of detail.audit) {
+      if (a.actor?.name) map.set(a.actor.id, a.actor.name);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [detail]);
+
+  const filtered = useMemo(() => {
+    if (!detail) return [];
+    return detail.audit.filter((item) => {
+      if (search && !normalizeLabel(item.action).toLowerCase().includes(search.toLowerCase()))
+        return false;
+      if (actionFilter && item.action !== actionFilter) return false;
+      if (actorFilter && item.actor?.id !== actorFilter) return false;
+      if (dateFrom && new Date(item.createdAt) < new Date(dateFrom)) return false;
+      if (dateTo) {
+        const toEnd = new Date(dateTo);
+        toEnd.setHours(23, 59, 59, 999);
+        if (new Date(item.createdAt) > toEnd) return false;
+      }
+      return true;
+    });
+  }, [detail, search, actionFilter, actorFilter, dateFrom, dateTo]);
+
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const paged = filtered.slice(page * perPage, (page + 1) * perPage);
+
+  if (loading) return <div className="loading">Cargando auditoría...</div>;
+  if (!detail) return <div className="loading">No se pudo cargar el documento.</div>;
+
+  return (
+    <section className="projects-workspace">
+      <div className="projects-header">
+        <div>
+          <h1>Auditoría: {detail.name}</h1>
+          <p className="muted">
+            {detail.documentNumber} &middot; {normalizeLabel(detail.status)}
+          </p>
+        </div>
+        <Link className="button secondary" href={`/documents/${params.id}`}>
+          Volver al documento
+        </Link>
+      </div>
+
+      <div className="grid" style={{ marginBottom: 16 }}>
+        <article className="card span-3 project-metric info">
+          <History size={20} />
+          <strong>{detail.audit.length}</strong>
+          <span>Registros totales</span>
+        </article>
+        <article className="card span-3 project-metric">
+          <Layers3 size={20} />
+          <strong>{actions.length}</strong>
+          <span>Tipos de acción</span>
+        </article>
+        <article className="card span-3 project-metric">
+          <Users size={20} />
+          <strong>{actors.length}</strong>
+          <span>Usuarios distintos</span>
+        </article>
+        <article className="card span-3 project-metric">
+          <CalendarDays size={20} />
+          <strong>{filtered.length}</strong>
+          <span>Filtrados</span>
+        </article>
+      </div>
+
+      <article className="card">
+        <div className="panel-header">
+          <h2>Historial de actividad</h2>
+          {(search || actionFilter || actorFilter || dateFrom || dateTo) && (
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setActionFilter('');
+                setActorFilter('');
+                setDateFrom('');
+                setDateTo('');
+              }}
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
+        <div
+          className="quick-filters-grid"
+          style={{ marginBottom: 16, gridTemplateColumns: 'repeat(5, 1fr)' }}
+        >
+          <div className="field">
+            <label>Buscar acción</label>
+            <input
+              className="input"
+              type="text"
+              placeholder="Ej. visualización, descarga..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label>Tipo de acción</label>
+            <select
+              className="input"
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+            >
+              <option value="">Todas</option>
+              {actions.map((a) => (
+                <option key={a} value={a}>
+                  {normalizeLabel(a)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>Usuario</label>
+            <select
+              className="input"
+              value={actorFilter}
+              onChange={(e) => setActorFilter(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {actors.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>Fecha desde</label>
+            <input
+              className="input"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label>Fecha hasta</label>
+            <input
+              className="input"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="simple-document-list">
+          {paged.map((item) => (
+            <div className="simple-document-item" key={item.id}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <strong>{normalizeLabel(item.action)}</strong>
+                <small>{new Date(item.createdAt).toLocaleString()}</small>
+              </div>
+              <span>{item.actor?.name ?? 'Usuario'}</span>
+            </div>
+          ))}
+          {paged.length === 0 && (
+            <p className="muted" style={{ textAlign: 'center', padding: 32 }}>
+              No hay registros de auditoría con los filtros actuales.
+            </p>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+              paddingTop: 16,
+              borderTop: '1px solid var(--border)',
+              marginTop: 8,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontSize: '0.8125rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+              {filtered.length} resultados · Página {page + 1} de {totalPages}
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                className="button secondary"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                style={{ minHeight: '2rem', padding: '0 0.625rem', fontSize: '0.8125rem' }}
+              >
+                Anterior
+              </button>
+              {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
+                const pageNum = i + 1;
+                const isActive = page === pageNum - 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum - 1)}
+                    style={{
+                      minWidth: '2rem',
+                      height: '2rem',
+                      border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                      borderRadius: 6,
+                      background: isActive ? 'var(--primary)' : '#fff',
+                      color: isActive ? '#fff' : '#374151',
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                className="button secondary"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                style={{ minHeight: '2rem', padding: '0 0.625rem', fontSize: '0.8125rem' }}
+              >
+                Siguiente
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem' }}>
+              <label htmlFor="audit-per-page">Por página:</label>
+              <select
+                id="audit-per-page"
+                className="input"
+                value={perPage}
+                onChange={(e) => {
+                  setPerPage(Number(e.target.value));
+                  setPage(0);
+                }}
+                style={{ minHeight: '2rem', width: 'auto' }}
+              >
+                {[10, 25, 50, 100].map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </article>
     </section>
   );

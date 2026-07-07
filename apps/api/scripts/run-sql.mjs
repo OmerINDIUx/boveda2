@@ -21,11 +21,48 @@ const connection = await mysql.createConnection({
 });
 
 try {
-  const files = (await fs.readdir(sourceDir)).filter((file) => file.endsWith('.sql')).sort();
-  for (const file of files) {
-    const sql = await fs.readFile(path.join(sourceDir, file), 'utf8');
-    process.stdout.write(`Aplicando ${mode}: ${file}\n`);
-    await connection.query(sql);
+  // Ensure migration tracking table exists
+  await connection.query(`CREATE TABLE IF NOT EXISTS _migrations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL UNIQUE,
+    applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  if (mode === 'migrations') {
+    const [rows] = await connection.query('SELECT filename FROM _migrations');
+    const applied = new Set(rows.map(r => r.filename));
+
+    const files = (await fs.readdir(sourceDir))
+      .filter((file) => file.endsWith('.sql'))
+      .sort();
+
+    for (const file of files) {
+      if (applied.has(file)) {
+        process.stdout.write(`Saltando ${file} (ya aplicado)\n`);
+        continue;
+      }
+      const sql = await fs.readFile(path.join(sourceDir, file), 'utf8');
+      process.stdout.write(`Aplicando ${mode}: ${file}\n`);
+      try {
+        await connection.query(sql);
+      } catch (err) {
+        // If table/column already exists, skip; otherwise rethrow
+        if (err.code === 'ER_TABLE_EXISTS_ERROR' || err.code === 'ER_DUP_FIELDNAME' || err.code === 'ER_COLUMN_DUPLICATE' || err.code === 'ER_DUP_KEYNAME' || (err.errno === 1050) || (err.errno === 1060) || (err.errno === 1061)) {
+          process.stdout.write(`  ↳ Saltado (ya existe): ${err.sqlMessage}\n`);
+        } else {
+          throw err;
+        }
+      }
+      await connection.query('INSERT INTO _migrations (filename) VALUES (?)', [file]);
+    }
+  } else {
+    // Seeders run all every time
+    const files = (await fs.readdir(sourceDir)).filter((file) => file.endsWith('.sql')).sort();
+    for (const file of files) {
+      const sql = await fs.readFile(path.join(sourceDir, file), 'utf8');
+      process.stdout.write(`Aplicando ${mode}: ${file}\n`);
+      await connection.query(sql);
+    }
   }
   process.stdout.write(`Completado: ${mode}\n`);
 } finally {

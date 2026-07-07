@@ -50,6 +50,9 @@ export class ContractObligation {
   @Column({ type: 'text', nullable: true })
   comments?: string;
 
+  @Column({ name: 'alert_days_before', nullable: true, default: 14 })
+  alertDaysBefore?: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

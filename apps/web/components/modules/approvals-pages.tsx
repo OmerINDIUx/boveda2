@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { normalizeLabel } from '../../lib/labels';
 
 type ProjectOption = { id: string; name: string; code: string };
 type DocumentOption = {
@@ -157,11 +158,6 @@ const emptyFlowForm: FlowForm = {
 function getToken() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem('holocron_token');
-}
-
-function normalizeLabel(value?: string | null) {
-  if (!value) return 'Sin definir';
-  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatSize(size?: number) {

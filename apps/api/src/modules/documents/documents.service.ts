@@ -201,7 +201,11 @@ export class DocumentsService {
         relations: ['author'],
         order: { createdAt: 'DESC' },
       }),
-      this.auditLogs.find({ where: { documentId }, order: { createdAt: 'DESC' } }),
+      this.auditLogs.find({
+        where: { documentId },
+        relations: ['actor'],
+        order: { createdAt: 'DESC' },
+      }),
     ]);
 
     if (logView) {

@@ -23,6 +23,12 @@ export const PermissionKey = {
   AuditView: 'audit.view',
   ContractsManage: 'contracts.manage',
   AiQuery: 'ai.query',
+  ClmTemplates: 'clm.templates',
+  ClmImport: 'clm.import',
+  ClmExport: 'clm.export',
+  ClmSign: 'clm.sign',
+  ClmFinance: 'clm.finance',
+  ClmReports: 'clm.reports',
 } as const;
 
 export type PermissionKey = (typeof PermissionKey)[keyof typeof PermissionKey];
@@ -46,6 +52,12 @@ export const PermissionCatalog: Array<{ key: PermissionKey; label: string; modul
   { key: PermissionKey.AuditView, label: 'Ver auditoria', module: 'audit' },
   { key: PermissionKey.ContractsManage, label: 'Administrar contratos', module: 'clm' },
   { key: PermissionKey.AiQuery, label: 'Consultar IA documental', module: 'ai-query' },
+  { key: PermissionKey.ClmTemplates, label: 'Gestionar plantillas CLM', module: 'clm' },
+  { key: PermissionKey.ClmImport, label: 'Importar contratos', module: 'clm' },
+  { key: PermissionKey.ClmExport, label: 'Exportar contratos', module: 'clm' },
+  { key: PermissionKey.ClmSign, label: 'Enviar a firma', module: 'clm' },
+  { key: PermissionKey.ClmFinance, label: 'Ver finanzas CLM', module: 'clm' },
+  { key: PermissionKey.ClmReports, label: 'Ver reportes CLM', module: 'clm' },
 ];
 
 export interface ProjectSummary {

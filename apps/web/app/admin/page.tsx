@@ -5,7 +5,7 @@ export default function AdminPage() {
   return (
     <>
       <SectionHeader
-        title="Administracion"
+        title="Administración"
         description="Usuarios, roles, permisos globales y catálogos separados del alta de proyectos."
       />
       <section className="grid">

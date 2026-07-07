@@ -35,6 +35,10 @@ export class CreateRfiDto {
   priority?: 'low' | 'normal' | 'high' | 'urgent';
 
   @IsOptional()
+  @IsString()
+  templateId?: string;
+
+  @IsOptional()
   @IsDateString()
   dueDate?: string;
 

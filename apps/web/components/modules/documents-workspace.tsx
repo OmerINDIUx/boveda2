@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { normalizeLabel } from '../../lib/labels';
 
 type ProjectOption = { id: string; name: string; code: string };
 
@@ -59,6 +60,7 @@ type DocumentDetail = DocumentListItem & {
     action: string;
     createdAt: string;
     actorId?: string;
+    actor?: { id: string; name: string; email: string } | null;
     beforeState?: unknown;
     afterState?: unknown;
   }>;
@@ -277,11 +279,6 @@ function getToken() {
   return window.localStorage.getItem('holocron_token');
 }
 
-function normalizeLabel(value?: string | null) {
-  if (!value) return 'Sin definir';
-  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function formatSize(size?: number) {
   if (!size) return 'Sin tamaño';
   if (size < 1024) return `${size} B`;
@@ -318,6 +315,36 @@ async function fetchProtectedBlob(path: string) {
   }
 
   return response.blob();
+}
+
+type AnnotationItem = {
+  id: string;
+  kind: 'comment' | 'text' | 'draw' | 'highlight' | 'stamp';
+  pageIndex: number;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+  text?: string;
+  stamp?: string;
+  path?: Array<{ x: number; y: number }>;
+  replies?: Array<{ id: string; text: string; createdAt: string }>;
+  createdAt: string;
+};
+
+type AnnotationPayload = {
+  versionId: string | null;
+  annotations: AnnotationItem[];
+};
+
+function parseAnnotationComment(body: string) {
+  if (!body.startsWith('[ANNOTATION_SET]')) return null;
+  try {
+    return JSON.parse(body.slice('[ANNOTATION_SET]\n'.length)) as AnnotationPayload;
+  } catch {
+    return null;
+  }
 }
 
 export function DocumentsWorkspace() {
@@ -825,13 +852,35 @@ export function DocumentsWorkspace() {
                     Guardar comentario
                   </button>
                   <div className="simple-document-list" style={{ marginTop: 16 }}>
-                    {detail.comments.map((item) => (
-                      <div className="simple-document-item" key={item.id}>
-                        <strong>{item.author?.name ?? 'Usuario'}</strong>
-                        <span>{item.body}</span>
-                        <small>{new Date(item.createdAt).toLocaleString()}</small>
-                      </div>
-                    ))}
+                    {detail.comments.flatMap((item) => {
+                      if (item.body.startsWith('[ANNOTATION_SET]')) {
+                        const parsed = parseAnnotationComment(item.body);
+                        if (!parsed) return [];
+                        return parsed.annotations
+                          .filter((a) => a.kind === 'comment' || a.kind === 'text')
+                          .map((a) => (
+                            <div className="simple-document-item" key={a.id}>
+                              <strong>{item.author?.name ?? 'Usuario'}</strong>
+                              <span>{a.text ?? '(sin texto)'}</span>
+                              {a.replies && a.replies.length > 0 && (
+                                <div style={{ marginLeft: 16, fontSize: '0.9em', opacity: 0.8 }}>
+                                  {a.replies.map((r) => (
+                                    <div key={r.id}>↳ {r.text}</div>
+                                  ))}
+                                </div>
+                              )}
+                              <small>{new Date(a.createdAt).toLocaleString()}</small>
+                            </div>
+                          ));
+                      }
+                      return (
+                        <div className="simple-document-item" key={item.id}>
+                          <strong>{item.author?.name ?? 'Usuario'}</strong>
+                          <span>{item.body}</span>
+                          <small>{new Date(item.createdAt).toLocaleString()}</small>
+                        </div>
+                      );
+                    })}
                   </div>
                 </article>
 
@@ -844,9 +893,18 @@ export function DocumentsWorkspace() {
                     {detail.audit.map((item) => (
                       <div className="simple-document-item" key={item.id}>
                         <strong>{normalizeLabel(item.action)}</strong>
+                        <span>{item.actor?.name ?? 'Usuario'}</span>
                         <small>{new Date(item.createdAt).toLocaleString()}</small>
                       </div>
                     ))}
+                  </div>
+                  <div className="projects-actions" style={{ marginTop: 8 }}>
+                    <Link
+                      className="button secondary"
+                      href={`/documents/${selectedDocumentId}/audit`}
+                    >
+                      Ver historial completo
+                    </Link>
                   </div>
                 </article>
               </div>

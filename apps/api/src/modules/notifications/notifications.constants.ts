@@ -5,6 +5,8 @@ export const NOTIFICATION_TYPES = [
   'approval_stopped',
   'rfi_assigned',
   'rfi_overdue',
+  'rfi_commented',
+  'rfi_responded',
   'contract_expiring_soon',
   'contract_expired',
   'contract_obligation_pending',
@@ -24,6 +26,8 @@ export const NOTIFICATION_DEFAULTS: Record<
   approval_stopped: { inApp: true, email: true, label: 'Flujo detenido' },
   rfi_assigned: { inApp: true, email: true, label: 'RFI asignado' },
   rfi_overdue: { inApp: true, email: true, label: 'RFI vencido' },
+  rfi_commented: { inApp: true, email: true, label: 'Comentario en RFI' },
+  rfi_responded: { inApp: true, email: true, label: 'RFI respondido' },
   contract_expiring_soon: { inApp: true, email: true, label: 'Contrato próximo a vencer' },
   contract_expired: { inApp: true, email: true, label: 'Contrato vencido' },
   contract_obligation_pending: {

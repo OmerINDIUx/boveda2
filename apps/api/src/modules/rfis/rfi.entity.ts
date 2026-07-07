@@ -15,6 +15,7 @@ import { User } from '../users/user.entity';
 import { RfiAttachment } from './rfi-attachment.entity';
 import { RfiComment } from './rfi-comment.entity';
 import { RfiHistory } from './rfi-history.entity';
+import { RfiTemplate } from './rfi-template.entity';
 
 @Entity('rfis')
 export class Rfi {
@@ -49,6 +50,16 @@ export class Rfi {
 
   @Column({ default: 'normal' })
   priority!: 'low' | 'normal' | 'high' | 'urgent';
+
+  @Column({ name: 'template_id', nullable: true })
+  templateId?: string;
+
+  @ManyToOne(() => RfiTemplate, { nullable: true })
+  @JoinColumn({ name: 'template_id' })
+  template?: RfiTemplate;
+
+  @Column({ name: 'reply_to_address', length: 255, nullable: true })
+  replyToAddress?: string;
 
   @Column({ name: 'due_date', type: 'date', nullable: true })
   dueDate?: string;

@@ -6,6 +6,10 @@ export class AskDocumentQueryDto {
 
   @IsOptional()
   @IsString()
+  sessionId?: string;
+
+  @IsOptional()
+  @IsString()
   projectId?: string;
 
   @IsOptional()
