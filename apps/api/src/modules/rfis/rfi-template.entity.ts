@@ -13,7 +13,7 @@ import { User } from '../users/user.entity';
 
 type AutoAssignRule = {
   type: 'project_role' | 'specific_user' | 'discipline_lead' | 'document_uploader';
-  projectRole?: string;
+  projectRole?: 'owner' | 'manager' | 'contributor' | 'viewer';
   userId?: string;
   disciplineId?: string;
   fallbackUserId?: string;
