@@ -7,4 +7,5 @@ coverage
 storage
 *.log
 .npm-cache/
+.pnpm-store/
 node_modules/

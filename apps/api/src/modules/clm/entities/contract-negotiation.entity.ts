@@ -33,7 +33,7 @@ export class ContractNegotiation {
   @Column({ name: 'party_name', length: 160 })
   partyName!: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'proposed_text', type: 'text', nullable: true })
   proposedText?: string;
 
   @Column({ name: 'original_text', type: 'text', nullable: true })

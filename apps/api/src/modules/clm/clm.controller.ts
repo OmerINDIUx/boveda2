@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   Patch,
   Post,
@@ -69,8 +70,21 @@ export class ClmController {
 
   @Get('contracts/:id')
   @Permissions(PermissionKey.ContractsManage)
-  detail(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.clm.getDetail(user.id, id);
+  async detail(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    try {
+      return await this.clm.getDetail(user.id, id);
+    } catch (err: unknown) {
+      const message = err instanceof Error && err.message ? err.message : 'Internal server error';
+      const status =
+        typeof err === 'object' &&
+        err !== null &&
+        'getStatus' in err &&
+        typeof err.getStatus === 'function'
+          ? err.getStatus()
+          : 500;
+
+      throw new HttpException(message, status);
+    }
   }
 
   @Patch('contracts/:id')

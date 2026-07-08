@@ -8,6 +8,7 @@ import {
   FileClock,
   FileText,
   FolderTree,
+  MessageSquare,
   PencilLine,
   Plus,
   Search,
@@ -456,6 +457,10 @@ export function ProjectsListPage() {
               Nuevo proyecto
             </Link>
           ) : null}
+          <Link className="button secondary" href="/rfis/new">
+            <MessageSquare size={18} />
+            Nuevo RFI
+          </Link>
         </div>
       </div>
 
@@ -505,6 +510,10 @@ export function ProjectsListPage() {
                 <div className="project-hero-actions">
                   <Link className="button secondary" href={`/projects/${project.id}`}>
                     Ver detalle
+                  </Link>
+                  <Link className="button secondary" href={`/rfis/new?projectId=${project.id}`}>
+                    <MessageSquare size={18} />
+                    RFI
                   </Link>
                   {canManage ? (
                     <Link className="button secondary" href={`/projects/${project.id}/edit`}>
@@ -637,6 +646,10 @@ export function ProjectDetailPage() {
           </Link>
           <Link className="button secondary" href={`/documents/new?projectId=${detail.project.id}`}>
             Nuevo documento
+          </Link>
+          <Link className="button secondary" href={`/rfis/new?projectId=${detail.project.id}`}>
+            <MessageSquare size={18} />
+            Nuevo RFI
           </Link>
           {canManage ? (
             <Link className="button secondary" href="/admin/project-users">

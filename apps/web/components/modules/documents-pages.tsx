@@ -21,6 +21,7 @@ import {
   History,
   Highlighter,
   Layers3,
+  MessageSquare,
   MessageSquareMore,
   Paintbrush,
   Palette,
@@ -1048,6 +1049,25 @@ export function DocumentsListPage() {
           >
             <Upload size={15} />
             Subir documento
+          </Link>
+          <Link
+            href={selectedProjectId ? `/rfis/new?projectId=${selectedProjectId}` : '/rfis/new'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              minHeight: '2.25rem',
+              padding: '0 0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+              background: '#fff',
+              color: '#374151',
+              textDecoration: 'none',
+              fontSize: '0.8125rem',
+            }}
+          >
+            <MessageSquare size={15} />
+            Nuevo RFI
           </Link>
         </div>
       </div>
@@ -2631,6 +2651,13 @@ export function DocumentDetailPage() {
           <Link className="button secondary" href={`/ai-query?documentId=${detail.id}`}>
             <Bot size={18} />
             Consultar con IA
+          </Link>
+          <Link
+            className="button secondary"
+            href={`/rfis/new?projectId=${detail.projectId}&documentId=${detail.id}`}
+          >
+            <MessageSquare size={18} />
+            Nuevo RFI
           </Link>
         </div>
       </div>

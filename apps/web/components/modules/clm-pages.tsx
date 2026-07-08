@@ -412,6 +412,9 @@ export function ClmWorkspacePage() {
         <Link className="button secondary" href="/clm/clauses">
           <Library size={18} /> Cláusulas
         </Link>
+        <Link className="button secondary" href="/rfis/new">
+          <MessageSquare size={18} /> Nuevo RFI
+        </Link>
         <button
           className="button secondary"
           type="button"
@@ -607,9 +610,9 @@ export function ContractDetailPage() {
         const response = await apiGet<ContractDetail>(`/clm/contracts/${contractId}`, getToken());
         if (!active) return;
         setDetail(response);
-      } catch {
+      } catch (err: any) {
         if (!active) return;
-        setMessage('No se pudo cargar el detalle.');
+        setMessage(err?.message ?? 'No se pudo cargar el detalle.');
       } finally {
         if (active) setLoading(false);
       }
@@ -704,7 +707,7 @@ export function ContractDetailPage() {
     return (
       <section className="projects-workspace">
         <article className="card">
-          <p className="muted">Contrato no encontrado.</p>
+          <p className="muted">{message || 'Contrato no encontrado.'}</p>
         </article>
       </section>
     );
@@ -740,6 +743,9 @@ export function ContractDetailPage() {
           </Link>
           <Link className="button secondary" href={`/clm/${detail.id}/audit`}>
             <ShieldCheck size={18} /> Auditoría
+          </Link>
+          <Link className="button secondary" href={`/rfis/new?projectId=${detail.projectId}`}>
+            <MessageSquare size={18} /> Nuevo RFI
           </Link>
         </div>
       </div>
@@ -1449,8 +1455,8 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
       await apiPatch(`/clm/contracts/${contractId}`, payload, getToken());
       await apiPost(`/clm/contracts/${contractId}/tags`, { tagIds: selectedTagIds }, getToken());
       router.push(`/clm/${contractId}`);
-    } catch {
-      setError('Error al guardar.');
+    } catch (err: any) {
+      setError(err?.message ?? 'Error al guardar.');
     } finally {
       setSaving(false);
     }
@@ -1703,8 +1709,8 @@ export function ContractObligationCreatePage() {
     try {
       await apiPost(`/clm/contracts/${contractId}/obligations`, form, getToken());
       router.push(`/clm/${contractId}`);
-    } catch {
-      setError('Error al guardar.');
+    } catch (err: any) {
+      setError(err?.message ?? 'Error al guardar.');
     } finally {
       setSaving(false);
     }
@@ -1768,8 +1774,8 @@ export function ContractMilestoneCreatePage() {
     try {
       await apiPost(`/clm/contracts/${contractId}/milestones`, form, getToken());
       router.push(`/clm/${contractId}`);
-    } catch {
-      setError('Error al guardar.');
+    } catch (err: any) {
+      setError(err?.message ?? 'Error al guardar.');
     } finally {
       setSaving(false);
     }
@@ -1831,8 +1837,8 @@ export function ContractCommentCreatePage() {
     try {
       await apiPost(`/clm/contracts/${contractId}/comments`, { body }, getToken());
       router.push(`/clm/${contractId}`);
-    } catch {
-      setError('Error al guardar.');
+    } catch (err: any) {
+      setError(err?.message ?? 'Error al guardar.');
     } finally {
       setSaving(false);
     }

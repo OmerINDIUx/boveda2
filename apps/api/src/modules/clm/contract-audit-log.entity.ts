@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { User } from '../users/user.entity';
 import { Contract } from './contract.entity';
 
 @Entity('contract_audit_logs')
@@ -22,6 +23,10 @@ export class ContractAuditLog {
 
   @Column({ name: 'actor_id', nullable: true })
   actorId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'actor_id' })
+  actor?: User | null;
 
   @Column({ length: 100 })
   action!: string;

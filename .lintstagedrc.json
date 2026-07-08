@@ -1,5 +1,5 @@
 {
-  "apps/api/**/*.{ts,tsx,js,jsx}": [
+  "apps/api/src/**/*.{ts,tsx}": [
     "eslint --config apps/api/eslint.config.js --fix",
     "prettier --write"
   ],

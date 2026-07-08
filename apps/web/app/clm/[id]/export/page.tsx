@@ -79,15 +79,7 @@ export default function Page() {
   async function printPDF() {
     if (!ref.current) return;
     try {
-      const { default: jsPDF } = await import('jspdf');
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(ref.current, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`contrato-${contractId?.slice(0, 8)}.pdf`);
+      window.print();
     } catch {
       alert('Error al generar PDF.');
     }
@@ -111,7 +103,7 @@ export default function Page() {
             Volver
           </Link>
           <button className="button" type="button" onClick={printPDF}>
-            Descargar PDF
+            Guardar PDF
           </button>
         </div>
       </div>

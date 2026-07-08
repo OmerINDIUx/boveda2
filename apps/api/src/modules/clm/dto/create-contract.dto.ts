@@ -70,4 +70,14 @@ export class CreateContractDto {
   @IsOptional()
   @IsString()
   closeReason?: string;
+
+  @IsOptional()
+  @IsString()
+  parentContractId?: string;
+
+  @IsOptional()
+  renewable?: boolean;
+
+  @IsOptional()
+  alertDaysBefore?: number;
 }
