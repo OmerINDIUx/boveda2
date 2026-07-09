@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LanguageSwitcher } from './language-switcher';
 
 const searchItems = [
   { href: '/dashboard', label: 'Panel', icon: Gauge, section: 'Principal' },
@@ -261,8 +262,9 @@ export function TopBar() {
           )}
         </div>
 
-        {/* Right: Notifications + User */}
+        {/* Right: Language + Notifications + User */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <LanguageSwitcher />
           {/* Notifications */}
           <div ref={notifRef} style={{ position: 'relative' }}>
             <button

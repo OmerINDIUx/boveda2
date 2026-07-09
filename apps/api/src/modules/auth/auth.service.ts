@@ -31,6 +31,7 @@ export class AuthService {
       name: user.name,
       email: user.email,
       active: user.active,
+      language: user.language,
       roles,
       permissions,
     });
@@ -45,7 +46,14 @@ export class AuthService {
 
     return {
       accessToken,
-      user: { id: user.id, name: user.name, email: user.email, roles, permissions },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        language: user.language,
+        roles,
+        permissions,
+      },
     };
   }
 

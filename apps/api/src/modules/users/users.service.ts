@@ -69,6 +69,7 @@ export class UsersService {
     if (dto.name !== undefined) user.name = dto.name;
     if (dto.email !== undefined) user.email = dto.email;
     if (dto.active !== undefined) user.active = dto.active;
+    if (dto.language !== undefined) user.language = dto.language;
     if (dto.password) user.passwordHash = await bcrypt.hash(dto.password, 12);
     if (dto.roleIds) user.roles = await this.roles.findBy({ id: In(dto.roleIds) });
 
@@ -83,8 +84,21 @@ export class UsersService {
     return this.serializeUser(saved);
   }
 
+  async updateLanguage(id: string, language: string) {
+    const user = await this.users.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    user.language = language;
+    await this.users.save(user);
+    return { language };
+  }
+
   updateProfile(id: string, dto: UpdateUserDto) {
-    return this.update(id, { name: dto.name, email: dto.email, password: dto.password });
+    return this.update(id, {
+      name: dto.name,
+      email: dto.email,
+      password: dto.password,
+      language: dto.language,
+    });
   }
 
   setActive(id: string, active: boolean) {
@@ -97,6 +111,7 @@ export class UsersService {
       name: user.name,
       email: user.email,
       active: user.active,
+      language: user.language,
       roles: user.roles?.map((role) => ({ id: role.id, key: role.key, name: role.name })) ?? [],
     };
   }

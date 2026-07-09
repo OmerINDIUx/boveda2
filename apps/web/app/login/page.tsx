@@ -2,15 +2,24 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { apiPost } from '../../lib/api';
 import { Button } from '../../components/ui/button';
 
 type LoginResponse = {
   accessToken: string;
-  user: { id: string; name: string; email: string; roles: string[]; permissions: string[] };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    language?: string;
+    roles: string[];
+    permissions: string[];
+  };
 };
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -33,6 +42,9 @@ export default function LoginPage() {
       const result = await apiPost<LoginResponse>('/auth/login', { email, password });
       window.localStorage.setItem('holocron_token', result.accessToken);
       window.localStorage.setItem('holocron_user', JSON.stringify(result.user));
+      if (result.user.language) {
+        window.localStorage.setItem('holocron_lang', result.user.language);
+      }
       window.location.href = '/dashboard';
     } catch {
       setError('No fue posible iniciar sesión. Verifica tus credenciales.');
@@ -137,7 +149,7 @@ export default function LoginPage() {
               letterSpacing: '-0.02em',
             }}
           >
-            Holocron
+            {t('app.name')}
           </h1>
           <p
             style={{
@@ -148,8 +160,7 @@ export default function LoginPage() {
               lineHeight: 1.6,
             }}
           >
-            Tu bóveda documental inteligente. Controla, revisa y aprueba documentos desde un solo
-            lugar.
+            {t('app.tagline')}
           </p>
 
           {/* Feature pills */}
@@ -162,7 +173,7 @@ export default function LoginPage() {
               maxWidth: 400,
             }}
           >
-            {['Control documental', 'Flujos de aprobación', 'IA integrada', 'Contratos'].map(
+            {[t('documents.title'), t('nav.approvals'), t('nav.ai_query'), t('nav.contracts')].map(
               (feat) => (
                 <span
                   key={feat}
@@ -209,10 +220,10 @@ export default function LoginPage() {
                 color: 'var(--text)',
               }}
             >
-              Bienvenido de nuevo
+              {t('auth.login.title')}
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>
-              Ingresa tus credenciales para acceder al sistema.
+              {t('auth.login.email')}
             </p>
           </div>
 
@@ -229,7 +240,7 @@ export default function LoginPage() {
                   marginBottom: '0.375rem',
                 }}
               >
-                Correo electrónico
+                {t('auth.login.email')}
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -293,7 +304,7 @@ export default function LoginPage() {
                   marginBottom: '0.375rem',
                 }}
               >
-                Contraseña
+                {t('auth.login.password')}
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -424,7 +435,7 @@ export default function LoginPage() {
 
             {/* Submit */}
             <Button type="submit" loading={loading} size="lg" style={{ width: '100%' }}>
-              Iniciar sesión
+              {t('auth.login.button')}
             </Button>
           </form>
 
@@ -437,7 +448,7 @@ export default function LoginPage() {
               color: 'var(--text-tertiary)',
             }}
           >
-            Holocron v0.1.0 · Bóveda documental empresarial
+            {t('app.name')} v0.1.0 · {t('app.tagline')}
           </p>
         </div>
       </div>

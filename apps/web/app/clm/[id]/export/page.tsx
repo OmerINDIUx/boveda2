@@ -65,7 +65,10 @@ export default function Page() {
     if (!contractId) return;
     async function load() {
       try {
-        const d = await apiGet(`/clm/contracts/${contractId}/export`, getToken());
+        const d = await apiGet<ContractExportData>(
+          `/clm/contracts/${contractId}/export`,
+          getToken()
+        );
         setData(d);
       } catch {
         setData(null);

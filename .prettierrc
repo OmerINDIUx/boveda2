@@ -12,7 +12,8 @@
     {
       "files": "*.sql",
       "options": {
-        "parser": "sql"
+        "parser": "sql",
+        "language": "mysql"
       }
     }
   ]

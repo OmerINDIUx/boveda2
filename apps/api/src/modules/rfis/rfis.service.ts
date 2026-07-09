@@ -719,7 +719,7 @@ export class RfisService {
         this.attachments.create({
           rfiId,
           commentId,
-          fileKey: stored.key,
+          fileKey: stored.fileKey,
           fileName: stored.fileName,
           mimeType: stored.mimeType,
           sizeBytes: stored.sizeBytes,

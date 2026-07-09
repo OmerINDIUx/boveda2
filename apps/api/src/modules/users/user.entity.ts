@@ -27,6 +27,9 @@ export class User {
   @Column({ default: true })
   active!: boolean;
 
+  @Column({ length: 10, default: 'es' })
+  language!: string;
+
   @Column({ name: 'last_login_at', type: 'datetime', nullable: true })
   lastLoginAt?: Date;
 

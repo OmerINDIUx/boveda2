@@ -46,6 +46,11 @@ export class UsersController {
     return this.users.update(id, dto);
   }
 
+  @Patch('me/language')
+  updateMyLanguage(@CurrentUser() user: RequestUser, @Body('language') language: string) {
+    return this.users.updateLanguage(user.id, language);
+  }
+
   @Patch(':id/activate')
   @Permissions(PermissionKey.UsersManage)
   activate(@Param('id') id: string) {

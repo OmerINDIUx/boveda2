@@ -19,6 +19,10 @@ export class UpdateUserDto {
   active?: boolean;
 
   @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   roleIds?: string[];

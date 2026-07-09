@@ -354,7 +354,7 @@ export class ClmService {
       this.versions.create({
         contractId,
         versionLabel: dto.versionLabel,
-        fileKey: stored.key,
+        fileKey: stored.fileKey,
         fileName: dto.fileName,
         fileExtension: this.getExtension(dto.fileName),
         mimeType: dto.mimeType,
@@ -385,7 +385,7 @@ export class ClmService {
       this.attachments.create({
         contractId,
         name: dto.name,
-        fileKey: stored.key,
+        fileKey: stored.fileKey,
         fileName: dto.fileName,
         fileExtension: this.getExtension(dto.fileName),
         mimeType: dto.mimeType,

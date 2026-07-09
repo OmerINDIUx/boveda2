@@ -18,6 +18,10 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AiQueryModule } from './modules/ai-query/ai-query.module';
 import { ClmModule } from './modules/clm/clm.module';
 import { StorageModule } from './storage/storage.module';
+import { NomenclaturesModule } from './modules/nomenclatures/nomenclatures.module';
+import { ProjectEmailsModule } from './modules/project-emails/project-emails.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { ResponseTimesModule } from './modules/response-times/response-times.module';
 
 @Module({
   imports: [
@@ -54,6 +58,10 @@ import { StorageModule } from './storage/storage.module';
     AiQueryModule,
     ClmModule,
     StorageModule,
+    NomenclaturesModule,
+    ProjectEmailsModule,
+    UploadsModule,
+    ResponseTimesModule,
   ],
   providers: [
     {

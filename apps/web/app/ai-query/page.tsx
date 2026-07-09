@@ -27,11 +27,13 @@ type Citation = {
   fragment: string;
   score: number;
 };
+type IntelligenceSource = 'cache' | 'summary' | 'entity' | 'suggested' | 'rag';
 type QueryResponse = {
   id: string;
   question: string;
   answer: string;
   status: 'answered' | 'insufficient_information' | 'error';
+  source?: IntelligenceSource;
   scopedDocumentCount: number;
   citations: Citation[];
 };
@@ -47,6 +49,7 @@ type HistoryMessage = {
   question: string;
   answer: string;
   status: 'answered' | 'insufficient_information' | 'error';
+  source?: IntelligenceSource;
   citationsJson?: Citation[];
   createdAt: string;
 };
@@ -60,6 +63,28 @@ function formatStatus(status: QueryResponse['status']) {
   if (status === 'answered') return 'Respondida';
   if (status === 'insufficient_information') return 'Sin evidencia suficiente';
   return 'Error';
+}
+
+function formatSource(source?: IntelligenceSource) {
+  const labels: Record<string, string> = {
+    cache: 'Respuesta instantánea',
+    summary: 'Resumen del documento',
+    entity: 'Datos extraídos',
+    suggested: 'Pregunta frecuente',
+    rag: 'Generado por IA',
+  };
+  return source ? (labels[source] ?? 'Generado por IA') : '';
+}
+
+function sourceColor(source?: IntelligenceSource) {
+  const colors: Record<string, string> = {
+    cache: '#059669',
+    summary: '#0284c7',
+    entity: '#7c3aed',
+    suggested: '#ca8a04',
+    rag: '#dc2626',
+  };
+  return source ? (colors[source] ?? '#6b7280') : '#6b7280';
 }
 
 export default function AiQueryPage() {
@@ -229,6 +254,7 @@ export default function AiQueryPage() {
           question: response.question,
           answer: response.answer,
           status: response.status,
+          source: response.source,
           citationsJson: response.citations,
           createdAt: new Date().toISOString(),
         };
@@ -506,6 +532,7 @@ export default function AiQueryPage() {
                             alignItems: 'center',
                             gap: 6,
                             marginBottom: 6,
+                            flexWrap: 'wrap',
                           }}
                         >
                           <Bot size={14} />
@@ -515,6 +542,22 @@ export default function AiQueryPage() {
                           >
                             {formatStatus(msg.status)}
                           </span>
+                          {msg.source && (
+                            <span
+                              title={`Fuente: ${formatSource(msg.source)}`}
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                padding: '2px 8px',
+                                borderRadius: 10,
+                                background: `${sourceColor(msg.source)}18`,
+                                color: sourceColor(msg.source),
+                                border: `1px solid ${sourceColor(msg.source)}30`,
+                              }}
+                            >
+                              {formatSource(msg.source)}
+                            </span>
+                          )}
                         </div>
                         <div style={{ whiteSpace: 'pre-wrap' }}>{msg.answer}</div>
 

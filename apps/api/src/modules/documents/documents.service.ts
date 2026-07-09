@@ -9,6 +9,7 @@ import { In, IsNull, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { StorageService } from '../../storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { DocumentConverterService } from './document-converter.service';
 import { ApprovalFlow } from '../approvals/approval-flow.entity';
 import { ApprovalRequest } from '../approvals/approval-request.entity';
 import { Folder } from '../folders/folder.entity';
@@ -35,6 +36,8 @@ const previewableMimeTypes = [
   'text/plain',
 ];
 
+const officeMimeTypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -53,7 +56,8 @@ export class DocumentsService {
     @InjectRepository(Folder) private readonly folders: Repository<Folder>,
     private readonly scope: AccessScopeService,
     private readonly storage: StorageService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly converter: DocumentConverterService
   ) {}
 
   async listVisible(userId: string, query: DocumentListQueryDto) {
@@ -121,7 +125,7 @@ export class DocumentsService {
         renewable: dto.renewable ?? false,
         renewalFrequency: dto.renewable ? (dto.renewalFrequency ?? null) : null,
         dueDate: dto.dueDate,
-        originalFileKey: stored.key,
+        originalFileKey: stored.fileKey,
         fileExtension: this.getExtension(dto.fileName),
         sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
         uploadedById: userId,
@@ -132,7 +136,7 @@ export class DocumentsService {
       this.versions.create({
         documentId: document.id,
         revision: dto.revision ?? 'A',
-        fileKey: stored.key,
+        fileKey: stored.fileKey,
         fileName: dto.fileName,
         fileExtension: this.getExtension(dto.fileName),
         mimeType: dto.mimeType,
@@ -292,7 +296,7 @@ export class DocumentsService {
       this.versions.create({
         documentId,
         revision: dto.revision,
-        fileKey: stored.key,
+        fileKey: stored.fileKey,
         fileName: dto.fileName,
         fileExtension: this.getExtension(dto.fileName),
         mimeType: dto.mimeType,
@@ -304,7 +308,7 @@ export class DocumentsService {
 
     const previousVersionId = document.currentVersionId;
     document.currentVersionId = version.id;
-    document.originalFileKey = stored.key;
+    document.originalFileKey = stored.fileKey;
     document.fileExtension = this.getExtension(dto.fileName);
     document.sizeBytes = dto.sizeBytes ?? stored.sizeBytes;
     document.uploadedById = userId;
@@ -407,6 +411,71 @@ export class DocumentsService {
     }
 
     return this.readCurrentVersion(document, version);
+  }
+
+  async getCurrentContentAsHtml(userId: string, documentId: string) {
+    const document = await this.assertDocumentAccess(userId, documentId);
+    const version = await this.versions.findOne({ where: { id: document.currentVersionId ?? '' } });
+    if (!version) {
+      throw new NotFoundException('No hay versión actual para este documento');
+    }
+
+    if (!officeMimeTypes.includes(version.mimeType)) {
+      return this.readCurrentVersion(document, version);
+    }
+
+    const { buffer } = await this.readCurrentVersion(document, version);
+    const { html } = await this.converter.docxToHtml(buffer);
+    const styledHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+    line-height: 1.6;
+    color: #1a1a1a;
+    margin: 0;
+    padding: 0;
+    background: #f5f5f5;
+  }
+  .document-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+  .document-content {
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    padding: 60px 80px;
+    min-height: 100vh;
+  }
+  .document-content p { margin: 0 0 1em; }
+  .document-content table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  .document-content td, .document-content th {
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .document-content img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<div class="document-wrapper">
+<div class="document-content">
+${html}
+</div>
+</div>
+</body>
+</html>`;
+
+    return {
+      buffer: Buffer.from(styledHtml, 'utf-8'),
+      fileName: version.fileName,
+      mimeType: 'text/html',
+      documentId: document.id,
+    };
   }
 
   async download(userId: string, documentId: string) {

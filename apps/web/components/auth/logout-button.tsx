@@ -1,10 +1,11 @@
 'use client';
 
 import { LogOut } from 'lucide-react';
+import { clearSession, getSessionToken } from '../../lib/auth';
 
 export function LogoutButton() {
   async function logout() {
-    const token = window.localStorage.getItem('holocron_token');
+    const token = getSessionToken();
     if (token) {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/auth/logout`, {
         method: 'POST',
@@ -12,8 +13,7 @@ export function LogoutButton() {
       }).catch(() => undefined);
     }
 
-    window.localStorage.removeItem('holocron_token');
-    window.localStorage.removeItem('holocron_user');
+    clearSession();
     window.location.href = '/login';
   }
 

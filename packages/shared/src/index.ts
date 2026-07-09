@@ -3,6 +3,25 @@ export type DocumentStatus = 'draft' | 'pending_approval' | 'in_review' | 'appro
 export type ApprovalStatus = 'draft' | 'pending' | 'in_process' | 'approved' | 'rejected' | 'cancelled';
 export type ContractStatus = 'draft' | 'active' | 'expired' | 'terminated' | 'renewed' | 'closed';
 export type RfiStatus = 'open' | 'answered' | 'closed';
+export type ProjectEmailStatus = 'unread' | 'read' | 'archived';
+export type BulkUploadStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type BulkUploadItemStatus = 'pending' | 'uploading' | 'completed' | 'failed';
+export type SlaScope = 'email_initial_response' | 'email_resolution' | 'workflow_step';
+
+export interface NomenclatureSegment {
+  type: 'project_code' | 'discipline' | 'sequential' | 'year' | 'month' | 'text';
+  value?: string;
+  padding?: number;
+}
+
+export interface NomenclatureRule {
+  id: string;
+  projectId: string;
+  name: string;
+  pattern: string;
+  segments: NomenclatureSegment[];
+  isActive: boolean;
+}
 
 export const PermissionKey = {
   UsersRead: 'users.read',
@@ -29,6 +48,12 @@ export const PermissionKey = {
   ClmSign: 'clm.sign',
   ClmFinance: 'clm.finance',
   ClmReports: 'clm.reports',
+  EmailsView: 'emails.view',
+  EmailsManage: 'emails.manage',
+  NomenclaturesManage: 'nomenclatures.manage',
+  BulkUpload: 'bulk.upload',
+  SlaManage: 'sla.manage',
+  LanguageEdit: 'language.edit',
 } as const;
 
 export type PermissionKey = (typeof PermissionKey)[keyof typeof PermissionKey];
@@ -58,6 +83,12 @@ export const PermissionCatalog: Array<{ key: PermissionKey; label: string; modul
   { key: PermissionKey.ClmSign, label: 'Enviar a firma', module: 'clm' },
   { key: PermissionKey.ClmFinance, label: 'Ver finanzas CLM', module: 'clm' },
   { key: PermissionKey.ClmReports, label: 'Ver reportes CLM', module: 'clm' },
+  { key: PermissionKey.EmailsView, label: 'Ver correos', module: 'emails' },
+  { key: PermissionKey.EmailsManage, label: 'Administrar correos', module: 'emails' },
+  { key: PermissionKey.NomenclaturesManage, label: 'Administrar nomenclaturas', module: 'nomenclatures' },
+  { key: PermissionKey.BulkUpload, label: 'Carga masiva de archivos', module: 'uploads' },
+  { key: PermissionKey.SlaManage, label: 'Administrar SLAs', module: 'sla' },
+  { key: PermissionKey.LanguageEdit, label: 'Cambiar idioma', module: 'users' },
 ];
 
 export interface ProjectSummary {
@@ -82,6 +113,7 @@ export interface AuthenticatedUser {
   email: string;
   roles: string[];
   permissions: string[];
+  language?: string;
 }
 
 export interface RequestUser {
@@ -91,4 +123,5 @@ export interface RequestUser {
   active?: boolean;
   roles: string[];
   permissions: string[];
+  language?: string;
 }

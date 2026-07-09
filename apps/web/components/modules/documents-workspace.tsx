@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import {
+  AlertCircle,
   Bot,
   CheckCircle2,
+  Clock,
   Download,
   Eye,
+  File,
   FileClock,
   FilePlus2,
   History,
@@ -14,8 +17,9 @@ import {
   Search,
   Send,
   Upload,
+  X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 import { normalizeLabel } from '../../lib/labels';
 
@@ -362,6 +366,36 @@ export function DocumentsWorkspace() {
   const [uploadForm, setUploadForm] = useState<UploadForm>(emptyUploadForm);
   const [uploadFile, setUploadFile] = useState<FilePayload | null>(null);
   const [comment, setComment] = useState('');
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
+  const [bulkFiles, setBulkFiles] = useState<File[]>([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    status: string;
+    totalFiles: number;
+    processedFiles: number;
+    items: Array<{ originalName: string; status: string; errorMessage?: string }>;
+  } | null>(null);
+  const [bulkProjects, setBulkProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [bulkSelectedProject, setBulkSelectedProject] = useState('');
+  const [bulkDragging, setBulkDragging] = useState(false);
+
+  const loadBulkProjects = useCallback(async () => {
+    try {
+      const data = await apiGet<Array<{ id: string; name: string }>>(
+        '/projects',
+        getToken() ?? undefined
+      );
+      setBulkProjects(data);
+      if (data.length && !bulkSelectedProject) setBulkSelectedProject(data[0].id);
+    } catch {
+      // Ignore project loading failures in the bulk-upload modal.
+    }
+  }, [bulkSelectedProject]);
+
+  useEffect(() => {
+    if (showBulkUpload) loadBulkProjects();
+  }, [showBulkUpload]);
 
   useEffect(() => {
     let active = true;
@@ -425,22 +459,12 @@ export function DocumentsWorkspace() {
   }, [selectedDocumentId]);
 
   useEffect(() => {
-    let objectUrl = '';
     if (!detail?.preview.available) {
       setPreviewUrl('');
       return;
     }
 
-    fetchProtectedBlob(`/documents/${detail.id}/content`)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => setPreviewUrl(''));
-
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    setPreviewUrl(`/api/documents/${detail.id}/content`);
   }, [detail?.id, detail?.preview.available]);
 
   const metrics = useMemo(() => {
@@ -624,6 +648,10 @@ export function DocumentsWorkspace() {
           <button className="button" type="button" onClick={openNewUpload}>
             <Upload size={18} />
             Cargar documento
+          </button>
+          <button className="button" type="button" onClick={() => setShowBulkUpload(true)}>
+            <Upload size={18} />
+            Carga masiva
           </button>
         </div>
       </div>
@@ -1115,6 +1143,396 @@ export function DocumentsWorkspace() {
                 Guardar
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showBulkUpload ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowBulkUpload(false)}
+        >
+          <div
+            className="card"
+            style={{
+              width: '90%',
+              maxWidth: 640,
+              maxHeight: '90vh',
+              overflow: 'auto',
+              padding: '1.5rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1rem',
+              }}
+            >
+              <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0 }}>Carga masiva</h2>
+              <button
+                onClick={() => setShowBulkUpload(false)}
+                style={{
+                  padding: '0.25rem',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--text-tertiary)',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  marginBottom: '0.375rem',
+                }}
+              >
+                Proyecto
+              </label>
+              <select
+                value={bulkSelectedProject}
+                onChange={(e) => setBulkSelectedProject(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {bulkProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setBulkDragging(true);
+              }}
+              onDragLeave={() => setBulkDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setBulkDragging(false);
+                setBulkFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files)]);
+              }}
+              onClick={() => bulkInputRef.current?.click()}
+              style={{
+                border: `2px dashed ${bulkDragging ? 'var(--color-primary)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-lg)',
+                padding: '2rem',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: bulkDragging ? 'var(--color-primary-light)' : 'var(--surface)',
+                transition: 'all 160ms ease',
+              }}
+            >
+              <Upload
+                size={32}
+                style={{
+                  color: bulkDragging ? 'var(--color-primary)' : 'var(--text-tertiary)',
+                  marginBottom: '0.5rem',
+                }}
+              />
+              <p
+                style={{
+                  color: 'var(--text-secondary)',
+                  fontWeight: 600,
+                  margin: '0 0 0.25rem',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Arrastra archivos aquí
+              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                o haz clic para seleccionar
+              </p>
+              <input
+                ref={bulkInputRef}
+                type="file"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files)
+                    setBulkFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+                }}
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            {bulkFiles.length > 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'grid', gap: '0.25rem', marginBottom: '0.75rem' }}>
+                  {bulkFiles.map((file, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.375rem 0.5rem',
+                        background: 'var(--surface-strong)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '0.8125rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                        <File size={14} style={{ color: 'var(--text-tertiary)' }} />
+                        <span>{file.name}</span>
+                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
+                          ({(file.size / 1024 / 1024).toFixed(1)} MB)
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setBulkFiles(bulkFiles.filter((_, j) => j !== i))}
+                        style={{
+                          padding: '0.25rem',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          color: 'var(--color-danger)',
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={async () => {
+                    if (!bulkSelectedProject || bulkFiles.length === 0 || bulkUploading) return;
+                    setBulkUploading(true);
+                    try {
+                      const { id } = await apiPost<{ id: string }>(
+                        '/uploads/bulk/start',
+                        { projectId: bulkSelectedProject, metadata: {} },
+                        getToken() ?? undefined
+                      );
+                      for (const file of bulkFiles) {
+                        const chunkSize = 5 * 1024 * 1024;
+                        const initRes = await fetch(
+                          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/init`,
+                          {
+                            method: 'POST',
+                            headers: {
+                              Authorization: `Bearer ${getToken() ?? ''}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              fileName: file.name,
+                              mimeType: file.type,
+                              sizeBytes: file.size,
+                            }),
+                          }
+                        );
+                        const { uploadId } = await initRes.json();
+                        for (let i = 0; i < Math.ceil(file.size / chunkSize); i++) {
+                          const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
+                          const fd = new FormData();
+                          fd.append('chunk', chunk);
+                          await fetch(
+                            `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/${uploadId}/chunks/${i}`,
+                            {
+                              method: 'POST',
+                              headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+                              body: fd,
+                            }
+                          );
+                        }
+                        const compRes = await fetch(
+                          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/${uploadId}/complete`,
+                          {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+                          }
+                        );
+                        const { fileKey, mimeType, sizeBytes } = await compRes.json();
+                        await apiPost(
+                          `/uploads/bulk/${id}/files`,
+                          { files: [{ fileKey, originalName: file.name, mimeType, sizeBytes }] },
+                          getToken() ?? undefined
+                        );
+                      }
+                      const result = await apiPost<{
+                        status: string;
+                        processed: number;
+                        total: number;
+                      }>(`/uploads/bulk/${id}/process`, {}, getToken() ?? undefined);
+                      setBulkProgress({
+                        status: result.status,
+                        totalFiles: result.total,
+                        processedFiles: result.processed,
+                        items: bulkFiles.map((f) => ({
+                          originalName: f.name,
+                          status: 'completed',
+                        })),
+                      });
+                      setBulkFiles([]);
+                    } catch {
+                      setBulkProgress({
+                        status: 'failed',
+                        totalFiles: bulkFiles.length,
+                        processedFiles: 0,
+                        items: bulkFiles.map((f) => ({
+                          originalName: f.name,
+                          status: 'failed',
+                          errorMessage: 'Error',
+                        })),
+                      });
+                    }
+                    setBulkUploading(false);
+                  }}
+                  disabled={bulkUploading || !bulkSelectedProject || bulkFiles.length === 0}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.625rem',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--color-primary)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    opacity: bulkUploading ? 0.6 : 1,
+                  }}
+                >
+                  {bulkUploading ? (
+                    <>
+                      <Clock size={16} /> Subiendo...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} /> Subir {bulkFiles.length} archivo(s)
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {bulkProgress && (
+              <div
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: 'var(--surface-strong)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  {bulkProgress.status === 'completed' ? (
+                    <CheckCircle2 size={16} style={{ color: 'var(--color-success)' }} />
+                  ) : bulkProgress.status === 'failed' ? (
+                    <AlertCircle size={16} style={{ color: 'var(--color-danger)' }} />
+                  ) : (
+                    <Clock size={16} style={{ color: 'var(--color-primary)' }} />
+                  )}
+                  Progreso: {bulkProgress.processedFiles}/{bulkProgress.totalFiles}
+                </div>
+                <div
+                  style={{
+                    height: 4,
+                    background: 'var(--border)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${(bulkProgress.processedFiles / Math.max(bulkProgress.totalFiles, 1)) * 100}%`,
+                      background:
+                        bulkProgress.status === 'failed'
+                          ? 'var(--color-danger)'
+                          : 'var(--color-primary)',
+                      borderRadius: '999px',
+                      transition: 'width 300ms ease',
+                    }}
+                  />
+                </div>
+                {bulkProgress.items.map((item, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.25rem 0',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <span>{item.originalName}</span>
+                    <span
+                      style={{
+                        color:
+                          item.status === 'completed'
+                            ? 'var(--color-success)'
+                            : 'var(--color-danger)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                      }}
+                    >
+                      {item.status === 'completed' ? (
+                        <CheckCircle2 size={12} />
+                      ) : (
+                        <AlertCircle size={12} />
+                      )}
+                      {item.errorMessage ?? item.status}
+                    </span>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setBulkProgress(null)}
+                  style={{
+                    marginTop: '0.5rem',
+                    padding: '0.375rem 0.75rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--surface)',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                  }}
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

@@ -1217,22 +1217,12 @@ export function ApprovalRequestDetailPage() {
   }, [detail?.document?.id]);
 
   useEffect(() => {
-    let objectUrl = '';
     if (!documentDetail?.preview.available) {
       setPreviewUrl('');
       return;
     }
 
-    fetchProtectedBlob(`/documents/${documentDetail.id}/content`)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => setPreviewUrl(''));
-
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    setPreviewUrl(`/api/documents/${documentDetail.id}/content`);
   }, [documentDetail?.id, documentDetail?.preview.available]);
 
   async function submitAction(action: 'approve' | 'reject' | 'request-changes' | 'comment') {

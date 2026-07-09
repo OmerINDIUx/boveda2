@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  ExternalLink,
   Eye,
   FilePlus2,
   FileCheck2,
@@ -46,6 +47,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasPermission } from '../../lib/auth';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { uploadFile } from '../../lib/upload';
 import { PermissionKey } from '../../lib/permissions';
 import { normalizeLabel } from '../../lib/labels';
 
@@ -143,7 +145,6 @@ type DocumentDetail = DocumentListItem & {
 type FilePayload = {
   fileName: string;
   mimeType: string;
-  base64Content: string;
   sizeBytes: number;
 };
 
@@ -287,18 +288,10 @@ function formatDate(value?: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString();
 }
 
-async function fileToPayload(file: File): Promise<FilePayload> {
-  const base64Content = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(new Error('No fue posible leer el archivo'));
-    reader.readAsDataURL(file);
-  });
-
+function fileToPayload(file: File): FilePayload {
   return {
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
-    base64Content,
     sizeBytes: file.size,
   };
 }
@@ -1999,6 +1992,7 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
   const [detail, setDetail] = useState<DocumentDetail | null>(null);
   const [form, setForm] = useState<UploadForm>(emptyUploadForm);
   const [file, setFile] = useState<FilePayload | null>(null);
+  const rawFileRef = useRef<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -2126,18 +2120,18 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
     };
   }, [form.projectId]);
 
-  async function handleFileChange(fileList: FileList | null) {
+  function handleFileChange(fileList: FileList | null) {
     const next = fileList?.[0];
     if (!next) return;
-    const payload = await fileToPayload(next);
-    setFile(payload);
+    rawFileRef.current = next;
+    setFile(fileToPayload(next));
     if (mode === 'create' && !form.name) {
       setForm((current) => ({ ...current, name: next.name.replace(/\.[^.]+$/, '') }));
     }
   }
 
   async function submit() {
-    if (!file) {
+    if (!file || !rawFileRef.current) {
       setError('Selecciona un archivo antes de guardar.');
       return;
     }
@@ -2156,14 +2150,16 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
 
     setSaving(true);
     try {
+      const uploaded = await uploadFile(rawFileRef.current, getToken);
+
       if (mode === 'create') {
         const payload = {
           ...form,
           renewalFrequency: form.renewable ? form.renewalFrequency : undefined,
-          fileName: file.fileName,
-          mimeType: file.mimeType,
-          base64Content: file.base64Content,
-          sizeBytes: file.sizeBytes,
+          fileKey: (uploaded as any).fileKey ?? (uploaded as any).key,
+          fileName: uploaded.fileName,
+          mimeType: uploaded.mimeType,
+          sizeBytes: uploaded.sizeBytes,
         };
 
         let created: DocumentDetail;
@@ -2196,10 +2192,10 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
       await apiPost<DocumentDetail>(
         `/documents/${documentId}/versions`,
         {
-          fileName: file.fileName,
-          mimeType: file.mimeType,
-          base64Content: file.base64Content,
-          sizeBytes: file.sizeBytes,
+          fileKey: (uploaded as any).fileKey ?? (uploaded as any).key,
+          fileName: uploaded.fileName,
+          mimeType: uploaded.mimeType,
+          sizeBytes: uploaded.sizeBytes,
           revision: form.revision,
           notes: form.notes,
         },
@@ -2492,27 +2488,14 @@ export function DocumentDetailPage() {
   }, [params.id]);
 
   useEffect(() => {
-    let objectUrl = '';
     if (!detail?.preview.available) {
       setPreviewUrl('');
       setPreviewError('');
       return;
     }
 
-    fetchProtectedBlob(`/documents/${detail.id}/content`)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-        setPreviewError('');
-      })
-      .catch(() => {
-        setPreviewUrl('');
-        setPreviewError('No fue posible cargar la vista previa del archivo.');
-      });
-
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    setPreviewUrl(`/api/documents/${detail.id}/content`);
+    setPreviewError('');
   }, [detail?.id, detail?.preview.available]);
 
   async function saveComment() {
@@ -2559,6 +2542,18 @@ export function DocumentDetailPage() {
       URL.revokeObjectURL(url);
     } catch {
       setError('No fue posible descargar el archivo.');
+    }
+  }
+
+  async function openInCollabora(documentId: string) {
+    try {
+      const res = await apiGet<{ url: string }>(
+        `/collabora/open/${documentId}`,
+        getToken() ?? undefined
+      );
+      window.open(res.url, '_blank');
+    } catch {
+      setError('No fue posible abrir el documento en Collabora.');
     }
   }
 
@@ -2652,6 +2647,16 @@ export function DocumentDetailPage() {
             <Bot size={18} />
             Consultar con IA
           </Link>
+          {['docx', 'xlsx', 'pptx'].includes(detail.fileExtension ?? '') ? (
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => void openInCollabora(detail.id)}
+            >
+              <ExternalLink size={18} />
+              Editar en Collabora
+            </button>
+          ) : null}
           <Link
             className="button secondary"
             href={`/rfis/new?projectId=${detail.projectId}&documentId=${detail.id}`}

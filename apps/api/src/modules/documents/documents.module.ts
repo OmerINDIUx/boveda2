@@ -16,6 +16,7 @@ import { DocumentEmbedding } from './document-embedding.entity';
 import { DocumentRecord } from './document.entity';
 import { DocumentMetadata } from './document-metadata.entity';
 import { DocumentPermission } from './document-permission.entity';
+import { DocumentConverterService } from './document-converter.service';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 
@@ -41,7 +42,7 @@ import { DocumentsService } from './documents.service';
     ]),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService],
+  providers: [DocumentsService, DocumentConverterService],
   exports: [DocumentsService],
 })
 export class DocumentsModule {}
