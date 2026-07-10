@@ -20,9 +20,13 @@
     "@nestjs/platform-express": "^11.1.27",
     "rxjs": "^7.8.1"
   },
+  "overrides": {
+    "postcss": "8.5.10"
+  },
   "devDependencies": {
     "husky": "^9.1.6",
     "lint-staged": "^15.3.0",
+    "postcss": "8.5.10",
     "prettier": "^3.3.3",
     "prettier-plugin-sql": "^0.20.0",
     "typescript": "^5.5.4"
