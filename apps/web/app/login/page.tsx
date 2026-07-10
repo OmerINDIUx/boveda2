@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { apiPost } from '../../lib/api';
+import { setSession } from '../../lib/auth';
 import { Button } from '../../components/ui/button';
 
 type LoginResponse = {
@@ -26,6 +27,28 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  function getFriendlyLoginError(error: unknown) {
+    if (!(error instanceof Error)) {
+      return 'No fue posible iniciar sesión. Intenta nuevamente.';
+    }
+
+    const message = error.message.toLowerCase();
+    if (message.includes('credenciales invalidas')) {
+      return 'El correo o la contraseña no coinciden.';
+    }
+    if (message.includes('usuario inactivo')) {
+      return 'Tu usuario está inactivo. Necesita reactivarse en administración.';
+    }
+    if (message.includes('aborterror')) {
+      return 'La solicitud tardó demasiado. Revisa la conexión con la API.';
+    }
+    if (message.includes('failed to fetch')) {
+      return 'La aplicación no logró comunicarse con la API. Revisa que ambos servicios estén encendidos.';
+    }
+
+    return 'No fue posible iniciar sesión por un problema de comunicación o sesión. Intenta nuevamente.';
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -40,14 +63,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await apiPost<LoginResponse>('/auth/login', { email, password });
-      window.localStorage.setItem('holocron_token', result.accessToken);
-      window.localStorage.setItem('holocron_user', JSON.stringify(result.user));
-      if (result.user.language) {
-        window.localStorage.setItem('holocron_lang', result.user.language);
-      }
+      setSession(result.accessToken, result.user);
       window.location.href = '/dashboard';
-    } catch {
-      setError('No fue posible iniciar sesión. Verifica tus credenciales.');
+    } catch (error) {
+      setError(getFriendlyLoginError(error));
     } finally {
       setLoading(false);
     }

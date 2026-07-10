@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -9,6 +21,7 @@ import { PermissionKey } from '../../common/permissions';
 import { RequestUser } from '../../common/interfaces/request-user.interface';
 import { UploadCatalogsService } from './upload-catalogs.service';
 import { BulkUploadsService } from './bulk-uploads.service';
+import { UploadSessionsService } from './upload-sessions.service';
 import {
   CreateUploadCatalogDto,
   UpdateUploadCatalogDto,
@@ -23,8 +36,45 @@ import {
 export class UploadsController {
   constructor(
     private readonly catalogs: UploadCatalogsService,
-    private readonly bulkUploads: BulkUploadsService
+    private readonly bulkUploads: BulkUploadsService,
+    private readonly uploadSessions: UploadSessionsService
   ) {}
+
+  @Post('init')
+  initUpload(
+    @Body('fileName') fileName?: string,
+    @Body('mimeType') mimeType?: string,
+    @Body('totalSize') totalSize?: number,
+    @Body('totalChunks') totalChunks?: number
+  ) {
+    if (!fileName || !totalChunks || totalChunks < 1) {
+      throw new BadRequestException('fileName and totalChunks are required');
+    }
+    return this.uploadSessions.init(
+      fileName,
+      mimeType ?? '',
+      Number(totalSize ?? 0),
+      Number(totalChunks)
+    );
+  }
+
+  @Post(':uploadId/chunks/:chunkIndex')
+  @UseInterceptors(FileInterceptor('chunk'))
+  uploadChunk(
+    @Param('uploadId') uploadId: string,
+    @Param('chunkIndex') chunkIndex: string,
+    @UploadedFile() file?: { buffer: Buffer }
+  ) {
+    if (!file?.buffer) {
+      throw new BadRequestException('chunk file is required');
+    }
+    return this.uploadSessions.appendChunk(uploadId, Number(chunkIndex), file.buffer);
+  }
+
+  @Post(':uploadId/complete')
+  completeUpload(@Param('uploadId') uploadId: string) {
+    return this.uploadSessions.complete(uploadId);
+  }
 
   @Get('catalogs')
   listCatalogs(@Param('projectId') projectId?: string) {

@@ -52,11 +52,11 @@ export function NotificationsCenter() {
     const token = window.localStorage.getItem('holocron_token') ?? undefined;
     try {
       const [notifications, prefs] = await Promise.all([
-        apiGet<{ items: NotificationItem[] }>('/notifications', token),
+        apiGet<NotificationItem[]>('/notifications', token),
         apiGet<NotificationPreference[]>('/notifications/preferences', token),
       ]);
       setItems(
-        notifications.items.sort(
+        notifications.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );

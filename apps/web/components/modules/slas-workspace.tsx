@@ -27,15 +27,6 @@ type Metrics = {
   avgResponseHours: string | null;
 };
 
-type WorkflowAction = {
-  id: string;
-  name: string;
-  triggerEvent: string;
-  actionType: string;
-  config: Record<string, unknown>;
-  isActive: boolean;
-};
-
 export function SlasWorkspace() {
   const { t } = useTranslation();
   const token = getSessionToken();
@@ -43,7 +34,6 @@ export function SlasWorkspace() {
   const [selectedProject, setSelectedProject] = useState('');
   const [slas, setSlas] = useState<Sla[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [workflows, setWorkflows] = useState<WorkflowAction[]>([]);
   const [creating, setCreating] = useState(false);
   const [newSla, setNewSla] = useState({
     name: '',
@@ -52,7 +42,7 @@ export function SlasWorkspace() {
     warningHours: 3,
   });
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'slas' | 'nomenclatures' | 'workflows' | 'metrics'>('slas');
+  const [tab, setTab] = useState<'slas' | 'nomenclatures' | 'metrics'>('slas');
 
   const loadProjects = useCallback(async () => {
     try {
@@ -70,14 +60,12 @@ export function SlasWorkspace() {
   const loadData = useCallback(async () => {
     if (!selectedProject) return;
     try {
-      const [slaData, metricsData, wfData] = await Promise.all([
+      const [slaData, metricsData] = await Promise.all([
         apiGet<Sla[]>(`/response-times/slas/${selectedProject}`, token),
         apiGet<Metrics>(`/response-times/metrics/${selectedProject}`, token),
-        apiGet<WorkflowAction[]>(`/response-times/workflows/${selectedProject}`, token),
       ]);
       setSlas(slaData);
       setMetrics(metricsData);
-      setWorkflows(wfData);
     } catch {
       // Keep the current dashboard values when refresh fails.
     }
@@ -151,7 +139,7 @@ export function SlasWorkspace() {
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        {(['slas', 'nomenclatures', 'workflows', 'metrics'] as const).map((tabKey) => (
+        {(['slas', 'nomenclatures', 'metrics'] as const).map((tabKey) => (
           <button
             key={tabKey}
             onClick={() => setTab(tabKey)}
@@ -170,9 +158,7 @@ export function SlasWorkspace() {
               ? t('sla.title')
               : tabKey === 'nomenclatures'
                 ? 'Nomenclaturas'
-                : tabKey === 'workflows'
-                  ? t('workflows.title')
-                  : t('sla.metrics')}
+                : t('sla.metrics')}
           </button>
         ))}
       </div>
@@ -388,55 +374,6 @@ export function SlasWorkspace() {
       )}
 
       {tab === 'nomenclatures' && <NomenclaturesWorkspace />}
-
-      {tab === 'workflows' && (
-        <div className="card" style={{ padding: '1.25rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-            {t('workflows.title')}
-          </h2>
-          {workflows.length === 0 ? (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
-              Sin flujos configurados
-            </p>
-          ) : (
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              {workflows.map((wf) => (
-                <div
-                  key={wf.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{wf.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      Trigger: {wf.triggerEvent} → Acción: {wf.actionType}
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '999px',
-                      background: wf.isActive
-                        ? 'var(--color-success-light)'
-                        : 'var(--surface-strong)',
-                      color: wf.isActive ? 'var(--color-success)' : 'var(--text-tertiary)',
-                    }}
-                  >
-                    {wf.isActive ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {tab === 'metrics' && (
         <div

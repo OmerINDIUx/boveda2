@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Upload, File, X, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { apiGet, apiPost } from '../../lib/api';
+import { buildBrowserApiUrl } from '../../lib/api-base';
 import { getSessionToken } from '../../lib/auth';
 import { useTranslation } from 'react-i18next';
 
@@ -86,18 +87,15 @@ export function UploadsWorkspace() {
       );
 
       for (const file of files) {
-        const uploadRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/init`,
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({
-              fileName: file.name,
-              mimeType: file.type,
-              sizeBytes: file.size,
-            }),
-          }
-        );
+        const uploadRes = await fetch(buildBrowserApiUrl('/uploads/init'), {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type,
+            sizeBytes: file.size,
+          }),
+        });
         const { uploadId: chunkUploadId } = await uploadRes.json();
 
         const chunkSize = 5 * 1024 * 1024;
@@ -105,23 +103,17 @@ export function UploadsWorkspace() {
           const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
           const chunkForm = new FormData();
           chunkForm.append('chunk', chunk);
-          await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/${chunkUploadId}/chunks/${i}`,
-            {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-              body: chunkForm,
-            }
-          );
-        }
-
-        const complete = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/${chunkUploadId}/complete`,
-          {
+          await fetch(buildBrowserApiUrl(`/uploads/${chunkUploadId}/chunks/${i}`), {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+            body: chunkForm,
+          });
+        }
+
+        const complete = await fetch(buildBrowserApiUrl(`/uploads/${chunkUploadId}/complete`), {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const { fileKey, mimeType, sizeBytes } = await complete.json();
 
         await apiPost(

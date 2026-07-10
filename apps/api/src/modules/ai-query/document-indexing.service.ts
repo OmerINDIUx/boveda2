@@ -7,6 +7,7 @@ import { inflateSync } from 'zlib';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as mammoth from 'mammoth';
 import { Repository } from 'typeorm';
 import { StorageService } from '../../storage/storage.service';
 import { DocumentChunk } from '../documents/document-chunk.entity';
@@ -224,6 +225,13 @@ export class DocumentIndexingService {
       }
     }
 
+    if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      fileName.toLowerCase().endsWith('.docx')
+    ) {
+      return this.extractDocxWithMammoth(buffer);
+    }
+
     const pythonCode = `
 import io, json, sys
 
@@ -246,22 +254,6 @@ def extract_pdf(data):
             segments.append({"text": text, "pageNumber": index})
     return {"contentType": "pdf", "segments": segments}
 
-def extract_docx(data):
-    from docx import Document
-    document = Document(io.BytesIO(data))
-    segments = []
-    current_label = None
-    for paragraph in document.paragraphs:
-        text = clean(paragraph.text)
-        if not text:
-            continue
-        style_name = getattr(paragraph.style, "name", "") or ""
-        if "heading" in style_name.lower():
-            current_label = text
-            continue
-        segments.append({"text": text, "sectionLabel": current_label})
-    return {"contentType": "docx", "segments": segments}
-
 def extract_xlsx(data):
     from openpyxl import load_workbook
     workbook = load_workbook(io.BytesIO(data), data_only=True)
@@ -276,8 +268,6 @@ def extract_xlsx(data):
 
 if mime_type == "application/pdf" or file_name.lower().endswith(".pdf"):
     output = extract_pdf(payload)
-elif mime_type in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",) or file_name.lower().endswith(".docx"):
-    output = extract_docx(payload)
 elif mime_type in ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel") or file_name.lower().endswith(".xlsx"):
     output = extract_xlsx(payload)
 else:
@@ -300,6 +290,21 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
         `No se pudo interpretar la extraccion documental para ${fileName}: ${error instanceof Error ? error.message : 'error'}`
       );
     }
+  }
+
+  private async extractDocxWithMammoth(buffer: Buffer): Promise<ExtractedDocument> {
+    const result = await mammoth.extractRawText({ buffer });
+    const text = result.value
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n');
+
+    return {
+      contentType: 'docx',
+      segments: text ? [{ text }] : [],
+    };
   }
 
   private async runPython(

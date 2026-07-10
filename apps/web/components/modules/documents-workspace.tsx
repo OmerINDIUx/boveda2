@@ -21,7 +21,9 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { buildBrowserApiUrl } from '../../lib/api-base';
 import { normalizeLabel } from '../../lib/labels';
+import { getFileIcon } from '../../lib/file-icons';
 
 type ProjectOption = { id: string; name: string; code: string };
 
@@ -307,12 +309,9 @@ async function fileToPayload(file: File): Promise<FilePayload> {
 }
 
 async function fetchProtectedBlob(path: string) {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`,
-    {
-      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
-    }
-  );
+  const response = await fetch(buildBrowserApiUrl(path), {
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+  });
 
   if (!response.ok) {
     throw new Error('No fue posible descargar el archivo');
@@ -459,12 +458,32 @@ export function DocumentsWorkspace() {
   }, [selectedDocumentId]);
 
   useEffect(() => {
-    if (!detail?.preview.available) {
-      setPreviewUrl('');
-      return;
+    let active = true;
+    let objectUrl = '';
+
+    async function loadPreview() {
+      if (!detail?.preview.available) {
+        setPreviewUrl('');
+        return;
+      }
+
+      try {
+        const blob = await fetchProtectedBlob(`/documents/${detail.id}/content`);
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      } catch {
+        if (!active) return;
+        setPreviewUrl('');
+      }
     }
 
-    setPreviewUrl(`/api/documents/${detail.id}/content`);
+    void loadPreview();
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [detail?.id, detail?.preview.available]);
 
   const metrics = useMemo(() => {
@@ -697,6 +716,12 @@ export function DocumentsWorkspace() {
                 onClick={() => setSelectedDocumentId(document.id)}
               >
                 <div className="project-list-head">
+                  {(() => {
+                    const { icon: Icon, color } = getFileIcon(document.fileExtension);
+                    return (
+                      <Icon size={16} style={{ color, flexShrink: 0, marginRight: '0.5rem' }} />
+                    );
+                  })()}
                   <strong>{document.documentNumber}</strong>
                   <span
                     className={`pill ${document.status === 'approved' ? 'success' : document.status === 'expired' ? 'danger' : 'warning'}`}
@@ -1332,37 +1357,31 @@ export function DocumentsWorkspace() {
                       );
                       for (const file of bulkFiles) {
                         const chunkSize = 5 * 1024 * 1024;
-                        const initRes = await fetch(
-                          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/init`,
-                          {
-                            method: 'POST',
-                            headers: {
-                              Authorization: `Bearer ${getToken() ?? ''}`,
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              fileName: file.name,
-                              mimeType: file.type,
-                              sizeBytes: file.size,
-                            }),
-                          }
-                        );
+                        const initRes = await fetch(buildBrowserApiUrl('/uploads/init'), {
+                          method: 'POST',
+                          headers: {
+                            Authorization: `Bearer ${getToken() ?? ''}`,
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            fileName: file.name,
+                            mimeType: file.type,
+                            sizeBytes: file.size,
+                          }),
+                        });
                         const { uploadId } = await initRes.json();
                         for (let i = 0; i < Math.ceil(file.size / chunkSize); i++) {
                           const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
                           const fd = new FormData();
                           fd.append('chunk', chunk);
-                          await fetch(
-                            `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/${uploadId}/chunks/${i}`,
-                            {
-                              method: 'POST',
-                              headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-                              body: fd,
-                            }
-                          );
+                          await fetch(buildBrowserApiUrl(`/uploads/${uploadId}/chunks/${i}`), {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+                            body: fd,
+                          });
                         }
                         const compRes = await fetch(
-                          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/uploads/${uploadId}/complete`,
+                          buildBrowserApiUrl(`/uploads/${uploadId}/complete`),
                           {
                             method: 'POST',
                             headers: { Authorization: `Bearer ${getToken() ?? ''}` },

@@ -8,7 +8,7 @@ export class CreateDocumentVersionDto {
   mimeType!: string;
 
   @IsString()
-  base64Content!: string;
+  fileKey!: string;
 
   @IsString()
   revision!: string;

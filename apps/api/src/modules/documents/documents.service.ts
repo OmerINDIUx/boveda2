@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { StorageService } from '../../storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -40,6 +42,8 @@ const officeMimeTypes = ['application/vnd.openxmlformats-officedocument.wordproc
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
     @InjectRepository(DocumentVersion) private readonly versions: Repository<DocumentVersion>,
@@ -106,76 +110,87 @@ export class DocumentsService {
   }
 
   async create(userId: string, dto: CreateDocumentDto) {
-    if (!(await this.scope.canAccessProject(userId, dto.projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
-    }
-    const folder = await this.resolveProjectFolder(dto.projectId, dto.folderId);
+    try {
+      if (!(await this.scope.canAccessProject(userId, dto.projectId))) {
+        throw new ForbiddenException('No tienes acceso a este proyecto');
+      }
+      const folder = await this.resolveProjectFolder(dto.projectId, dto.folderId);
+      const disciplineId = this.optionalValue(dto.disciplineId);
+      const responsibleUserId = this.optionalValue(dto.responsibleUserId);
+      const dueDate = this.optionalValue(dto.dueDate);
+      const notes = this.optionalValue(dto.notes);
+      const renewalFrequency =
+        dto.renewable && this.optionalValue(dto.renewalFrequency)
+          ? (this.optionalValue(dto.renewalFrequency) as 'day' | 'week' | 'month' | 'year')
+          : null;
 
-    const stored = await this.storeBase64File(dto.base64Content, dto.fileName, dto.mimeType);
-    const document = await this.documents.save(
-      this.documents.create({
-        projectId: dto.projectId,
-        folderId: folder.id,
-        disciplineId: dto.disciplineId,
-        responsibleUserId: dto.responsibleUserId,
-        documentNumber: dto.documentNumber,
-        name: dto.name ?? dto.title ?? dto.fileName,
-        status: dto.status ?? 'draft',
-        confidentialityLevel: dto.confidentialityLevel ?? 'internal',
-        renewable: dto.renewable ?? false,
-        renewalFrequency: dto.renewable ? (dto.renewalFrequency ?? null) : null,
-        dueDate: dto.dueDate,
-        originalFileKey: stored.fileKey,
-        fileExtension: this.getExtension(dto.fileName),
-        sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
-        uploadedById: userId,
-      })
-    );
-
-    const version = await this.versions.save(
-      this.versions.create({
-        documentId: document.id,
-        revision: dto.revision ?? 'A',
-        fileKey: stored.fileKey,
-        fileName: dto.fileName,
-        fileExtension: this.getExtension(dto.fileName),
-        mimeType: dto.mimeType,
-        sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
-        uploadedById: userId,
-        notes: dto.notes,
-      })
-    );
-
-    document.currentVersionId = version.id;
-    await this.documents.save(document);
-
-    if (dto.metadata?.length) {
-      await this.metadata.save(
-        dto.metadata.map((item) =>
-          this.metadata.create({
-            documentId: document.id,
-            metaKey: item.key,
-            metaValue: item.value,
-            valueType: item.type ?? 'string',
-          })
-        )
+      const document = await this.documents.save(
+        this.documents.create({
+          projectId: dto.projectId,
+          folderId: folder.id,
+          disciplineId,
+          responsibleUserId,
+          documentNumber: dto.documentNumber,
+          name: dto.name ?? dto.title ?? dto.fileName,
+          status: dto.status ?? 'draft',
+          confidentialityLevel: dto.confidentialityLevel ?? 'internal',
+          renewable: dto.renewable ?? false,
+          renewalFrequency,
+          dueDate,
+          originalFileKey: dto.fileKey,
+          fileExtension: this.getExtension(dto.fileName),
+          sizeBytes: dto.sizeBytes ?? 0,
+          uploadedById: userId,
+        })
       );
+
+      const version = await this.versions.save(
+        this.versions.create({
+          documentId: document.id,
+          revision: dto.revision ?? 'A',
+          fileKey: dto.fileKey,
+          fileName: dto.fileName,
+          fileExtension: this.getExtension(dto.fileName),
+          mimeType: dto.mimeType,
+          sizeBytes: dto.sizeBytes ?? 0,
+          uploadedById: userId,
+          notes,
+        })
+      );
+
+      document.currentVersionId = version.id;
+      await this.documents.save(document);
+
+      if (dto.metadata?.length) {
+        await this.metadata.save(
+          dto.metadata.map((item) =>
+            this.metadata.create({
+              documentId: document.id,
+              metaKey: item.key,
+              metaValue: item.value,
+              valueType: item.type ?? 'string',
+            })
+          )
+        );
+      }
+
+      await this.log(document.id, userId, 'upload_new_version', undefined, {
+        versionId: version.id,
+        revision: version.revision,
+        fileName: version.fileName,
+      });
+      await this.notifyDocumentVersion(
+        document.id,
+        document.name,
+        document.documentNumber,
+        version.revision,
+        [document.responsibleUserId, document.uploadedById]
+      );
+
+      return this.getDetail(userId, document.id, false);
+    } catch (error) {
+      throw this.handleDocumentMutationError(error, 'No fue posible crear el documento.');
     }
-
-    await this.log(document.id, userId, 'upload_new_version', undefined, {
-      versionId: version.id,
-      revision: version.revision,
-      fileName: version.fileName,
-    });
-    await this.notifyDocumentVersion(
-      document.id,
-      document.name,
-      document.documentNumber,
-      version.revision,
-      [document.responsibleUserId, document.uploadedById]
-    );
-
-    return this.getDetail(userId, document.id, false);
   }
 
   async getDetail(userId: string, documentId: string, logView = true) {
@@ -289,46 +304,49 @@ export class DocumentsService {
   }
 
   async createVersion(userId: string, documentId: string, dto: CreateDocumentVersionDto) {
-    const document = await this.assertDocumentAccess(userId, documentId);
-    const stored = await this.storeBase64File(dto.base64Content, dto.fileName, dto.mimeType);
+    try {
+      const document = await this.assertDocumentAccess(userId, documentId);
 
-    const version = await this.versions.save(
-      this.versions.create({
-        documentId,
-        revision: dto.revision,
-        fileKey: stored.fileKey,
-        fileName: dto.fileName,
-        fileExtension: this.getExtension(dto.fileName),
-        mimeType: dto.mimeType,
-        sizeBytes: dto.sizeBytes ?? stored.sizeBytes,
-        uploadedById: userId,
-        notes: dto.notes,
-      })
-    );
+      const version = await this.versions.save(
+        this.versions.create({
+          documentId,
+          revision: dto.revision,
+          fileKey: dto.fileKey,
+          fileName: dto.fileName,
+          fileExtension: this.getExtension(dto.fileName),
+          mimeType: dto.mimeType,
+          sizeBytes: dto.sizeBytes ?? 0,
+          uploadedById: userId,
+          notes: dto.notes,
+        })
+      );
 
-    const previousVersionId = document.currentVersionId;
-    document.currentVersionId = version.id;
-    document.originalFileKey = stored.fileKey;
-    document.fileExtension = this.getExtension(dto.fileName);
-    document.sizeBytes = dto.sizeBytes ?? stored.sizeBytes;
-    document.uploadedById = userId;
-    await this.documents.save(document);
+      const previousVersionId = document.currentVersionId;
+      document.currentVersionId = version.id;
+      document.originalFileKey = dto.fileKey;
+      document.fileExtension = this.getExtension(dto.fileName);
+      document.sizeBytes = dto.sizeBytes ?? 0;
+      document.uploadedById = userId;
+      await this.documents.save(document);
 
-    await this.log(
-      document.id,
-      userId,
-      'upload_new_version',
-      { previousVersionId },
-      { versionId: version.id, revision: dto.revision }
-    );
-    await this.notifyDocumentVersion(
-      document.id,
-      document.name,
-      document.documentNumber,
-      version.revision,
-      [document.responsibleUserId, document.uploadedById]
-    );
-    return this.getDetail(userId, documentId, false);
+      await this.log(
+        document.id,
+        userId,
+        'upload_new_version',
+        { previousVersionId },
+        { versionId: version.id, revision: dto.revision }
+      );
+      await this.notifyDocumentVersion(
+        document.id,
+        document.name,
+        document.documentNumber,
+        version.revision,
+        [document.responsibleUserId, document.uploadedById]
+      );
+      return this.getDetail(userId, documentId, false);
+    } catch (error) {
+      throw this.handleDocumentMutationError(error, 'No fue posible subir la nueva versión.');
+    }
   }
 
   async addComment(userId: string, documentId: string, dto: CreateDocumentCommentDto) {
@@ -595,6 +613,48 @@ ${html}
   private getExtension(fileName: string) {
     const parts = fileName.split('.');
     return parts.length > 1 ? parts.at(-1)?.toLowerCase() : undefined;
+  }
+
+  private optionalValue(value?: string | null) {
+    const normalized = value?.trim();
+    return normalized ? normalized : undefined;
+  }
+
+  private handleDocumentMutationError(error: unknown, fallback: string) {
+    if (error instanceof HttpException) {
+      return error;
+    }
+
+    if (error instanceof QueryFailedError) {
+      const dbError = error.driverError as
+        { code?: string; errno?: number; sqlMessage?: string; message?: string } | undefined;
+      const message = dbError?.sqlMessage ?? dbError?.message ?? error.message;
+
+      this.logger.error(`Document mutation failed: ${message}`, error.stack);
+
+      if (
+        dbError?.code === 'ER_DUP_ENTRY' ||
+        message.includes('uq_documents_project_number') ||
+        message.includes('Duplicate entry')
+      ) {
+        return new BadRequestException(
+          'Ya existe un documento con ese numero documental dentro del proyecto.'
+        );
+      }
+
+      if (
+        dbError?.code === 'ER_NO_REFERENCED_ROW_2' ||
+        dbError?.code === 'ER_ROW_IS_REFERENCED_2'
+      ) {
+        return new BadRequestException(
+          'Alguno de los datos relacionados ya no es valido. Recarga proyecto, carpeta y responsable e intenta de nuevo.'
+        );
+      }
+    } else if (error instanceof Error) {
+      this.logger.error(`Document mutation failed: ${error.message}`, error.stack);
+    }
+
+    return new BadRequestException(fallback);
   }
 
   private async canPublish(documentId: string, projectId: string) {

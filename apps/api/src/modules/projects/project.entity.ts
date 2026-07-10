@@ -52,6 +52,9 @@ export class Project {
   @Column({ name: 'discipline_ids', type: 'simple-json', nullable: true })
   disciplineIds?: string[];
 
+  @Column({ name: 'is_draft', default: false })
+  isDraft!: boolean;
+
   @Column({ name: 'owner_id', nullable: true })
   ownerId?: string;
 

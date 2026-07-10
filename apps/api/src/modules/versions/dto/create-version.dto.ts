@@ -16,9 +16,6 @@ export class CreateVersionDto {
   @IsString()
   mimeType!: string;
 
-  @IsString()
-  base64Content!: string;
-
   @IsOptional()
   @IsNumber()
   sizeBytes!: number;

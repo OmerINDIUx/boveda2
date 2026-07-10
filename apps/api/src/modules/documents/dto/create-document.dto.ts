@@ -53,7 +53,7 @@ export class CreateDocumentDto {
   mimeType!: string;
 
   @IsString()
-  base64Content!: string;
+  fileKey!: string;
 
   @IsOptional()
   @IsString()

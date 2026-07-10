@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
@@ -7,6 +7,8 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly users: UsersService,
     private readonly jwt: JwtService,
@@ -16,9 +18,11 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.users.findByEmailWithRoles(dto.email);
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+      this.logger.warn(`Login failed for ${dto.email || 'unknown-email'}: invalid credentials`);
       throw new UnauthorizedException('Credenciales invalidas');
     }
     if (!user.active) {
+      this.logger.warn(`Login blocked for ${dto.email}: inactive user`);
       throw new UnauthorizedException('Usuario inactivo');
     }
 

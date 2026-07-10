@@ -24,10 +24,12 @@ export class CreateApprovalFlowDto {
 
   @IsArray()
   steps!: Array<{
+    id?: string;
     stepOrder: number;
     name: string;
-    approverUserId?: string;
+    approverUserIds?: string[];
     approverRoleId?: string;
     required?: boolean;
+    dueDays?: number;
   }>;
 }

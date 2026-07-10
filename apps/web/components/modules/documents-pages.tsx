@@ -47,7 +47,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasPermission } from '../../lib/auth';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { buildBrowserApiUrl } from '../../lib/api-base';
 import { uploadFile } from '../../lib/upload';
+import { getFileIcon } from '../../lib/file-icons';
 import { PermissionKey } from '../../lib/permissions';
 import { normalizeLabel } from '../../lib/labels';
 
@@ -68,11 +70,22 @@ type ProjectMemberOption = {
   user?: UserOption | null;
 };
 
+type WorkflowStep = {
+  id: string;
+  stepOrder: number;
+  name: string;
+  approverUserIds: string[];
+  approverRoleId?: string;
+  required: boolean;
+  dueDays?: number;
+};
+
 type Workflow = {
   id: string;
   name: string;
   scopeType: 'global' | 'document_specific';
   requireForPublication: boolean;
+  steps: WorkflowStep[];
 };
 
 type ApprovalRequest = {
@@ -297,12 +310,9 @@ function fileToPayload(file: File): FilePayload {
 }
 
 async function fetchProtectedBlob(path: string) {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`,
-    {
-      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
-    }
-  );
+  const response = await fetch(buildBrowserApiUrl(path), {
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+  });
 
   if (!response.ok) {
     throw new Error('No fue posible descargar el archivo');
@@ -324,6 +334,11 @@ function mapMembersToUsers(members: ProjectMemberOption[]) {
     .map((member) => member.user)
     .filter((user): user is UserOption => Boolean(user))
     .map((user) => ({ id: user.id, name: user.name, email: user.email }));
+}
+
+function optionalField(value?: string) {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 }
 
 function renewalFrequencyLabel(value?: string | null) {
@@ -1654,7 +1669,10 @@ export function DocumentsListPage() {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FileText size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                        {(() => {
+                          const { icon: Icon, color } = getFileIcon(doc.fileExtension);
+                          return <Icon size={16} style={{ color, flexShrink: 0 }} />;
+                        })()}
                         <div>
                           <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>
                             {doc.name}
@@ -2155,7 +2173,13 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
       if (mode === 'create') {
         const payload = {
           ...form,
+          disciplineId: optionalField(form.disciplineId),
+          responsibleUserId: optionalField(form.responsibleUserId),
+          dueDate: optionalField(form.dueDate),
+          notes: optionalField(form.notes),
           renewalFrequency: form.renewable ? form.renewalFrequency : undefined,
+          confidentialityLevel: optionalField(form.confidentialityLevel) ?? 'internal',
+          status: optionalField(form.status) ?? 'draft',
           fileKey: (uploaded as any).fileKey ?? (uploaded as any).key,
           fileName: uploaded.fileName,
           mimeType: uploaded.mimeType,
@@ -2488,14 +2512,35 @@ export function DocumentDetailPage() {
   }, [params.id]);
 
   useEffect(() => {
-    if (!detail?.preview.available) {
-      setPreviewUrl('');
-      setPreviewError('');
-      return;
+    let active = true;
+    let objectUrl = '';
+
+    async function loadPreview() {
+      if (!detail?.preview.available) {
+        setPreviewUrl('');
+        setPreviewError('');
+        return;
+      }
+
+      try {
+        const blob = await fetchProtectedBlob(`/documents/${detail.id}/content`);
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+        setPreviewError('');
+      } catch {
+        if (!active) return;
+        setPreviewUrl('');
+        setPreviewError('No fue posible cargar la vista previa del archivo.');
+      }
     }
 
-    setPreviewUrl(`/api/documents/${detail.id}/content`);
-    setPreviewError('');
+    void loadPreview();
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [detail?.id, detail?.preview.available]);
 
   async function saveComment() {
@@ -2703,7 +2748,10 @@ export function DocumentDetailPage() {
             )
           ) : (
             <div className="preview-empty">
-              <FileText size={48} color="var(--muted)" />
+              {(() => {
+                const { icon: Icon, color } = getFileIcon(detail.fileExtension);
+                return <Icon size={48} style={{ color }} />;
+              })()}
               <p className="muted">
                 {previewError ||
                   'No hay vista previa para este formato. Puedes descargarlo o subir una nueva versión.'}
@@ -4445,6 +4493,17 @@ export function DocumentApprovalPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const selectedFlow = useMemo(
+    () => flows.find((flow) => flow.id === workflowId) ?? null,
+    [flows, workflowId]
+  );
+  const totalEstimatedDays = useMemo(
+    () => selectedFlow?.steps.reduce((total, step) => total + (step.dueDays ?? 0), 0) ?? 0,
+    [selectedFlow]
+  );
+  const requiredSteps = selectedFlow?.steps.filter((step) => step.required) ?? [];
+  const optionalSteps = selectedFlow?.steps.filter((step) => !step.required) ?? [];
+
   useEffect(() => {
     let active = true;
 
@@ -4530,18 +4589,8 @@ export function DocumentApprovalPage() {
 
       <article className="card">
         <div className="quick-filters-grid">
-          <TextField
-            label="Proyecto"
-            value={detail?.project?.name ?? ''}
-            onChange={() => undefined}
-          />
-          <TextField
-            label="Disciplina"
-            value={detail?.discipline?.name ?? ''}
-            onChange={() => undefined}
-          />
           <SelectField
-            label="Workflow"
+            label="Flujo"
             value={workflowId}
             onChange={setWorkflowId}
             options={flows.map((flow) => ({
@@ -4551,7 +4600,7 @@ export function DocumentApprovalPage() {
             placeholder="Automático según configuración"
           />
           <div className="field span-2">
-            <label>Comentario inicial</label>
+            <label>Comentarios</label>
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
@@ -4563,6 +4612,75 @@ export function DocumentApprovalPage() {
           <p className="muted">
             Si no eliges un workflow, el sistema intentará usar el flujo global o específico del
             proyecto. Si todavía no existe, configúralo en la página de aprobaciones.
+          </p>
+        ) : null}
+        {selectedFlow ? (
+          <div className="approval-outline-card">
+            <div className="panel-header" style={{ marginBottom: 12 }}>
+              <div>
+                <h2>Esquema de aprobación</h2>
+                <p className="muted" style={{ margin: '4px 0 0' }}>
+                  {selectedFlow.name} · {selectedFlow.steps.length} pasos definidos
+                </p>
+              </div>
+              <span className={`pill ${selectedFlow.requireForPublication ? 'warning' : 'info'}`}>
+                {selectedFlow.requireForPublication
+                  ? 'Requerido para publicar'
+                  : 'No bloquea publicación'}
+              </span>
+            </div>
+
+            <div className="approval-outline-metrics">
+              <div className="state-card">
+                <span>Tiempo estimado</span>
+                <strong>
+                  {totalEstimatedDays > 0
+                    ? `${totalEstimatedDays} día${totalEstimatedDays === 1 ? '' : 's'} aprox.`
+                    : 'Sin plazo definido'}
+                </strong>
+              </div>
+              <div className="state-card">
+                <span>Pasos obligatorios</span>
+                <strong>{requiredSteps.length}</strong>
+              </div>
+              <div className="state-card">
+                <span>Pasos opcionales</span>
+                <strong>{optionalSteps.length}</strong>
+              </div>
+            </div>
+
+            <div className="approval-outline-list">
+              {selectedFlow.steps.map((step) => (
+                <article className="approval-outline-step" key={step.id}>
+                  <div className="approval-outline-step-head">
+                    <span className="approval-step-index">Paso {step.stepOrder}</span>
+                    <span className={`pill ${step.required ? 'success' : 'info'}`}>
+                      {step.required ? 'Obligatorio' : 'Opcional'}
+                    </span>
+                  </div>
+                  <strong>{step.name}</strong>
+                  <div className="approval-outline-step-meta">
+                    <span>
+                      <Clock3 size={14} />
+                      {step.dueDays
+                        ? `${step.dueDays} día${step.dueDays === 1 ? '' : 's'} estimados`
+                        : 'Sin tiempo definido'}
+                    </span>
+                    <span>
+                      <CheckCircle2 size={14} />
+                      {step.approverUserIds.length
+                        ? `${step.approverUserIds.length} aprobador${step.approverUserIds.length === 1 ? '' : 'es'} asignado${step.approverUserIds.length === 1 ? '' : 's'}`
+                        : 'Aprobadores según configuración'}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : flows.length ? (
+          <p className="muted" style={{ marginTop: 16 }}>
+            Elige un flujo para ver aquí el esquema de aprobación, los tiempos estimados y la
+            aproximación general del proceso.
           </p>
         ) : null}
         <div className="projects-actions">

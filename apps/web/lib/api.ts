@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+import { clearSession } from './auth';
+import { buildBrowserApiUrl } from './api-base';
+
 const DEFAULT_TIMEOUT = 30_000;
 
 function handleUnauthorized(response: Response) {
@@ -6,8 +8,7 @@ function handleUnauthorized(response: Response) {
     return;
   }
 
-  window.localStorage.removeItem('holocron_token');
-  window.localStorage.removeItem('holocron_user');
+  clearSession();
 
   if (window.location.pathname !== '/login') {
     window.location.href = '/login';
@@ -53,7 +54,7 @@ async function request<T>(
   }
 
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(buildBrowserApiUrl(path), {
       method,
       headers: {
         ...(options?.body ? { 'Content-Type': 'application/json' } : {}),

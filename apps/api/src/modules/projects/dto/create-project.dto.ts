@@ -44,4 +44,7 @@ export class CreateProjectDto {
   @IsArray()
   @IsString({ each: true })
   disciplineIds?: string[];
+
+  @IsOptional()
+  isDraft?: string | boolean;
 }

@@ -8,7 +8,9 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequestUser } from '../../common/interfaces/request-user.interface';
 import { PermissionKey } from '../../common/permissions';
 import { AssignProjectUserDto } from './dto/assign-project-user.dto';
+import { CheckCatalogSynonymsDto } from './dto/check-catalog-synonyms.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { SearchCatalogSynonymsDto } from './dto/search-catalog-synonyms.dto';
 import { CreateProjectCatalogOptionDto } from './dto/create-project-catalog-option.dto';
 import { ProjectDocumentsQueryDto } from './dto/project-documents-query.dto';
 import { UpdateProjectCatalogOptionDto } from './dto/update-project-catalog-option.dto';
@@ -49,6 +51,18 @@ export class ProjectsController {
     return this.projects.createCatalogOption(user.id, dto);
   }
 
+  @Post('catalog-options/check-synonyms')
+  @Permissions(PermissionKey.ProjectsManage)
+  checkSynonyms(@Body() dto: CheckCatalogSynonymsDto) {
+    return this.projects.checkSynonyms(dto);
+  }
+
+  @Post('catalog-options/search-synonyms')
+  @Permissions(PermissionKey.ProjectsManage)
+  searchSynonyms(@Body() dto: SearchCatalogSynonymsDto) {
+    return this.projects.searchSynonyms(dto);
+  }
+
   @Patch('catalog-options/:id')
   @Permissions(PermissionKey.ProjectsManage)
   updateCatalogOption(
@@ -69,6 +83,18 @@ export class ProjectsController {
   @Permissions(PermissionKey.ProjectsManage)
   create(@Body() dto: CreateProjectDto, @CurrentUser() user: RequestUser) {
     return this.projects.create(dto, user.id);
+  }
+
+  @Get('drafts')
+  @Permissions(PermissionKey.ProjectsManage)
+  listDrafts(@CurrentUser() user: RequestUser) {
+    return this.projects.listDrafts(user.id);
+  }
+
+  @Patch(':id/publish')
+  @Permissions(PermissionKey.ProjectsManage)
+  publishDraft(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.projects.publishDraft(user.id, id);
   }
 
   @Get(':id')

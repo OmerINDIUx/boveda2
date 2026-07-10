@@ -1,9 +1,13 @@
 'use client';
 
 import {
+  AlertTriangle,
   CheckCircle2,
+  Clock,
   Clock3,
   FileCheck2,
+  FileText,
+  FolderKanban,
   GitBranchPlus,
   MessageSquareMore,
   Search,
@@ -47,6 +51,7 @@ type Workflow = {
 
 type ApprovalRequest = {
   id: string;
+  projectId: string;
   status: string;
   requestedAt: string;
   lastActionAt?: string;
@@ -142,6 +147,7 @@ const fallbackFlows: Workflow[] = [
 const fallbackPending: ApprovalRequest[] = [
   {
     id: 'req-1',
+    projectId: 'mock-project-1',
     status: 'in_process',
     requestedAt: '2026-07-02T09:00:00.000Z',
     lastActionAt: '2026-07-02T09:00:00.000Z',
@@ -184,6 +190,20 @@ const fallbackRequestDetail: Record<string, ApprovalRequestDetail> = {
   },
 };
 
+function timeAgo(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Ahora';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Hace ${days}d`;
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+}
+
 function getToken() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem('holocron_token');
@@ -206,6 +226,7 @@ export function ApprovalsWorkspace() {
   const [newRequestWorkflowId, setNewRequestWorkflowId] = useState('');
   const [actionComment, setActionComment] = useState('');
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -308,19 +329,59 @@ export function ApprovalsWorkspace() {
     };
   }, [selectedRequestId]);
 
+  const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+
+  const filteredPending = useMemo(
+    () =>
+      pending.filter((item) => {
+        if (filterStatus !== 'all' && item.status !== filterStatus) return false;
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        return (
+          item.document?.documentNumber?.toLowerCase().includes(q) ||
+          item.document?.name?.toLowerCase().includes(q)
+        );
+      }),
+    [pending, search, filterStatus]
+  );
+
   const metrics = useMemo(() => {
+    const expiringSoon = pending.filter(
+      (item) => item.status === 'pending' || item.status === 'in_process'
+    );
+    const approvedCount = pending.filter((item) => item.status === 'approved').length;
+    const blockedCount = pending.filter((item) =>
+      ['stopped', 'expired'].includes(item.status)
+    ).length;
+
     return [
-      { label: 'Solicitudes pendientes', value: pending.length, icon: Clock3 },
-      { label: 'Flujos activos', value: flows.length, icon: GitBranchPlus },
       {
-        label: 'Aprobados hoy',
-        value: pending.filter((item) => item.status === 'approved').length,
-        icon: CheckCircle2,
+        label: 'Pendientes',
+        value: pending.length,
+        sub: `${expiringSoon.length} en proceso`,
+        icon: Clock3,
+        variant: 'pending' as const,
       },
       {
-        label: 'Detenidos o vencidos',
-        value: pending.filter((item) => ['stopped', 'expired'].includes(item.status)).length,
+        label: 'Por vencer',
+        value: expiringSoon.length,
+        sub: 'Requieren atención pronto',
+        icon: AlertTriangle,
+        variant: 'expiring' as const,
+      },
+      {
+        label: 'Aprobados',
+        value: approvedCount,
+        sub: approvedCount > 0 ? 'Completados hoy' : 'Sin aprobaciones hoy',
+        icon: CheckCircle2,
+        variant: 'approved' as const,
+      },
+      {
+        label: 'Por falta de aprobación',
+        value: blockedCount,
+        sub: blockedCount > 0 ? 'Detenidos o vencidos' : 'Sin bloqueos',
         icon: ShieldAlert,
+        variant: 'blocked' as const,
       },
     ];
   }, [pending, flows]);
@@ -376,6 +437,7 @@ export function ApprovalsWorkspace() {
       setPending((current) => [
         {
           id: created.id,
+          projectId: created.workflow.projectId,
           status: created.status,
           requestedAt: created.requestedAt,
           lastActionAt: created.lastActionAt,
@@ -433,14 +495,21 @@ export function ApprovalsWorkspace() {
 
       {error ? <div className="card muted">{error}</div> : null}
 
-      <div className="grid">
+      <div className="status-metric-grid">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
-            <article className="card span-3 project-metric info" key={metric.label}>
-              <Icon size={20} />
-              <strong>{metric.value}</strong>
-              <span>{metric.label}</span>
+            <article className={`status-metric-card ${metric.variant}`} key={metric.label}>
+              <div className="status-metric-head">
+                <div className="status-metric-icon">
+                  <Icon size={22} />
+                </div>
+              </div>
+              <div className="status-metric-body">
+                <div className="status-metric-value">{metric.value}</div>
+                <div className="status-metric-label">{metric.label}</div>
+                <div className="status-metric-sub">{metric.sub}</div>
+              </div>
             </article>
           );
         })}
@@ -555,39 +624,112 @@ export function ApprovalsWorkspace() {
         <article className="card span-3">
           <div className="panel-header">
             <h2>Solicitudes pendientes</h2>
-            <Clock3 size={18} color="var(--accent)" />
+            <span className="pill">
+              {filteredPending.length} de {pending.length}
+            </span>
           </div>
-          <div className="field">
-            <label>Buscar documento</label>
-            <div className="search-input">
-              <Search size={16} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Documento o código"
-              />
+          <div className="filter-bar-stacked">
+            <div className="filter-bar">
+              <div className="search-input">
+                <Search size={16} />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar documento o código..."
+                />
+              </div>
+            </div>
+            <div className="filter-pills">
+              {[
+                { value: 'all', label: 'Todos', cls: 'all' },
+                { value: 'pending', label: 'Pendiente', cls: 'pending' },
+                { value: 'in_process', label: 'En proceso', cls: 'in_process' },
+                { value: 'approved', label: 'Aprobado', cls: 'approved' },
+                { value: 'stopped', label: 'Detenido', cls: 'stopped' },
+              ].map((p) => (
+                <button
+                  key={p.value}
+                  className={`filter-pill ${p.cls}${filterStatus === p.value ? ' active' : ''}`}
+                  onClick={() => setFilterStatus(p.value)}
+                >
+                  <span className="pill-dot" />
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="project-list">
-            {pending.map((item) => (
-              <button
-                className={`project-list-item ${item.id === selectedRequestId ? 'active' : ''}`}
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedRequestId(item.id)}
-              >
-                <div className="project-list-head">
-                  <strong>{item.document?.documentNumber ?? 'Documento'}</strong>
-                  <span
-                    className={`pill ${item.status === 'approved' ? 'success' : item.status === 'rejected' ? 'danger' : 'warning'}`}
-                  >
-                    {normalizeLabel(item.status)}
-                  </span>
-                </div>
-                <span>{item.document?.name ?? 'Sin documento'}</span>
-                <small className="muted">{item.currentStep?.name ?? 'Sin paso actual'}</small>
-              </button>
-            ))}
+          <div className="active-request-list">
+            {filteredPending.map((item) => {
+              const statusClass =
+                item.status === 'approved'
+                  ? 'approved'
+                  : item.status === 'rejected'
+                    ? 'rejected'
+                    : item.status === 'stopped' || item.status === 'expired'
+                      ? 'stopped'
+                      : 'in_process';
+              const isSelected = item.id === selectedRequestId;
+              const stepOrder = item.currentStep?.stepOrder ?? 0;
+              const progressPct = stepOrder > 0 ? Math.min((stepOrder / 3) * 100, 100) : 0;
+              return (
+                <button
+                  className={`active-request-card${isSelected ? ' active-request-selected' : ''}`}
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedRequestId(item.id)}
+                  style={{
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    font: 'inherit',
+                    width: '100%',
+                    background: isSelected ? '#f0fdfa' : '#fff',
+                  }}
+                >
+                  <div className="active-request-top">
+                    <div className="active-request-icon">
+                      <FileText />
+                    </div>
+                    <div className="active-request-info">
+                      <span className="active-request-number">
+                        {item.document?.documentNumber ?? 'Documento'}
+                      </span>
+                      <span className="active-request-name">
+                        {item.document?.name ?? 'Sin nombre'}
+                      </span>
+                    </div>
+                    <span className={`active-request-pill ${statusClass}`}>
+                      <span className="pill-dot" />
+                      {normalizeLabel(item.status)}
+                    </span>
+                  </div>
+                  <div className="active-request-meta-row">
+                    <span className="active-request-meta-item">
+                      <FolderKanban />
+                      {projectMap.get(item.projectId)?.code ??
+                        projectMap.get(item.projectId)?.name ??
+                        'Sin proyecto'}
+                    </span>
+                    <span className="active-request-meta-item">
+                      <Clock />
+                      {timeAgo(item.requestedAt)}
+                    </span>
+                    <span className="active-request-meta-item">
+                      <GitBranchPlus />
+                      {item.currentStep?.name ?? 'Finalizado'}
+                    </span>
+                    <span className="active-request-progress">
+                      <span className="compact-progress-bar">
+                        <span
+                          className="compact-progress-fill"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </span>
+                      <span className="compact-progress-text">{progressPct.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </article>
 

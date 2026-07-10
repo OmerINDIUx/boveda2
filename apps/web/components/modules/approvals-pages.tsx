@@ -3,21 +3,24 @@
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowDown,
-  ArrowUp,
+  AlertTriangle,
   CheckCircle2,
+  Clock,
   Clock3,
   Download,
-  FileCheck2,
   FileText,
+  FolderKanban,
+  GitBranchPlus,
+  Hourglass,
   MessageSquareMore,
-  Plus,
+  Search,
   ShieldAlert,
-  Trash2,
+  Tag,
   XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { buildBrowserApiUrl } from '../../lib/api-base';
 import { normalizeLabel } from '../../lib/labels';
 
 type ProjectOption = { id: string; name: string; code: string };
@@ -28,15 +31,14 @@ type DocumentOption = {
   projectId: string;
   status: string;
 };
-type UserOption = { id: string; name: string; email: string };
-
 type WorkflowStep = {
   id?: string;
   stepOrder: number;
   name: string;
-  approverUserId?: string;
+  approverUserIds: string[];
   approverRoleId?: string;
   required?: boolean;
+  dueDays?: number;
 };
 
 type Workflow = {
@@ -59,8 +61,15 @@ type ApprovalRequest = {
   status: string;
   requestedAt: string;
   lastActionAt?: string;
-  currentStep: { id: string; name: string; stepOrder: number } | null;
-  document: { id: string; documentNumber: string; name: string; status: string } | null;
+  currentStep: { id: string; name: string; stepOrder: number; dueDays?: number } | null;
+  document: {
+    id: string;
+    documentNumber: string;
+    name: string;
+    status: string;
+    discipline?: { id: string; code: string; name: string } | null;
+  } | null;
+  project?: { id: string; name: string; code: string } | null;
 };
 
 type ApprovalRequestDetail = {
@@ -133,28 +142,6 @@ type SavedReviewPayload = {
   annotations: ReviewAnnotation[];
 };
 
-type FlowForm = {
-  projectId: string;
-  name: string;
-  scopeType: 'global' | 'document_specific';
-  targetDocumentId: string;
-  requireForPublication: boolean;
-};
-
-type ProjectAssignmentMode = 'all_projects' | 'selected_projects';
-
-type FormOptionsResponse = {
-  users: UserOption[];
-};
-
-const emptyFlowForm: FlowForm = {
-  projectId: '',
-  name: '',
-  scopeType: 'global',
-  targetDocumentId: '',
-  requireForPublication: true,
-};
-
 function getToken() {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem('holocron_token');
@@ -195,12 +182,9 @@ function describeAnnotationKind(kind: ReviewAnnotation['kind']) {
 }
 
 async function fetchProtectedBlob(path: string) {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}${path}`,
-    {
-      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
-    }
-  );
+  const response = await fetch(buildBrowserApiUrl(path), {
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+  });
 
   if (!response.ok) {
     throw new Error('No fue posible descargar el archivo');
@@ -214,10 +198,6 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function buildEmptyStep(stepOrder: number): WorkflowStep {
-  return { stepOrder, name: '', approverUserId: '', required: true };
-}
-
 type ApprovalInboxFilter = 'all' | 'active' | 'stopped';
 
 function normalizeApprovalInboxFilter(value: string | null): ApprovalInboxFilter {
@@ -225,13 +205,42 @@ function normalizeApprovalInboxFilter(value: string | null): ApprovalInboxFilter
   return 'all';
 }
 
+function daysRemaining(requestedAt: string, dueDays?: number): number | null {
+  if (!dueDays) return null;
+  const requested = new Date(requestedAt);
+  const due = new Date(requested.getTime() + dueDays * 86400000);
+  const now = new Date();
+  return Math.ceil((due.getTime() - now.getTime()) / 86400000);
+}
+
+function timeAgoShort(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Ahora';
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+}
+
 export function ApprovalsInboxPage() {
   const searchParams = useSearchParams();
   const queryFilter = normalizeApprovalInboxFilter(searchParams.get('status'));
   const queryProjectId = searchParams.get('projectId') ?? '';
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [pending, setPending] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [inboxSearch, setInboxSearch] = useState('');
+  const [inboxFilter, setInboxFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('');
+  const [disciplineFilter, setDisciplineFilter] = useState('');
+  const [stepFilter, setStepFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
 
   useEffect(() => {
     let active = true;
@@ -240,12 +249,13 @@ export function ApprovalsInboxPage() {
       setLoading(true);
       setError('');
       try {
-        const response = await apiGet<ApprovalRequest[]>(
-          '/approvals/requests/pending',
-          getToken() ?? undefined
-        );
+        const [projectsResponse, pendingResponse] = await Promise.all([
+          apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
+          apiGet<ApprovalRequest[]>('/approvals/requests/pending', getToken() ?? undefined),
+        ]);
         if (!active) return;
-        setPending(response);
+        setProjects(projectsResponse);
+        setPending(pendingResponse);
       } catch (nextError) {
         if (!active) return;
         setError(getErrorMessage(nextError, 'No fue posible cargar la bandeja de aprobaciones.'));
@@ -260,7 +270,31 @@ export function ApprovalsInboxPage() {
     };
   }, []);
 
-  const filteredPending = useMemo(
+  const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+
+  const disciplineOptions = useMemo(() => {
+    const set = new Set<string>();
+    pending.forEach((item) => {
+      const d = item.document?.discipline;
+      if (d) set.add(`${d.id}|${d.code}|${d.name}`);
+    });
+    return Array.from(set)
+      .map((entry) => {
+        const [id, code, name] = entry.split('|');
+        return { id, code, name, label: `${code} - ${name}` };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [pending]);
+
+  const stepOptions = useMemo(() => {
+    const set = new Set<string>();
+    pending.forEach((item) => {
+      if (item.currentStep?.name) set.add(item.currentStep.name);
+    });
+    return Array.from(set).sort();
+  }, [pending]);
+
+  const queryFiltered = useMemo(
     () =>
       pending.filter((item) => {
         if (queryProjectId && item.projectId !== queryProjectId) return false;
@@ -275,22 +309,108 @@ export function ApprovalsInboxPage() {
     [pending, queryFilter, queryProjectId]
   );
 
+  const blockedCount = useMemo(
+    () => queryFiltered.filter((item) => item.status === 'stopped').length,
+    [queryFiltered]
+  );
+
   const metrics = useMemo(
     () => [
-      { label: 'Solicitudes visibles', value: filteredPending.length, icon: Clock3 },
       {
-        label: 'En proceso',
-        value: filteredPending.filter((item) => item.status === 'in_process').length,
-        icon: FileCheck2,
+        label: 'Pendientes',
+        value: queryFiltered.filter(
+          (item) => item.status === 'pending' || item.status === 'in_process'
+        ).length,
+        sub: `${queryFiltered.length} solicitudes en total`,
+        icon: Clock3,
+        variant: 'pending' as const,
       },
       {
-        label: 'Detenidas',
-        value: filteredPending.filter((item) => item.status === 'stopped').length,
+        label: 'Por vencer',
+        value: queryFiltered.filter((item) => item.status === 'pending').length,
+        sub: 'Esperando aprobación inicial',
+        icon: AlertTriangle,
+        variant: 'expiring' as const,
+      },
+      {
+        label: 'Aprobados',
+        value: queryFiltered.filter((item) => item.status === 'approved').length,
+        sub: 'Completados exitosamente',
+        icon: CheckCircle2,
+        variant: 'approved' as const,
+      },
+      {
+        label: 'Por falta de aprobación',
+        value: blockedCount,
+        sub: blockedCount > 0 ? 'Requieren intervención' : 'Sin bloqueos',
         icon: ShieldAlert,
+        variant: 'blocked' as const,
       },
     ],
-    [filteredPending]
+    [queryFiltered, blockedCount]
   );
+
+  const filteredPending = useMemo(() => {
+    let result = queryFiltered;
+
+    if (inboxFilter !== 'all') {
+      result = result.filter((item) => item.status === inboxFilter);
+    }
+
+    if (projectFilter) {
+      result = result.filter((item) => item.projectId === projectFilter);
+    }
+
+    if (disciplineFilter) {
+      result = result.filter((item) => item.document?.discipline?.id === disciplineFilter);
+    }
+
+    if (stepFilter) {
+      result = result.filter((item) => item.currentStep?.name === stepFilter);
+    }
+
+    if (inboxSearch.trim()) {
+      const q = inboxSearch.toLowerCase();
+      result = result.filter((item) => {
+        const doc = item.document;
+        return (
+          doc?.documentNumber?.toLowerCase().includes(q) ||
+          doc?.name?.toLowerCase().includes(q) ||
+          doc?.discipline?.name?.toLowerCase().includes(q) ||
+          doc?.discipline?.code?.toLowerCase().includes(q) ||
+          item.currentStep?.name?.toLowerCase().includes(q) ||
+          item.project?.name?.toLowerCase().includes(q) ||
+          item.project?.code?.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    result = [...result].sort((a, b) => {
+      const aDays = daysRemaining(a.requestedAt, a.currentStep?.dueDays) ?? 999;
+      const bDays = daysRemaining(b.requestedAt, b.currentStep?.dueDays) ?? 999;
+      switch (sortOrder) {
+        case 'oldest':
+          return new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime();
+        case 'due_asc':
+          return aDays - bDays;
+        case 'due_desc':
+          return bDays - aDays;
+        case 'newest':
+        default:
+          return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+      }
+    });
+
+    return result;
+  }, [
+    queryFiltered,
+    inboxFilter,
+    inboxSearch,
+    projectFilter,
+    disciplineFilter,
+    stepFilter,
+    sortOrder,
+  ]);
 
   return (
     <section className="projects-workspace">
@@ -311,14 +431,21 @@ export function ApprovalsInboxPage() {
 
       {error ? <div className="card muted">{error}</div> : null}
 
-      <div className="grid">
+      <div className="status-metric-grid">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
-            <article className="card span-4 project-metric info" key={metric.label}>
-              <Icon size={20} />
-              <strong>{metric.value}</strong>
-              <span>{metric.label}</span>
+            <article className={`status-metric-card ${metric.variant}`} key={metric.label}>
+              <div className="status-metric-head">
+                <div className="status-metric-icon">
+                  <Icon size={22} />
+                </div>
+              </div>
+              <div className="status-metric-body">
+                <div className="status-metric-value">{metric.value}</div>
+                <div className="status-metric-label">{metric.label}</div>
+                <div className="status-metric-sub">{metric.sub}</div>
+              </div>
             </article>
           );
         })}
@@ -331,21 +458,172 @@ export function ApprovalsInboxPage() {
             {loading ? 'Cargando' : `${filteredPending.length} registros`}
           </span>
         </div>
-        <div className="simple-document-list">
-          {filteredPending.map((item) => (
-            <div className="simple-document-item" key={item.id}>
-              <strong>{item.document?.documentNumber ?? 'Documento'}</strong>
-              <span>{item.document?.name ?? 'Sin documento'}</span>
-              <small>
-                {item.currentStep?.name ?? 'Sin paso actual'} · {normalizeLabel(item.status)}
-              </small>
-              <div className="projects-actions" style={{ marginTop: 8 }}>
-                <Link className="button secondary" href={`/approvals/requests/${item.id}`}>
-                  Abrir solicitud
-                </Link>
+        <div className="filter-bar" style={{ marginBottom: 14 }}>
+          <div className="search-input" style={{ flex: 1, minWidth: 200 }}>
+            <Search size={16} />
+            <input
+              value={inboxSearch}
+              onChange={(e) => setInboxSearch(e.target.value)}
+              placeholder="Buscar doc, nombre, disciplina, proyecto..."
+            />
+          </div>
+
+          <select
+            className="select-filter"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+          >
+            <option value="">Todos los proyectos</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.code} - {p.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="select-filter"
+            value={disciplineFilter}
+            onChange={(e) => setDisciplineFilter(e.target.value)}
+          >
+            <option value="">Todas las disciplinas</option>
+            {disciplineOptions.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="select-filter"
+            value={stepFilter}
+            onChange={(e) => setStepFilter(e.target.value)}
+          >
+            <option value="">Todos los pasos</option>
+            {stepOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="select-filter"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          >
+            <option value="newest">Más recientes</option>
+            <option value="oldest">Más antiguos</option>
+            <option value="due_asc">Por vencer primero</option>
+            <option value="due_desc">Por vencer último</option>
+          </select>
+        </div>
+        <div className="filter-bar" style={{ marginBottom: 14 }}>
+          <div className="filter-pills">
+            {[
+              { value: 'all', label: 'Todos', cls: 'all' },
+              { value: 'pending', label: 'Pendiente', cls: 'pending' },
+              { value: 'in_process', label: 'En proceso', cls: 'in_process' },
+              { value: 'approved', label: 'Aprobado', cls: 'approved' },
+              { value: 'stopped', label: 'Detenido', cls: 'stopped' },
+            ].map((p) => (
+              <button
+                key={p.value}
+                className={`filter-pill ${p.cls}${inboxFilter === p.value ? ' active' : ''}`}
+                onClick={() => setInboxFilter(p.value)}
+              >
+                <span className="pill-dot" />
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="active-request-list">
+          {filteredPending.map((item) => {
+            const statusClass =
+              item.status === 'approved'
+                ? 'approved'
+                : item.status === 'rejected'
+                  ? 'rejected'
+                  : item.status === 'stopped' || item.status === 'expired'
+                    ? 'stopped'
+                    : item.status === 'pending'
+                      ? 'pending'
+                      : 'in_process';
+            const stepOrder = item.currentStep?.stepOrder ?? 0;
+            const progressPct = stepOrder > 0 ? Math.min((stepOrder / 3) * 100, 100) : 0;
+            const remaining = daysRemaining(item.requestedAt, item.currentStep?.dueDays);
+            return (
+              <div className="active-request-card" key={item.id}>
+                <div className="active-request-top">
+                  <div className="active-request-icon">
+                    <FileText />
+                  </div>
+                  <div className="active-request-sku">
+                    {item.document?.documentNumber ?? 'Documento'}
+                  </div>
+                  {item.document?.discipline ? (
+                    <span className="discipline-badge">
+                      <Tag size={10} />
+                      {item.document.discipline.code}
+                    </span>
+                  ) : null}
+                  <div className="active-request-name" style={{ flex: 1 }}>
+                    {item.document?.name ?? 'Sin documento'}
+                  </div>
+                  <span className={`active-request-pill ${statusClass}`}>
+                    <span className="pill-dot" />
+                    {normalizeLabel(item.status)}
+                  </span>
+                </div>
+                <div className="active-request-meta-row">
+                  <span className="active-request-meta-item">
+                    <FolderKanban />
+                    {item.project?.name ?? projectMap.get(item.projectId)?.name ?? 'Sin proyecto'}
+                    {item.project?.code ? (
+                      <span className="muted" style={{ marginLeft: 4 }}>
+                        ({item.project.code})
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="active-request-meta-row">
+                  <span className="active-request-meta-item">
+                    <Clock />
+                    Solicitado {timeAgoShort(item.requestedAt)}
+                  </span>
+                  {remaining !== null ? (
+                    <span
+                      className={`active-request-meta-item ${remaining < 0 ? 'text-danger' : ''}`}
+                    >
+                      <Hourglass />
+                      {remaining < 0
+                        ? `Vencido hace ${Math.abs(remaining)}d`
+                        : `Faltan ${remaining}d`}
+                    </span>
+                  ) : null}
+                  <span className="active-request-meta-item">
+                    <GitBranchPlus />
+                    Paso: {item.currentStep?.name ?? 'Finalizado'}
+                  </span>
+                  <span className="active-request-progress">
+                    <span className="compact-progress-bar">
+                      <span
+                        className="compact-progress-fill"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </span>
+                    <span className="compact-progress-text">{progressPct.toFixed(0)}%</span>
+                  </span>
+                </div>
+                <div className="active-request-footer">
+                  <Link className="button secondary" href={`/approvals/requests/${item.id}`}>
+                    Abrir solicitud
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {!loading && !filteredPending.length ? (
             <p className="muted">No hay solicitudes pendientes con este enfoque.</p>
           ) : null}
@@ -487,489 +765,6 @@ export function ApprovalFlowsListPage() {
           </article>
         ) : null}
       </div>
-    </section>
-  );
-}
-
-export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
-  const params = useParams<{ id: string }>();
-  const flowId = Array.isArray(params?.id) ? params.id[0] : params?.id;
-  const router = useRouter();
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [documents, setDocuments] = useState<DocumentOption[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
-  const [form, setForm] = useState<FlowForm>(emptyFlowForm);
-  const [steps, setSteps] = useState<WorkflowStep[]>([buildEmptyStep(1)]);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [projectAssignmentMode, setProjectAssignmentMode] =
-    useState<ProjectAssignmentMode>('all_projects');
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-  const [projectSearch, setProjectSearch] = useState('');
-  const [loading, setLoading] = useState(mode === 'edit');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    async function loadBase() {
-      try {
-        const [projectsResponse, documentsResponse, formOptionsResponse] = await Promise.all([
-          apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
-          apiGet<DocumentOption[]>('/documents', getToken() ?? undefined),
-          apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined),
-        ]);
-        if (!active) return;
-        setProjects(projectsResponse);
-        setDocuments(documentsResponse);
-        setUsers(formOptionsResponse.users);
-        setSelectedProjectIds((current) =>
-          current.length ? current : projectsResponse[0] ? [projectsResponse[0].id] : []
-        );
-        setForm((current) => ({
-          ...current,
-          projectId: current.projectId || projectsResponse[0]?.id || '',
-        }));
-      } catch (nextError) {
-        if (!active) return;
-        setError(getErrorMessage(nextError, 'No fue posible cargar datos para el flujo.'));
-      }
-    }
-    void loadBase();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mode !== 'edit' || !flowId) return;
-    let active = true;
-    async function loadFlow() {
-      setLoading(true);
-      try {
-        const response = await apiGet<Workflow>(
-          `/approvals/flows/${flowId}`,
-          getToken() ?? undefined
-        );
-        if (!active) return;
-        setForm({
-          projectId: response.projectId,
-          name: response.name,
-          scopeType: response.scopeType,
-          targetDocumentId: response.targetDocumentId ?? '',
-          requireForPublication: response.requireForPublication,
-        });
-        setProjectAssignmentMode('selected_projects');
-        setSelectedProjectIds([response.projectId]);
-        setSteps(
-          response.steps.length
-            ? response.steps.sort((a, b) => a.stepOrder - b.stepOrder)
-            : [buildEmptyStep(1)]
-        );
-      } catch (nextError) {
-        if (!active) return;
-        setError(getErrorMessage(nextError, 'No fue posible cargar el flujo.'));
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    void loadFlow();
-    return () => {
-      active = false;
-    };
-  }, [flowId, mode]);
-
-  function syncStepOrders(nextSteps: WorkflowStep[]) {
-    return nextSteps.map((step, index) => ({ ...step, stepOrder: index + 1 }));
-  }
-
-  function setStep(index: number, patch: Partial<WorkflowStep>) {
-    setSteps((current) =>
-      current.map((step, stepIndex) => (stepIndex === index ? { ...step, ...patch } : step))
-    );
-  }
-
-  function addStep() {
-    setSteps((current) => [...current, buildEmptyStep(current.length + 1)]);
-  }
-
-  function removeStep(index: number) {
-    setSteps((current) => syncStepOrders(current.filter((_, stepIndex) => stepIndex !== index)));
-  }
-
-  function moveStep(fromIndex: number, toIndex: number) {
-    setSteps((current) => {
-      const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return syncStepOrders(next);
-    });
-  }
-
-  const filteredProjects = useMemo(() => {
-    const normalized = projectSearch.trim().toLowerCase();
-    if (!normalized) return projects;
-    return projects.filter((project) =>
-      `${project.code} ${project.name}`.toLowerCase().includes(normalized)
-    );
-  }, [projectSearch, projects]);
-
-  const canUseDocumentSpecificScope = mode === 'edit' || selectedProjectIds.length === 1;
-  const activeProjectId = mode === 'edit' ? form.projectId : (selectedProjectIds[0] ?? '');
-  const filteredDocuments = useMemo(
-    () => documents.filter((document) => document.projectId === activeProjectId),
-    [activeProjectId, documents]
-  );
-
-  function toggleProjectSelection(projectId: string) {
-    setSelectedProjectIds((current) => {
-      if (current.includes(projectId)) {
-        return current.filter((id) => id !== projectId);
-      }
-      return [...current, projectId];
-    });
-  }
-
-  useEffect(() => {
-    if (mode === 'edit') return;
-    if (projectAssignmentMode === 'all_projects') {
-      const nextProjectIds = projects.map((project) => project.id);
-      setSelectedProjectIds(nextProjectIds);
-      setForm((current) => ({
-        ...current,
-        projectId: nextProjectIds[0] ?? '',
-        scopeType: 'global',
-        targetDocumentId: '',
-      }));
-      return;
-    }
-
-    setSelectedProjectIds((current) => {
-      if (current.length) return current;
-      return projects[0] ? [projects[0].id] : [];
-    });
-  }, [mode, projectAssignmentMode, projects]);
-
-  useEffect(() => {
-    if (mode === 'edit') return;
-    if (!canUseDocumentSpecificScope && form.scopeType === 'document_specific') {
-      setForm((current) => ({ ...current, scopeType: 'global', targetDocumentId: '' }));
-    }
-  }, [canUseDocumentSpecificScope, form.scopeType, mode]);
-
-  useEffect(() => {
-    if (mode === 'edit') return;
-    const nextProjectId = selectedProjectIds[0] ?? '';
-    setForm((current) => {
-      if (current.projectId === nextProjectId) return current;
-      return { ...current, projectId: nextProjectId, targetDocumentId: '' };
-    });
-  }, [mode, selectedProjectIds]);
-
-  async function submit() {
-    if (!form.name.trim()) {
-      setError('Completa el nombre del flujo.');
-      return;
-    }
-    if (mode === 'create' && !selectedProjectIds.length) {
-      setError('Selecciona al menos un proyecto o usa la opción de todos los proyectos.');
-      return;
-    }
-    if (!steps.length || steps.some((step) => !step.name.trim() || !step.approverUserId)) {
-      setError('Cada paso debe tener nombre y aprobador.');
-      return;
-    }
-    if (form.scopeType === 'document_specific' && !canUseDocumentSpecificScope) {
-      setError(
-        'El alcance por documento solo está disponible cuando seleccionas un solo proyecto.'
-      );
-      return;
-    }
-    if (form.scopeType === 'document_specific' && !form.targetDocumentId) {
-      setError('Selecciona el documento objetivo para este flujo.');
-      return;
-    }
-
-    setSaving(true);
-    setError('');
-
-    const targetProjectIds = mode === 'edit' ? [form.projectId] : selectedProjectIds;
-    const payloadBase = {
-      name: form.name,
-      entityType: 'document',
-      scopeType: form.scopeType,
-      requireForPublication: form.requireForPublication,
-      steps: syncStepOrders(steps),
-    };
-
-    try {
-      if (mode === 'create') {
-        await Promise.all(
-          targetProjectIds.map((projectId) =>
-            apiPost(
-              '/approvals/flows',
-              {
-                ...payloadBase,
-                projectId,
-                targetDocumentId:
-                  form.scopeType === 'document_specific' && projectId === targetProjectIds[0]
-                    ? form.targetDocumentId || undefined
-                    : undefined,
-              },
-              getToken() ?? undefined
-            )
-          )
-        );
-      } else if (flowId) {
-        await apiPatch(
-          `/approvals/flows/${flowId}`,
-          {
-            ...payloadBase,
-            projectId: form.projectId,
-            targetDocumentId:
-              form.scopeType === 'document_specific'
-                ? form.targetDocumentId || undefined
-                : undefined,
-          },
-          getToken() ?? undefined
-        );
-      }
-      router.push('/approvals/flows');
-      router.refresh();
-    } catch (nextError) {
-      setError(getErrorMessage(nextError, 'No fue posible guardar el flujo.'));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="projects-workspace">
-      <div className="topbar">
-        <div>
-          <h1>{mode === 'create' ? 'Nuevo flujo de aprobación' : 'Editar flujo de aprobación'}</h1>
-          <p className="muted">
-            Pasos dinámicos, aprobadores variables y reordenamiento sin rigidez.
-          </p>
-        </div>
-        <div className="projects-actions">
-          <Link className="button secondary" href="/approvals/flows">
-            Volver
-          </Link>
-        </div>
-      </div>
-      {error ? <div className="card muted">{error}</div> : null}
-      <article className="card">
-        {loading ? (
-          <p className="muted">Cargando formulario...</p>
-        ) : (
-          <>
-            <div className="quick-filters-grid">
-              {mode === 'create' ? (
-                <SelectField
-                  label="Alcance"
-                  value={projectAssignmentMode}
-                  onChange={(value) => setProjectAssignmentMode(value as ProjectAssignmentMode)}
-                  options={[
-                    { value: 'all_projects', label: 'Todos los proyectos' },
-                    { value: 'selected_projects', label: 'Seleccionar proyectos' },
-                  ]}
-                />
-              ) : (
-                <SelectField
-                  label="Proyecto"
-                  value={form.projectId}
-                  onChange={(value) => setForm((current) => ({ ...current, projectId: value }))}
-                  options={projects.map((project) => ({
-                    value: project.id,
-                    label: `${project.code} · ${project.name}`,
-                  }))}
-                />
-              )}
-              <TextField
-                label="Nombre del flujo"
-                value={form.name}
-                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
-              />
-              <SelectField
-                label="Aplica a"
-                value={form.scopeType}
-                onChange={(value) =>
-                  setForm((current) => ({ ...current, scopeType: value as FlowForm['scopeType'] }))
-                }
-                options={[
-                  { value: 'global', label: 'Todo el proyecto' },
-                  { value: 'document_specific', label: 'Documento específico' },
-                ]}
-                disabled={!canUseDocumentSpecificScope}
-              />
-              {form.scopeType === 'document_specific' && canUseDocumentSpecificScope ? (
-                <SelectField
-                  label="Documento objetivo"
-                  value={form.targetDocumentId}
-                  onChange={(value) =>
-                    setForm((current) => ({ ...current, targetDocumentId: value }))
-                  }
-                  options={filteredDocuments.map((document) => ({
-                    value: document.id,
-                    label: `${document.documentNumber} · ${document.name}`,
-                  }))}
-                />
-              ) : null}
-              <SelectField
-                label="Requiere aprobación para publicar"
-                value={form.requireForPublication ? 'yes' : 'no'}
-                onChange={(value) =>
-                  setForm((current) => ({ ...current, requireForPublication: value === 'yes' }))
-                }
-                options={[
-                  { value: 'yes', label: 'Sí' },
-                  { value: 'no', label: 'No' },
-                ]}
-              />
-            </div>
-
-            {mode === 'create' ? (
-              <div className="field" style={{ marginTop: 16 }}>
-                <label>Proyectos incluidos</label>
-                {projectAssignmentMode === 'all_projects' ? (
-                  <div className="selection-summary-card">
-                    <strong>{projects.length} proyectos seleccionados</strong>
-                    <span className="muted">
-                      El flujo se creará en todos los proyectos visibles para tu usuario.
-                    </span>
-                  </div>
-                ) : (
-                  <div className="project-picker-card">
-                    <input
-                      type="search"
-                      placeholder="Buscar proyecto por clave o nombre"
-                      value={projectSearch}
-                      onChange={(event) => setProjectSearch(event.target.value)}
-                    />
-                    <div className="project-picker-list">
-                      {filteredProjects.map((project) => {
-                        const checked = selectedProjectIds.includes(project.id);
-                        return (
-                          <label className="project-picker-item" key={project.id}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleProjectSelection(project.id)}
-                            />
-                            <span>
-                              <strong>{project.code}</strong> · {project.name}
-                            </span>
-                          </label>
-                        );
-                      })}
-                      {!filteredProjects.length ? (
-                        <p className="muted">No hay proyectos que coincidan con la búsqueda.</p>
-                      ) : null}
-                    </div>
-                    <span className="muted">
-                      {selectedProjectIds.length} proyecto
-                      {selectedProjectIds.length === 1 ? '' : 's'} seleccionado
-                      {selectedProjectIds.length === 1 ? '' : 's'}.
-                    </span>
-                  </div>
-                )}
-                {!canUseDocumentSpecificScope ? (
-                  <span className="muted">
-                    Si eliges varios proyectos, el flujo solo puede aplicarse a todo el proyecto.
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="panel-header" style={{ marginTop: 20 }}>
-              <h2>Pasos del flujo</h2>
-              <button className="button secondary" type="button" onClick={addStep}>
-                <Plus size={16} />
-                Agregar paso
-              </button>
-            </div>
-
-            <div className="simple-document-list">
-              {steps.map((step, index) => (
-                <div
-                  className="simple-document-item"
-                  key={step.id ?? `step-${index}`}
-                  draggable
-                  onDragStart={() => setDragIndex(index)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (dragIndex === null || dragIndex === index) return;
-                    moveStep(dragIndex, index);
-                    setDragIndex(null);
-                  }}
-                >
-                  <strong>Paso {index + 1}</strong>
-                  <div className="quick-filters-grid">
-                    <TextField
-                      label="Nombre del paso"
-                      value={step.name}
-                      onChange={(value) => setStep(index, { name: value })}
-                    />
-                    <SelectField
-                      label="Aprobador"
-                      value={step.approverUserId ?? ''}
-                      onChange={(value) => setStep(index, { approverUserId: value })}
-                      options={users.map((user) => ({
-                        value: user.id,
-                        label: `${user.name} · ${user.email}`,
-                      }))}
-                    />
-                    <SelectField
-                      label="Requerido"
-                      value={step.required === false ? 'no' : 'yes'}
-                      onChange={(value) => setStep(index, { required: value === 'yes' })}
-                      options={[
-                        { value: 'yes', label: 'Sí' },
-                        { value: 'no', label: 'No' },
-                      ]}
-                    />
-                  </div>
-                  <div className="projects-actions" style={{ marginTop: 8 }}>
-                    <button
-                      className="button secondary"
-                      type="button"
-                      onClick={() => index > 0 && moveStep(index, index - 1)}
-                      disabled={index === 0}
-                    >
-                      <ArrowUp size={16} />
-                      Subir
-                    </button>
-                    <button
-                      className="button secondary"
-                      type="button"
-                      onClick={() => index < steps.length - 1 && moveStep(index, index + 1)}
-                      disabled={index === steps.length - 1}
-                    >
-                      <ArrowDown size={16} />
-                      Bajar
-                    </button>
-                    <button
-                      className="button danger-button"
-                      type="button"
-                      onClick={() => removeStep(index)}
-                      disabled={steps.length === 1}
-                    >
-                      <Trash2 size={16} />
-                      Quitar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="projects-actions" style={{ marginTop: 16 }}>
-              <button className="button" type="button" onClick={submit} disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar flujo'}
-              </button>
-            </div>
-          </>
-        )}
-      </article>
     </section>
   );
 }
@@ -1217,12 +1012,32 @@ export function ApprovalRequestDetailPage() {
   }, [detail?.document?.id]);
 
   useEffect(() => {
-    if (!documentDetail?.preview.available) {
-      setPreviewUrl('');
-      return;
+    let active = true;
+    let objectUrl = '';
+
+    async function loadPreview() {
+      if (!documentDetail?.preview.available) {
+        setPreviewUrl('');
+        return;
+      }
+
+      try {
+        const blob = await fetchProtectedBlob(`/documents/${documentDetail.id}/content`);
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      } catch {
+        if (!active) return;
+        setPreviewUrl('');
+      }
     }
 
-    setPreviewUrl(`/api/documents/${documentDetail.id}/content`);
+    void loadPreview();
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [documentDetail?.id, documentDetail?.preview.available]);
 
   async function submitAction(action: 'approve' | 'reject' | 'request-changes' | 'comment') {
@@ -1656,25 +1471,6 @@ export function ApprovalRequestDetailPage() {
         )}
       </article>
     </section>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-  type = 'text',
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-}) {
-  return (
-    <div className="field">
-      <label>{label}</label>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
-    </div>
   );
 }
 

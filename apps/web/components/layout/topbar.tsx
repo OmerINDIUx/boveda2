@@ -19,6 +19,8 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LanguageSwitcher } from './language-switcher';
+import { apiGet } from '../../lib/api';
+import { clearSession, getSessionUser } from '../../lib/auth';
 
 const searchItems = [
   { href: '/dashboard', label: 'Panel', icon: Gauge, section: 'Principal' },
@@ -45,15 +47,62 @@ const searchItems = [
   },
 ];
 
+type NotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  notificationType: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+  meta?: { route?: string } | null;
+};
+
 export function TopBar() {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifItems, setNotifItems] = useState<NotificationItem[]>([]);
+  const [notifCount, setNotifCount] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userName, setUserName] = useState('Usuario');
+  const [userEmail, setUserEmail] = useState('');
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const token = window.localStorage.getItem('holocron_token') ?? undefined;
+    if (!token) return;
+    apiGet<number>('/notifications/unread-count', token)
+      .then(setNotifCount)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const user = getSessionUser();
+    if (!user) return;
+    setUserName(user.name || 'Usuario');
+    setUserEmail(user.email || '');
+  }, []);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const token = window.localStorage.getItem('holocron_token') ?? undefined;
+    if (!token) return;
+    Promise.all([
+      apiGet<NotificationItem[]>('/notifications', token),
+      apiGet<number>('/notifications/unread-count', token),
+    ])
+      .then(([items, count]) => {
+        setNotifItems(items.slice(0, 5));
+        setNotifCount(count);
+      })
+      .catch(() => {});
+  }, [notifOpen]);
 
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -287,25 +336,27 @@ export function TopBar() {
               onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--surface)')}
             >
               <Bell size={18} />
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -2,
-                  width: 18,
-                  height: 18,
-                  borderRadius: '999px',
-                  background: 'var(--color-danger)',
-                  color: '#fff',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                3
-              </span>
+              {notifCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 18,
+                    height: 18,
+                    borderRadius: '999px',
+                    background: 'var(--color-danger)',
+                    color: '#fff',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {notifCount > 99 ? '99+' : notifCount}
+                </span>
+              )}
             </button>
 
             {notifOpen && (
@@ -342,33 +393,48 @@ export function TopBar() {
                   </Link>
                 </div>
                 <div style={{ padding: '0.5rem', maxHeight: 300, overflow: 'auto' }}>
-                  {[1, 2, 3].map((i) => (
+                  {notifItems.length === 0 ? (
                     <div
-                      key={i}
                       style={{
-                        padding: '0.625rem 0.75rem',
-                        borderRadius: 'var(--radius-md)',
-                        marginBottom: '2px',
-                        borderLeft: '3px solid var(--color-primary)',
-                        background: 'var(--color-primary-light)',
-                        cursor: 'pointer',
-                        transition: 'background 120ms ease',
+                        padding: '1.5rem',
+                        textAlign: 'center',
+                        color: 'var(--text-tertiary)',
+                        fontSize: 'var(--font-sm)',
                       }}
                     >
-                      <div style={{ fontSize: 'var(--font-sm)', fontWeight: 600 }}>
-                        Documento vencido
-                      </div>
+                      No hay notificaciones
+                    </div>
+                  ) : (
+                    notifItems.map((item) => (
                       <div
+                        key={item.id}
                         style={{
-                          fontSize: 'var(--font-xs)',
-                          color: 'var(--text-secondary)',
-                          marginTop: '2px',
+                          padding: '0.625rem 0.75rem',
+                          borderRadius: 'var(--radius-md)',
+                          marginBottom: '2px',
+                          borderLeft: item.readAt
+                            ? '3px solid transparent'
+                            : '3px solid var(--color-primary)',
+                          background: item.readAt ? 'transparent' : 'var(--color-primary-light)',
+                          cursor: 'pointer',
+                          transition: 'background 120ms ease',
                         }}
                       >
-                        Plano estructural A-102 ha vencido
+                        <div style={{ fontSize: 'var(--font-sm)', fontWeight: 600 }}>
+                          {item.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 'var(--font-xs)',
+                            color: 'var(--text-secondary)',
+                            marginTop: '2px',
+                          }}
+                        >
+                          {item.body}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -407,9 +473,9 @@ export function TopBar() {
                   fontWeight: 700,
                 }}
               >
-                U
+                {userName.trim().charAt(0).toUpperCase() || 'U'}
               </div>
-              <span className="topbar-user-name">Usuario</span>
+              <span className="topbar-user-name">{userName}</span>
             </button>
 
             {userMenuOpen && (
@@ -428,16 +494,15 @@ export function TopBar() {
                 }}
               >
                 <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>Usuario Demo</div>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{userName}</div>
                   <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-secondary)' }}>
-                    admin@empresa.com
+                    {userEmail || 'Sin correo'}
                   </div>
                 </div>
                 <div style={{ padding: '0.5rem' }}>
                   <button
                     onClick={() => {
-                      window.localStorage.removeItem('holocron_token');
-                      window.localStorage.removeItem('holocron_user');
+                      clearSession();
                       window.location.href = '/login';
                     }}
                     style={{

@@ -9,9 +9,23 @@ export type SessionUser = {
   roles: string[];
 };
 
+const TOKEN_KEY = 'holocron_token';
+const USER_KEY = 'holocron_user';
+const LANGUAGE_KEY = 'holocron_lang';
+const COOKIE_NAME = 'holocron_token';
+const COOKIE_MAX_AGE = 60 * 60 * 8;
+
+function writeTokenCookie(token: string) {
+  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function clearTokenCookie() {
+  document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
 export function getSessionUser(): SessionUser | null {
   if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem('holocron_user');
+  const raw = window.localStorage.getItem(USER_KEY);
   if (!raw) return null;
 
   try {
@@ -26,13 +40,24 @@ export function hasPermission(permission: string): boolean {
   return Boolean(user?.permissions?.includes(permission));
 }
 
+export function setSession(token: string, user: SessionUser) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(TOKEN_KEY, token);
+  window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (user.language) {
+    window.localStorage.setItem(LANGUAGE_KEY, user.language);
+  }
+  writeTokenCookie(token);
+}
+
 export function clearSession() {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem('holocron_token');
-  window.localStorage.removeItem('holocron_user');
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(USER_KEY);
+  clearTokenCookie();
 }
 
 export function getSessionToken(): string | undefined {
   if (typeof window === 'undefined') return undefined;
-  return window.localStorage.getItem('holocron_token') ?? undefined;
+  return window.localStorage.getItem(TOKEN_KEY) ?? undefined;
 }

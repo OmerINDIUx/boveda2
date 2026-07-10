@@ -15,7 +15,7 @@ export class VersionsService {
     return this.documents.createVersion(uploadedById, dto.documentId, {
       fileName: dto.fileName,
       mimeType: dto.mimeType,
-      base64Content: dto.base64Content,
+      fileKey: dto.fileKey,
       revision: dto.revision,
       notes: dto.notes,
       sizeBytes: dto.sizeBytes,

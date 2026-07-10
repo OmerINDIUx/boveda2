@@ -72,12 +72,12 @@ export class SmtpMailService {
       `From: Holocron <${from}>`,
       `To: <${payload.to}>`,
       `Subject: ${payload.subject}`,
-      payload.replyTo ? `Reply-To: <${payload.replyTo}>` : '',
+      ...(payload.replyTo ? [`Reply-To: <${payload.replyTo}>`] : []),
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=UTF-8',
       '',
       payload.html ?? `<pre>${this.escapeHtml(payload.text)}</pre>`,
-    ].filter(Boolean);
+    ];
     return `${lines.join('\r\n')}\r\n.\r\n`;
   }
 

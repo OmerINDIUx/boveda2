@@ -5,6 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   AlertTriangle,
   CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileClock,
   FileText,
   FolderTree,
@@ -13,6 +17,7 @@ import {
   Plus,
   Search,
   ShieldBan,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getSessionUser } from '../../lib/auth';
@@ -147,6 +152,47 @@ const emptyForm: ProjectForm = {
   assignedUserIds: [],
   disciplineIds: [],
 };
+
+const STEPS = [
+  { number: 1, title: 'Información general', description: 'Datos básicos del proyecto' },
+  { number: 2, title: 'Equipo y planificación', description: 'Responsables, prioridad y fechas' },
+  { number: 3, title: 'Alcance técnico', description: 'Disciplinas y configuración' },
+];
+
+const DRAFT_KEY = 'project_draft';
+
+function saveDraftLocally(form: ProjectForm) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadDraftLocally(): ProjectForm | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraftLocally() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function validateStep(step: number, form: ProjectForm): string | null {
+  if (step === 0) {
+    if (!form.name.trim()) return 'El nombre del proyecto es obligatorio.';
+    if (!form.code.trim()) return 'El código interno es obligatorio.';
+  }
+  return null;
+}
 
 const emptyFilters: Filters = {
   search: '',
@@ -559,41 +605,37 @@ export function ProjectDetailPage() {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folderSaving, setFolderSaving] = useState(false);
+
+  async function loadDetail() {
+    if (!projectId) return;
+    setLoading(true);
+    setError('');
+    try {
+      const query = buildQuery(filters);
+      const [detailResponse, documentsResponse] = await Promise.all([
+        apiGet<ProjectDetail>(`/projects/${projectId}`, getToken() ?? undefined),
+        apiGet<ProjectDocumentsResponse>(
+          `/projects/${projectId}/documents${query ? `?${query}` : ''}`,
+          getToken() ?? undefined
+        ),
+      ]);
+
+      setDetail(detailResponse);
+      setDocuments(documentsResponse);
+    } catch {
+      setDetail(fallbackDetail[projectId] ?? fallbackDetail['mock-1']);
+      setDocuments(fallbackDocuments[projectId] ?? fallbackDocuments['mock-1']);
+      setError('Se muestra un respaldo local porque no fue posible cargar el detalle completo.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    if (!projectId) return;
-    let active = true;
-
-    async function loadDetail() {
-      setLoading(true);
-      setError('');
-      try {
-        const query = buildQuery(filters);
-        const [detailResponse, documentsResponse] = await Promise.all([
-          apiGet<ProjectDetail>(`/projects/${projectId}`, getToken() ?? undefined),
-          apiGet<ProjectDocumentsResponse>(
-            `/projects/${projectId}/documents${query ? `?${query}` : ''}`,
-            getToken() ?? undefined
-          ),
-        ]);
-
-        if (!active) return;
-        setDetail(detailResponse);
-        setDocuments(documentsResponse);
-      } catch {
-        if (!active) return;
-        setDetail(fallbackDetail[projectId] ?? fallbackDetail['mock-1']);
-        setDocuments(fallbackDocuments[projectId] ?? fallbackDocuments['mock-1']);
-        setError('Se muestra un respaldo local porque no fue posible cargar el detalle completo.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
     void loadDetail();
-    return () => {
-      active = false;
-    };
   }, [filters, projectId]);
 
   async function deactivateProject() {
@@ -605,6 +647,30 @@ export function ProjectDetailPage() {
       );
     } catch (error) {
       setError(getErrorMessage(error, 'No fue posible desactivar el proyecto en este momento.'));
+    }
+  }
+
+  async function createFolder() {
+    if (!projectId || !newFolderName.trim()) return;
+    setFolderSaving(true);
+    try {
+      await apiPost(
+        '/folders',
+        {
+          projectId,
+          parentId: filters.folderId || undefined,
+          name: newFolderName.trim(),
+        },
+        getToken() ?? undefined
+      );
+      setNewFolderName('');
+      setShowCreateFolder(false);
+      setError('');
+      void loadDetail();
+    } catch (error) {
+      setError(getErrorMessage(error, 'No fue posible crear la carpeta.'));
+    } finally {
+      setFolderSaving(false);
     }
   }
 
@@ -736,11 +802,73 @@ export function ProjectDetailPage() {
         <article className="card span-4">
           <div className="panel-header">
             <h2>Carpetas del proyecto</h2>
-            <FolderTree size={18} color="var(--primary)" />
+            <div className="projects-actions">
+              {canManage ? (
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => setShowCreateFolder(!showCreateFolder)}
+                >
+                  <Plus size={16} />
+                  Nueva carpeta
+                </button>
+              ) : null}
+              <FolderTree size={18} color="var(--primary)" />
+            </div>
           </div>
           <p className="muted">
             Cada documento del proyecto debe vivir dentro de una de estas carpetas.
           </p>
+          {showCreateFolder ? (
+            <div
+              style={{
+                padding: '12px 0',
+                borderBottom: '1px solid var(--border)',
+                marginBottom: 12,
+              }}
+            >
+              <div className="field">
+                <label>Nombre de la carpeta</label>
+                <input
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Ej. Planos estructurales"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void createFolder();
+                    if (e.key === 'Escape') {
+                      setShowCreateFolder(false);
+                      setNewFolderName('');
+                    }
+                  }}
+                />
+              </div>
+              {filters.folderId ? (
+                <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                  Se creará dentro de la carpeta seleccionada
+                </p>
+              ) : null}
+              <div className="projects-actions">
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => {
+                    setShowCreateFolder(false);
+                    setNewFolderName('');
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => void createFolder()}
+                  disabled={folderSaving || !newFolderName.trim()}
+                >
+                  {folderSaving ? 'Creando...' : 'Crear'}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <FolderTreeView
             nodes={detail.folders}
             onSelectFolder={(folderId) => setFilters((current) => ({ ...current, folderId }))}
@@ -945,12 +1073,12 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
     disciplines: [],
     catalogs: { workType: [], currentStage: [], priority: [], status: [] },
   });
-  const [responsibleSearch, setResponsibleSearch] = useState('');
+
   const [codeTouched, setCodeTouched] = useState(false);
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
+  const [step, setStep] = useState(0);
   useEffect(() => {
     let active = true;
 
@@ -1103,6 +1231,21 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   }, []);
 
   useEffect(() => {
+    if (mode !== 'create') return;
+    const saved = loadDraftLocally();
+    if (saved && saved.name) {
+      setForm(saved);
+      setError('Se restauró un borrador guardado. Puedes continuar o empezar de nuevo.');
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const timer = setTimeout(() => saveDraftLocally(form), 500);
+    return () => clearTimeout(timer);
+  }, [form, mode]);
+
+  useEffect(() => {
     if (mode !== 'edit' || !projectId) return;
     let active = true;
 
@@ -1169,14 +1312,6 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
     });
   }, [codeTouched, form.name, mode]);
 
-  const filteredUsers = useMemo(() => {
-    const needle = responsibleSearch.trim().toLowerCase();
-    if (!needle) return formOptions.users;
-    return formOptions.users.filter((user) =>
-      `${user.name} ${user.email}`.toLowerCase().includes(needle)
-    );
-  }, [formOptions.users, responsibleSearch]);
-
   async function submit() {
     if (!form.name.trim() || !form.code.trim()) {
       setError('Completa al menos el nombre y el código del proyecto.');
@@ -1188,13 +1323,14 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
     const payload = {
       ...form,
-      assignedUserIds: mode === 'create' ? [] : form.assignedUserIds,
+      assignedUserIds: form.assignedUserIds,
       disciplineIds: form.disciplineIds,
     };
 
     try {
       if (mode === 'create') {
         const created = await apiPost<ProjectDetail>('/projects', payload, getToken() ?? undefined);
+        clearDraftLocally();
         router.push(`/projects/${created.project.id}`);
         router.refresh();
         return;
@@ -1226,6 +1362,36 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   }
 
+  function handleNext() {
+    const validationError = validateStep(step, form);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError('');
+    saveDraftLocally(form);
+    setStep((s) => s + 1);
+  }
+
+  async function handleSaveDraft() {
+    setSaving(true);
+    setError('');
+    const payload = { ...form, status: 'borrador' };
+    try {
+      await apiPost('/projects', payload, getToken() ?? undefined);
+      clearDraftLocally();
+      router.push('/projects');
+      router.refresh();
+    } catch {
+      saveDraftLocally(form);
+      clearDraftLocally();
+      router.push('/projects');
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function toggleDiscipline(disciplineId: string) {
     setForm((current) => ({
       ...current,
@@ -1242,7 +1408,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <h1>{mode === 'create' ? 'Nuevo proyecto' : 'Editar proyecto'}</h1>
           <p className="muted">
             {mode === 'create'
-              ? 'Formulario independiente para alta de proyectos.'
+              ? 'Completa la información del proyecto en 3 pasos.'
               : 'Formulario independiente para edición, sin compartir estado con el listado.'}
           </p>
         </div>
@@ -1263,143 +1429,308 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <p className="muted">Cargando formulario...</p>
         ) : (
           <>
-            <div className="quick-filters-grid">
-              <FormField
-                label="Nombre"
-                value={form.name}
-                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
-              />
-              <FormField
-                label="Código interno"
-                value={form.code}
-                onChange={(value) => {
-                  setCodeTouched(true);
-                  setForm((current) => ({ ...current, code: value.toUpperCase() }));
-                }}
-              />
-              <SelectField
-                label="Tipo de obra"
-                value={form.workType}
-                onChange={(value) => setForm((current) => ({ ...current, workType: value }))}
-                options={formOptions.catalogs.workType.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-              />
-              <SelectField
-                label="Etapa actual"
-                value={form.currentStage}
-                onChange={(value) => setForm((current) => ({ ...current, currentStage: value }))}
-                options={formOptions.catalogs.currentStage.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-              />
-              <SelectField
-                label="Prioridad"
-                value={form.priority}
-                onChange={(value) => setForm((current) => ({ ...current, priority: value }))}
-                options={formOptions.catalogs.priority.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-              />
-              <SelectField
-                label="Estado"
-                value={form.status}
-                onChange={(value) => setForm((current) => ({ ...current, status: value }))}
-                options={formOptions.catalogs.status.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-              />
-              <div className="field">
-                <label>Catálogos del proyecto</label>
-                <div className="projects-actions">
-                  <Link className="button secondary" href="/admin/project-catalogs">
-                    Administrar catálogos
-                  </Link>
-                </div>
-              </div>
-              <SearchableUserField
-                users={filteredUsers}
-                value={form.responsibleUserId}
-                search={responsibleSearch}
-                onSearchChange={setResponsibleSearch}
-                onChange={(value) =>
-                  setForm((current) => ({ ...current, responsibleUserId: value }))
-                }
-              />
-              <FormField
-                label="Fecha objetivo"
-                type="date"
-                value={form.targetDate}
-                onChange={(value) => setForm((current) => ({ ...current, targetDate: value }))}
-              />
-              <div className="field span-2">
-                <label>Disciplinas del proyecto</label>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                    gap: 10,
-                  }}
-                >
-                  {formOptions.disciplines.map((discipline) => (
-                    <label
-                      key={discipline.id}
+            {mode === 'create' ? <StepIndicator currentStep={step} /> : null}
+
+            <div className="quick-filters-grid" style={{ marginTop: mode === 'create' ? 24 : 0 }}>
+              {mode === 'edit' ? (
+                <>
+                  <FormField
+                    label="Nombre"
+                    value={form.name}
+                    onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+                  />
+                  <FormField
+                    label="Código interno"
+                    value={form.code}
+                    onChange={(value) => {
+                      setCodeTouched(true);
+                      setForm((current) => ({ ...current, code: value.toUpperCase() }));
+                    }}
+                  />
+                  <SelectField
+                    label="Tipo de obra"
+                    value={form.workType}
+                    onChange={(value) => setForm((current) => ({ ...current, workType: value }))}
+                    options={formOptions.catalogs.workType.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  />
+                  <SelectField
+                    label="Etapa actual"
+                    value={form.currentStage}
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, currentStage: value }))
+                    }
+                    options={formOptions.catalogs.currentStage.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  />
+                  <SelectField
+                    label="Prioridad"
+                    value={form.priority}
+                    onChange={(value) => setForm((current) => ({ ...current, priority: value }))}
+                    options={formOptions.catalogs.priority.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  />
+                  <div className="field">
+                    <label>Catálogos del proyecto</label>
+                    <div className="projects-actions">
+                      <Link className="button secondary" href="/admin/project-catalogs">
+                        Administrar catálogos
+                      </Link>
+                    </div>
+                  </div>
+                  <SearchableUserSelect
+                    users={formOptions.users}
+                    value={form.responsibleUserId}
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, responsibleUserId: value }))
+                    }
+                  />
+                  <FormField
+                    label="Fecha objetivo"
+                    type="date"
+                    value={form.targetDate}
+                    onChange={(value) => setForm((current) => ({ ...current, targetDate: value }))}
+                  />
+                  <div className="field span-2">
+                    <label>Disciplinas del proyecto</label>
+                    <div
                       style={{
-                        display: 'flex',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                         gap: 10,
-                        alignItems: 'center',
-                        padding: '10px 12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: 12,
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={form.disciplineIds.includes(discipline.id)}
-                        onChange={() => toggleDiscipline(discipline.id)}
+                      {formOptions.disciplines.map((discipline) => (
+                        <label
+                          key={discipline.id}
+                          style={{
+                            display: 'flex',
+                            gap: 10,
+                            alignItems: 'center',
+                            padding: '10px 12px',
+                            border: '1px solid var(--border)',
+                            borderRadius: 12,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={form.disciplineIds.includes(discipline.id)}
+                            onChange={() => toggleDiscipline(discipline.id)}
+                          />
+                          <span>
+                            {discipline.code} · {discipline.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="projects-actions" style={{ marginTop: 12 }}>
+                      <Link className="button secondary" href="/admin/project-disciplines">
+                        Administrar disciplinas
+                      </Link>
+                      {mode === 'edit' ? (
+                        <Link className="button secondary" href="/admin/project-users">
+                          Administrar usuarios del proyecto
+                        </Link>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="field span-2">
+                    <label>Descripción</label>
+                    <textarea
+                      value={form.description}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, description: event.target.value }))
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Paso 1: Información general */}
+                  {step === 0 && (
+                    <>
+                      <FormField
+                        label="Nombre"
+                        value={form.name}
+                        onChange={(value) => setForm((current) => ({ ...current, name: value }))}
                       />
-                      <span>
-                        {discipline.code} · {discipline.name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <div className="projects-actions" style={{ marginTop: 12 }}>
-                  <Link className="button secondary" href="/admin/project-disciplines">
-                    Administrar disciplinas
+                      <FormField
+                        label="Código interno"
+                        value={form.code}
+                        onChange={(value) => {
+                          setCodeTouched(true);
+                          setForm((current) => ({ ...current, code: value.toUpperCase() }));
+                        }}
+                      />
+                      <SelectField
+                        label="Tipo de obra"
+                        value={form.workType}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, workType: value }))
+                        }
+                        options={formOptions.catalogs.workType.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        }))}
+                      />
+                      <SelectField
+                        label="Etapa actual"
+                        value={form.currentStage}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, currentStage: value }))
+                        }
+                        options={formOptions.catalogs.currentStage.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        }))}
+                      />
+                      <div className="field span-2">
+                        <label>Descripción</label>
+                        <textarea
+                          value={form.description}
+                          onChange={(event) =>
+                            setForm((current) => ({ ...current, description: event.target.value }))
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Paso 2: Equipo y planificación */}
+                  {step === 1 && (
+                    <>
+                      <SearchableUserSelect
+                        users={formOptions.users}
+                        value={form.responsibleUserId}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, responsibleUserId: value }))
+                        }
+                      />
+                      <MultiSelectField
+                        label="Usuarios asignados"
+                        items={formOptions.users.map((u) => ({
+                          id: u.id,
+                          name: u.name,
+                          subtitle: u.email,
+                        }))}
+                        selectedIds={form.assignedUserIds}
+                        onChange={(ids) =>
+                          setForm((current) => ({ ...current, assignedUserIds: ids }))
+                        }
+                        placeholder="Selecciona usuarios del proyecto"
+                        helpText="Podrán ver todos los archivos del proyecto"
+                        searchPlaceholder="Buscar usuario..."
+                      />
+                      <SelectField
+                        label="Prioridad"
+                        value={form.priority}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, priority: value }))
+                        }
+                        options={formOptions.catalogs.priority.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        }))}
+                      />
+                      <FormField
+                        label="Fecha objetivo"
+                        type="date"
+                        value={form.targetDate}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, targetDate: value }))
+                        }
+                      />
+                    </>
+                  )}
+
+                  {/* Paso 3: Alcance técnico */}
+                  {step === 2 && (
+                    <MultiSelectField
+                      label="Disciplinas del proyecto"
+                      items={formOptions.disciplines.map((d) => ({
+                        id: d.id,
+                        name: d.name,
+                        subtitle: d.code,
+                      }))}
+                      selectedIds={form.disciplineIds}
+                      onChange={(ids) => setForm((current) => ({ ...current, disciplineIds: ids }))}
+                      placeholder="Selecciona disciplinas"
+                      helpText="Define el alcance técnico del proyecto"
+                      searchPlaceholder="Buscar disciplina..."
+                      renderItem={(item) => (
+                        <>
+                          <span
+                            className="multi-select-option-avatar"
+                            style={{ background: '#e2e8f0', color: '#475569', fontSize: 11 }}
+                          >
+                            {item.subtitle}
+                          </span>
+                          <span className="multi-select-option-copy">
+                            <strong>{item.name}</strong>
+                            <small>{item.subtitle}</small>
+                          </span>
+                        </>
+                      )}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+
+            {mode === 'create' ? (
+              <div className="projects-actions" style={{ marginTop: 24 }}>
+                {step > 0 ? (
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setStep(step - 1)}
+                  >
+                    <ChevronLeft size={18} />
+                    Anterior
+                  </button>
+                ) : (
+                  <Link className="button secondary" href="/projects">
+                    Cancelar
                   </Link>
-                  {mode === 'edit' ? (
-                    <Link className="button secondary" href="/admin/project-users">
-                      Administrar usuarios del proyecto
-                    </Link>
-                  ) : null}
-                </div>
+                )}
+                <div style={{ flex: 1 }} />
+                {step < 2 ? (
+                  <>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={saving}
+                    >
+                      Guardar borrador
+                    </button>
+                    <button className="button" type="button" onClick={handleNext}>
+                      Siguiente
+                      <ChevronRight size={18} />
+                    </button>
+                  </>
+                ) : (
+                  <button className="button" type="button" onClick={submit} disabled={saving}>
+                    {saving ? 'Guardando...' : 'Guardar proyecto'}
+                  </button>
+                )}
               </div>
-              <div className="field span-2">
-                <label>Descripción</label>
-                <textarea
-                  value={form.description}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, description: event.target.value }))
-                  }
-                />
+            ) : (
+              <div className="projects-actions" style={{ marginTop: 24 }}>
+                <Link className="button secondary" href={`/projects/${projectId}`}>
+                  Volver
+                </Link>
+                <button className="button" type="button" onClick={submit} disabled={saving}>
+                  {saving ? 'Guardando...' : 'Guardar cambios'}
+                </button>
               </div>
-            </div>
-            <div className="projects-actions">
-              <Link
-                className="button secondary"
-                href={mode === 'create' ? '/projects' : `/projects/${projectId}`}
-              >
-                Volver
-              </Link>
-              <button className="button" type="button" onClick={submit} disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
+            )}
           </>
         )}
       </article>
@@ -1515,39 +1846,293 @@ function SelectField({
   );
 }
 
-function SearchableUserField({
+function SearchableUserSelect({
   users,
   value,
-  search,
-  onSearchChange,
   onChange,
 }: {
   users: UserOption[];
   value: string;
-  search: string;
-  onSearchChange: (value: string) => void;
   onChange: (value: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const selectedUser = users.find((u) => u.id === value);
+
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return users;
+    return users.filter(
+      (user) =>
+        user.name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle)
+    );
+  }, [search, users]);
+
+  function getInitials(name: string) {
+    const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+    return parts.map((part) => part[0]?.toUpperCase() ?? '').join('') || 'U';
+  }
+
   return (
-    <div className="field">
+    <div className="field multi-select-field">
       <label>Responsable</label>
-      <input
-        placeholder="Buscar usuario por nombre o correo"
-        value={search}
-        onChange={(event) => onSearchChange(event.target.value)}
-      />
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        style={{ marginTop: 8 }}
+      <button
+        type="button"
+        className="multi-select-trigger"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
       >
-        <option value="">Selecciona un responsable</option>
-        {users.map((user) => (
-          <option key={user.id} value={user.id}>
-            {user.name} · {user.email}
-          </option>
-        ))}
-      </select>
+        <div className="multi-select-trigger-copy">
+          {!selectedUser ? (
+            <>
+              <span className="multi-select-placeholder">Selecciona un responsable</span>
+              <small className="muted">Busca por nombre o correo</small>
+            </>
+          ) : (
+            <>
+              <div className="multi-select-chip-row">
+                <span className="multi-select-chip">
+                  <span className="multi-select-chip-avatar">{getInitials(selectedUser.name)}</span>
+                  <span>{selectedUser.name}</span>
+                </span>
+              </div>
+              <small className="muted">{selectedUser.email}</small>
+            </>
+          )}
+        </div>
+        <div className="multi-select-trigger-meta">
+          <span className="multi-select-count">{value ? '1' : '0'}</span>
+          <ChevronDown className={open ? 'is-open' : ''} size={18} />
+        </div>
+      </button>
+      {open ? (
+        <div className="multi-select-popover">
+          <div className="multi-select-toolbar">
+            <div className="multi-select-search">
+              <Search size={16} />
+              <input
+                type="search"
+                placeholder="Buscar usuario..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            {value ? (
+              <button
+                className="multi-select-clear"
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setOpen(false);
+                }}
+              >
+                <X size={14} />
+                Limpiar
+              </button>
+            ) : null}
+          </div>
+
+          <div className="multi-select-options">
+            {filtered.map((user) => {
+              const checked = user.id === value;
+              return (
+                <label
+                  className={`multi-select-option ${checked ? 'selected' : ''}`}
+                  key={user.id}
+                  onClick={() => {
+                    onChange(user.id);
+                    setOpen(false);
+                  }}
+                >
+                  <input type="radio" name="responsible" checked={checked} readOnly />
+                  <span className="multi-select-option-check">
+                    {checked ? <Check size={14} /> : null}
+                  </span>
+                  <span className="multi-select-option-avatar">{getInitials(user.name)}</span>
+                  <span className="multi-select-option-copy">
+                    <strong>{user.name}</strong>
+                    <small>{user.email}</small>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {!filtered.length ? (
+            <p className="muted multi-select-empty">No hay usuarios que coincidan.</p>
+          ) : null}
+        </div>
+      ) : null}
+      {open ? <div className="multi-select-overlay" onClick={() => setOpen(false)} /> : null}
+    </div>
+  );
+}
+
+function StepIndicator({ currentStep }: { currentStep: number }) {
+  return (
+    <div className="step-indicator">
+      {STEPS.map((s, i) => (
+        <div key={s.number} style={{ display: 'contents' }}>
+          <div
+            className={`step-node ${i < currentStep ? 'completed' : i === currentStep ? 'active' : ''}`}
+          >
+            <div className="step-circle">{i < currentStep ? <Check size={16} /> : s.number}</div>
+            <div className="step-text">
+              <strong>{s.title}</strong>
+              <small>{s.description}</small>
+            </div>
+          </div>
+          {i < STEPS.length - 1 ? (
+            <div className={`step-connector ${i < currentStep ? 'completed' : ''}`} />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MultiSelectField({
+  label,
+  items,
+  selectedIds = [],
+  onChange,
+  placeholder = 'Selecciona opciones',
+  helpText,
+  searchPlaceholder = 'Buscar...',
+  renderItem,
+}: {
+  label: string;
+  items: Array<{ id: string; name: string; subtitle?: string }>;
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  placeholder?: string;
+  helpText?: string;
+  searchPlaceholder?: string;
+  renderItem?: (item: { id: string; name: string; subtitle?: string }) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) return items;
+    return items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(normalized) ||
+        (item.subtitle ?? '').toLowerCase().includes(normalized)
+    );
+  }, [search, items]);
+
+  function toggle(id: string) {
+    onChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id]);
+  }
+
+  const selectedItems = items.filter((i) => selectedIds.includes(i.id));
+  const previewItems = selectedItems.slice(0, 2);
+
+  function getInitials(name: string) {
+    const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+    return parts.map((part) => part[0]?.toUpperCase() ?? '').join('') || 'U';
+  }
+
+  return (
+    <div className="field multi-select-field">
+      <label>{label}</label>
+      <button
+        type="button"
+        className="multi-select-trigger"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        <div className="multi-select-trigger-copy">
+          {selectedIds.length === 0 ? (
+            <>
+              <span className="multi-select-placeholder">{placeholder}</span>
+              {helpText ? <small className="muted">{helpText}</small> : null}
+            </>
+          ) : (
+            <>
+              <div className="multi-select-chip-row">
+                {previewItems.map((item) => (
+                  <span className="multi-select-chip" key={item.id}>
+                    <span className="multi-select-chip-avatar">{getInitials(item.name)}</span>
+                    <span>{item.name}</span>
+                  </span>
+                ))}
+                {selectedItems.length > previewItems.length ? (
+                  <span className="multi-select-chip more">
+                    +{selectedItems.length - previewItems.length} más
+                  </span>
+                ) : null}
+              </div>
+              <small className="muted">
+                {selectedItems.length} seleccionado{selectedItems.length === 1 ? '' : 's'}
+              </small>
+            </>
+          )}
+        </div>
+        <div className="multi-select-trigger-meta">
+          <span className="multi-select-count">{selectedIds.length}</span>
+          <ChevronDown className={open ? 'is-open' : ''} size={18} />
+        </div>
+      </button>
+      {open ? (
+        <div className="multi-select-popover">
+          <div className="multi-select-toolbar">
+            <div className="multi-select-search">
+              <Search size={16} />
+              <input
+                type="search"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            {selectedIds.length ? (
+              <button className="multi-select-clear" type="button" onClick={() => onChange([])}>
+                <X size={14} />
+                Limpiar
+              </button>
+            ) : null}
+          </div>
+
+          {selectedItems.length ? (
+            <div className="multi-select-selected-summary">
+              <span>Seleccionados</span>
+              <strong>{selectedItems.map((item) => item.name).join(', ')}</strong>
+            </div>
+          ) : null}
+
+          <div className="multi-select-options">
+            {filtered.map((item) => {
+              const checked = selectedIds.includes(item.id);
+              return (
+                <label className={`multi-select-option ${checked ? 'selected' : ''}`} key={item.id}>
+                  <input type="checkbox" checked={checked} onChange={() => toggle(item.id)} />
+                  <span className="multi-select-option-check">
+                    {checked ? <Check size={14} /> : null}
+                  </span>
+                  {renderItem ? (
+                    renderItem(item)
+                  ) : (
+                    <>
+                      <span className="multi-select-option-avatar">{getInitials(item.name)}</span>
+                      <span className="multi-select-option-copy">
+                        <strong>{item.name}</strong>
+                        {item.subtitle ? <small>{item.subtitle}</small> : null}
+                      </span>
+                    </>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+          {!filtered.length ? (
+            <p className="muted multi-select-empty">No hay resultados que coincidan.</p>
+          ) : null}
+        </div>
+      ) : null}
+      {open ? <div className="multi-select-overlay" onClick={() => setOpen(false)} /> : null}
     </div>
   );
 }

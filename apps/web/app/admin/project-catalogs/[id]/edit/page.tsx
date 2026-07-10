@@ -1,11 +1,7 @@
-import { RequirePermission } from '../../../../../components/auth/require-permission';
-import { ProjectCatalogFormPage } from '../../../../../components/modules/project-admin-pages';
-import { PermissionKey } from '../../../../../lib/permissions';
+import { redirect } from 'next/navigation';
 
-export default function EditProjectCatalogPage() {
-  return (
-    <RequirePermission permission={PermissionKey.ProjectsManage}>
-      <ProjectCatalogFormPage mode="edit" />
-    </RequirePermission>
-  );
+export const dynamic = 'force-dynamic';
+
+export default function OldEditProjectCatalogPage() {
+  redirect('/admin/project-catalogs');
 }

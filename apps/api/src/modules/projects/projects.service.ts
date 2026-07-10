@@ -1,4 +1,11 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
@@ -8,7 +15,9 @@ import { Discipline } from '../folders/discipline.entity';
 import { Folder } from '../folders/folder.entity';
 import { User } from '../users/user.entity';
 import { AssignProjectUserDto } from './dto/assign-project-user.dto';
+import { CheckCatalogSynonymsDto } from './dto/check-catalog-synonyms.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { SearchCatalogSynonymsDto } from './dto/search-catalog-synonyms.dto';
 import { CreateProjectCatalogOptionDto } from './dto/create-project-catalog-option.dto';
 import { ProjectDocumentsQueryDto } from './dto/project-documents-query.dto';
 import { UpdateProjectCatalogOptionDto } from './dto/update-project-catalog-option.dto';
@@ -40,7 +49,8 @@ export class ProjectsService {
     @InjectRepository(ProjectCatalogOption)
     private readonly catalogOptions: Repository<ProjectCatalogOption>,
     private readonly scope: AccessScopeService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly config: ConfigService
   ) {}
 
   async getFormOptions(userId: string) {
@@ -118,6 +128,181 @@ export class ProjectsService {
     return created;
   }
 
+  async checkSynonyms(dto: CheckCatalogSynonymsDto): Promise<{ synonym: string | null }> {
+    const existing = await this.catalogOptions.find({
+      where: { category: dto.category, isActive: true },
+      select: ['label'],
+    });
+
+    if (!existing.length) {
+      return { synonym: null };
+    }
+
+    const existingLabels = existing.map((opt) => opt.label);
+    const baseUrl = this.config.get<string>('OLLAMA_BASE_URL') ?? 'http://127.0.0.1:11434';
+    const model = this.config.get<string>('OLLAMA_MODEL') ?? 'llama3.1';
+    const timeoutMs = Number(this.config.get<string>('OLLAMA_TIMEOUT_MS') ?? 120000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    const userPrompt = [
+      'Categoria: ' + dto.category,
+      '',
+      'Terminos existentes:',
+      ...existingLabels.map((l, i) => `${i + 1}. ${l}`),
+      '',
+      `Nuevo termino: "${dto.label}"`,
+      '',
+      'Responde unicamente el numero del termino existente que sea sinonimo o muy similar',
+      'al nuevo termino. Si ninguno se parece, responde "0".',
+      'No incluyas nada mas en tu respuesta, solo el numero.',
+    ].join('\n');
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          stream: false,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Eres un asistente que identifica sinonimos o terminos muy similares en espanol ' +
+                'para catalogos de proyectos de construccion. ' +
+                'Considera sinonimos reales (edificio/edificacion, obra/construccion, planificacion/planeacion), ' +
+                'plurales, variaciones ortograficas y conceptos equivalentes. ' +
+                'Responde UNICAMENTE con el numero del termino existente mas parecido, o "0" si no hay.',
+            },
+            { role: 'user', content: userPrompt },
+          ],
+          options: { temperature: 0.1 },
+        }),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Ollama respondio ${response.status} en checkSynonyms`);
+        return { synonym: null };
+      }
+
+      const payload = (await response.json()) as { message?: { content?: string } };
+      const answer = (payload.message?.content ?? '').trim();
+
+      if (!answer || answer === '0') {
+        return { synonym: null };
+      }
+
+      const matchedIndex = parseInt(answer, 10);
+      if (!isNaN(matchedIndex) && matchedIndex >= 1 && matchedIndex <= existingLabels.length) {
+        return { synonym: existingLabels[matchedIndex - 1] };
+      }
+
+      const matched = existingLabels.find(
+        (l) => l.toLowerCase().trim() === answer.toLowerCase().trim()
+      );
+      if (matched) {
+        return { synonym: matched };
+      }
+
+      this.logger.warn(`Ollama respondio algo inesperado en checkSynonyms: "${answer}"`);
+      return { synonym: null };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        this.logger.warn(`Ollama timeout en checkSynonyms tras ${timeoutMs}ms`);
+      } else {
+        this.logger.warn(`Error conectando con Ollama en checkSynonyms: ${error}`);
+      }
+      return { synonym: null };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async searchSynonyms(dto: SearchCatalogSynonymsDto): Promise<{ ids: string[] }> {
+    const existing = await this.catalogOptions.find({
+      where: { category: dto.category, isActive: true },
+      select: ['id', 'label'],
+    });
+
+    if (!existing.length || dto.query.trim().length < 2) {
+      return { ids: [] };
+    }
+
+    const baseUrl = this.config.get<string>('OLLAMA_BASE_URL') ?? 'http://127.0.0.1:11434';
+    const model = this.config.get<string>('OLLAMA_MODEL') ?? 'llama3.1';
+    const timeoutMs = Number(this.config.get<string>('OLLAMA_TIMEOUT_MS') ?? 120000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    const userPrompt = [
+      'Categoria: ' + dto.category,
+      '',
+      'Terminos disponibles:',
+      ...existing.map((opt, i) => `${i + 1}. ${opt.label}`),
+      '',
+      `Busqueda: "${dto.query}"`,
+      '',
+      'Responde unicamente los numeros de los terminos que esten relacionados',
+      'semanticamente con la busqueda (sinonimos, conceptos similares, equivalentes).',
+      'Si ninguno se relaciona responde "0".',
+      'Separa los numeros con comas. Ej: "1, 3, 5"',
+    ].join('\n');
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          stream: false,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Eres un asistente que encuentra terminos semanticamente relacionados ' +
+                'en espanol para catalogos de proyectos de construccion. ' +
+                'Responde UNICAMENTE con numeros separados por comas, o "0" si no hay coincidencias.',
+            },
+            { role: 'user', content: userPrompt },
+          ],
+          options: { temperature: 0.1 },
+        }),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Ollama respondio ${response.status} en searchSynonyms`);
+        return { ids: [] };
+      }
+
+      const payload = (await response.json()) as { message?: { content?: string } };
+      const answer = (payload.message?.content ?? '').trim();
+
+      if (!answer || answer === '0') {
+        return { ids: [] };
+      }
+
+      const indices = answer
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n) && n >= 1 && n <= existing.length);
+
+      const ids = [...new Set(indices.map((i) => existing[i - 1].id))];
+      return { ids };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        this.logger.warn(`Ollama timeout en searchSynonyms tras ${timeoutMs}ms`);
+      } else {
+        this.logger.warn(`Error conectando con Ollama en searchSynonyms: ${error}`);
+      }
+      return { ids: [] };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async updateCatalogOption(userId: string, id: string, dto: UpdateProjectCatalogOptionDto) {
     const option = await this.catalogOptions.findOne({ where: { id } });
     if (!option) {
@@ -167,7 +352,7 @@ export class ProjectsService {
 
     const [projects, members, documents, disciplineCatalog] = await Promise.all([
       this.projects.find({
-        where: { id: In(projectIds) },
+        where: { id: In(projectIds), isDraft: false },
         relations: ['responsibleUser'],
         order: { updatedAt: 'DESC' },
       }),
@@ -231,6 +416,14 @@ export class ProjectsService {
       this.disciplines.find(),
     ]);
 
+    const projectDisciplineIds = new Set(project.disciplineIds ?? []);
+    const projectDisciplineCatalog = disciplineCatalog.filter((d) =>
+      projectDisciplineIds.has(d.id)
+    );
+    const filteredFolderList = folderList.filter(
+      (f) => !f.disciplineId || projectDisciplineIds.has(f.disciplineId)
+    );
+
     const disciplineMap = new Map(
       disciplineCatalog.map((discipline) => [discipline.id, discipline])
     );
@@ -238,11 +431,11 @@ export class ProjectsService {
 
     return {
       project: this.toProjectSummary(project, members, documents, disciplineMap),
-      folders: this.buildFolderTree(folderList),
+      folders: this.buildFolderTree(filteredFolderList),
       recentDocuments: this.getRecentDocuments(documents),
       criticalDocuments: this.getCriticalDocuments(documents),
       documentsSummary: this.buildDocumentsSummary(documents),
-      availableDisciplines: disciplineCatalog,
+      availableDisciplines: projectDisciplineCatalog,
     };
   }
 
@@ -258,14 +451,17 @@ export class ProjectsService {
   }
 
   async create(dto: CreateProjectDto, ownerId: string) {
+    const isDraft = dto.isDraft === 'true' || dto.isDraft === true;
+
     const project = await this.projects.save(
       this.projects.create({
         ...dto,
         ownerId,
         responsibleUserId: dto.responsibleUserId ?? ownerId,
         priority: dto.priority ?? 'media',
-        status: dto.status ?? 'planificacion',
+        status: isDraft ? 'borrador' : (dto.status ?? 'planificacion'),
         isActive: true,
+        isDraft,
         disciplineIds: dto.disciplineIds ?? [],
       })
     );
@@ -280,17 +476,52 @@ export class ProjectsService {
       })
     );
 
-    await this.syncAssignedUsers(project.id, ownerId, dto.assignedUserIds ?? []);
-    await this.ensureProjectFolderStructure(project.id, ownerId, dto.disciplineIds ?? []);
+    if (!isDraft) {
+      await this.syncAssignedUsers(project.id, ownerId, dto.assignedUserIds ?? []);
+      await this.ensureProjectFolderStructure(project.id, ownerId, dto.disciplineIds ?? []);
+      await this.audit.record({
+        actorId: ownerId,
+        action: 'project.create',
+        entityType: 'project',
+        entityId: project.id,
+        metadata: { name: project.name, code: project.code },
+      });
+    }
+
+    return this.getDetail(ownerId, project.id);
+  }
+
+  async listDrafts(userId: string) {
+    return this.projects.find({
+      where: { ownerId: userId, isDraft: true },
+      relations: ['responsibleUser'],
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  async publishDraft(requesterId: string, projectId: string) {
+    const project = await this.projects.findOne({ where: { id: projectId } });
+    if (!project) {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+    if (!project.isDraft) {
+      throw new BadRequestException('El proyecto no es un borrador');
+    }
+
+    project.isDraft = false;
+    project.status = project.status === 'borrador' ? 'planificacion' : project.status;
+    await this.projects.save(project);
+
+    await this.ensureProjectFolderStructure(projectId, requesterId, project.disciplineIds ?? []);
     await this.audit.record({
-      actorId: ownerId,
+      actorId: requesterId,
       action: 'project.create',
       entityType: 'project',
-      entityId: project.id,
+      entityId: projectId,
       metadata: { name: project.name, code: project.code },
     });
 
-    return this.getDetail(ownerId, project.id);
+    return this.getDetail(requesterId, projectId);
   }
 
   async update(requesterId: string, projectId: string, dto: UpdateProjectDto) {
