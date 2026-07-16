@@ -13,6 +13,7 @@ export const NOTIFICATION_TYPES = [
   'contract_obligation_pending',
   'document_new_version',
   'document_approval_result',
+  'bitacora_pending_signature',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -43,4 +44,9 @@ export const NOTIFICATION_DEFAULTS: Record<
   },
   document_new_version: { inApp: true, email: true, label: 'Nueva versión de documento' },
   document_approval_result: { inApp: true, email: true, label: 'Documento aprobado o rechazado' },
+  bitacora_pending_signature: {
+    inApp: true,
+    email: true,
+    label: 'Entrada de bitácora pendiente de firma',
+  },
 };

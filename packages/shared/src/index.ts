@@ -42,6 +42,8 @@ export const PermissionKey = {
   AuditView: 'audit.view',
   ContractsManage: 'contracts.manage',
   AiQuery: 'ai.query',
+  ClmCounterparties: 'clm.counterparties',
+  ClmRequests: 'clm.requests',
   ClmTemplates: 'clm.templates',
   ClmImport: 'clm.import',
   ClmExport: 'clm.export',
@@ -54,6 +56,12 @@ export const PermissionKey = {
   BulkUpload: 'bulk.upload',
   SlaManage: 'sla.manage',
   LanguageEdit: 'language.edit',
+  BitacorasView: 'bitacoras.view',
+  BitacorasCreate: 'bitacoras.create',
+  BitacorasEdit: 'bitacoras.edit',
+  BitacorasSign: 'bitacoras.sign',
+  BitacorasDelete: 'bitacoras.delete',
+  BitacorasManage: 'bitacoras.manage',
 } as const;
 
 export type PermissionKey = (typeof PermissionKey)[keyof typeof PermissionKey];
@@ -77,6 +85,8 @@ export const PermissionCatalog: Array<{ key: PermissionKey; label: string; modul
   { key: PermissionKey.AuditView, label: 'Ver auditoria', module: 'audit' },
   { key: PermissionKey.ContractsManage, label: 'Administrar contratos', module: 'clm' },
   { key: PermissionKey.AiQuery, label: 'Consultar IA documental', module: 'ai-query' },
+  { key: PermissionKey.ClmCounterparties, label: 'Gestionar contrapartes CLM', module: 'clm' },
+  { key: PermissionKey.ClmRequests, label: 'Gestionar solicitudes CLM', module: 'clm' },
   { key: PermissionKey.ClmTemplates, label: 'Gestionar plantillas CLM', module: 'clm' },
   { key: PermissionKey.ClmImport, label: 'Importar contratos', module: 'clm' },
   { key: PermissionKey.ClmExport, label: 'Exportar contratos', module: 'clm' },
@@ -89,6 +99,12 @@ export const PermissionCatalog: Array<{ key: PermissionKey; label: string; modul
   { key: PermissionKey.BulkUpload, label: 'Carga masiva de archivos', module: 'uploads' },
   { key: PermissionKey.SlaManage, label: 'Administrar SLAs', module: 'sla' },
   { key: PermissionKey.LanguageEdit, label: 'Cambiar idioma', module: 'users' },
+  { key: PermissionKey.BitacorasView, label: 'Ver bitácora', module: 'bitacoras' },
+  { key: PermissionKey.BitacorasCreate, label: 'Crear entrada de bitácora', module: 'bitacoras' },
+  { key: PermissionKey.BitacorasEdit, label: 'Editar entrada de bitácora', module: 'bitacoras' },
+  { key: PermissionKey.BitacorasSign, label: 'Firmar entrada de bitácora', module: 'bitacoras' },
+  { key: PermissionKey.BitacorasDelete, label: 'Eliminar entrada de bitácora', module: 'bitacoras' },
+  { key: PermissionKey.BitacorasManage, label: 'Administrar bitácora', module: 'bitacoras' },
 ];
 
 export interface ProjectSummary {

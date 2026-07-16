@@ -1,4 +1,4 @@
-import { clearSession } from './auth';
+import { clearSession, getSessionToken } from './auth';
 import { buildBrowserApiUrl } from './api-base';
 
 const DEFAULT_TIMEOUT = 30_000;
@@ -13,6 +13,10 @@ function handleUnauthorized(response: Response) {
   if (window.location.pathname !== '/login') {
     window.location.href = '/login';
   }
+}
+
+function resolveToken(token?: string): string | undefined {
+  return token ?? getSessionToken();
 }
 
 async function readApiError(response: Response, method: string, path: string) {
@@ -58,7 +62,9 @@ async function request<T>(
       method,
       headers: {
         ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(options?.token ? { Authorization: `Bearer ${options.token}` } : {}),
+        ...(resolveToken(options?.token)
+          ? { Authorization: `Bearer ${resolveToken(options?.token)}` }
+          : {}),
       },
       ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
       signal: controller.signal,

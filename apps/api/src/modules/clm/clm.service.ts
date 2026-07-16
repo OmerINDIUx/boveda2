@@ -1,7 +1,7 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
-import { Repository, Brackets } from 'typeorm';
+import { Repository, Brackets, Like } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { StorageService } from '../../storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -35,18 +35,28 @@ import { UpdateContractObligationDto } from './dto/update-contract-obligation.dt
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { UpdateLifecycleStageDto } from './dto/update-lifecycle-stage.dto';
+import { CreateCounterpartyDto } from './dto/create-counterparty.dto';
+import { UpdateCounterpartyDto } from './dto/update-counterparty.dto';
+import { CreateContractRequestDto } from './dto/create-contract-request.dto';
+import { ReviewContractRequestDto } from './dto/review-contract-request.dto';
 import { ContractAmendment } from './entities/contract-amendment.entity';
 import { ContractClause } from './entities/contract-clause.entity';
 import { ContractCustomField } from './entities/contract-custom-field.entity';
 import { ContractCustomValue } from './entities/contract-custom-value.entity';
 import { ContractImportLog } from './entities/contract-import-log.entity';
+import { ContractLifecycleEvent } from './entities/contract-lifecycle-event.entity';
 import { ContractNegotiation } from './entities/contract-negotiation.entity';
 import { ContractPayment } from './entities/contract-payment.entity';
 import { ContractSignatureRequest } from './entities/contract-signature-request.entity';
 import { ContractTemplate } from './entities/contract-template.entity';
+import { ContractRequest } from './entities/contract-request.entity';
+import { Counterparty } from './entities/counterparty.entity';
+import { CounterpartyContact } from './entities/counterparty-contact.entity';
+import { CounterpartyDocument } from './entities/counterparty-document.entity';
+import { ContractTextIndex } from './entities/contract-text-index.entity';
 import { Tag } from './entities/tag.entity';
 import { SignatureProvider } from './signature/signature-provider.interface';
-import { StubSignatureProvider } from './signature/stub-signature.provider';
 import { ReportGeneratorService } from './reports/report-generator.service';
 import { ReportType } from './reports/report-types';
 import { ContractAttachment } from './contract-attachment.entity';
@@ -62,8 +72,6 @@ const CONTRACT_SOON_DAYS = 30;
 
 @Injectable()
 export class ClmService {
-  private signatureProvider: SignatureProvider;
-
   constructor(
     @InjectRepository(Contract) private readonly contracts: Repository<Contract>,
     @InjectRepository(ContractVersion) private readonly versions: Repository<ContractVersion>,
@@ -94,13 +102,24 @@ export class ClmService {
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
     @InjectRepository(DocumentVersion)
     private readonly documentVersions: Repository<DocumentVersion>,
+    @InjectRepository(Counterparty)
+    private readonly counterpartiesRepo: Repository<Counterparty>,
+    @InjectRepository(CounterpartyContact)
+    private readonly counterpartyContactsRepo: Repository<CounterpartyContact>,
+    @InjectRepository(CounterpartyDocument)
+    private readonly counterpartyDocumentsRepo: Repository<CounterpartyDocument>,
+    @InjectRepository(ContractRequest)
+    private readonly requestsRepo: Repository<ContractRequest>,
+    @InjectRepository(ContractTextIndex)
+    private readonly textIndexRepo: Repository<ContractTextIndex>,
+    @InjectRepository(ContractLifecycleEvent)
+    private readonly lifecycleEventsRepo: Repository<ContractLifecycleEvent>,
     private readonly scope: AccessScopeService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService,
-    private readonly reportGenerator: ReportGeneratorService
-  ) {
-    this.signatureProvider = new StubSignatureProvider();
-  }
+    private readonly reportGenerator: ReportGeneratorService,
+    @Inject('SIGNATURE_PROVIDER') private readonly signatureProvider: SignatureProvider
+  ) {}
 
   async list(userId: string, search?: ContractSearchDto) {
     const projectIds = search?.projectId
@@ -1079,6 +1098,694 @@ export class ClmService {
       order: { createdAt: 'DESC' },
       take: 50,
     });
+  }
+
+  async updateLifecycleStage(userId: string, contractId: string, dto: UpdateLifecycleStageDto) {
+    const contract = await this.assertContractAccess(userId, contractId);
+    const previousStage = contract.lifecycleStage;
+    const now = new Date();
+    let timeInPreviousStageMinutes: number | undefined;
+    if (contract.lifecycleChangedAt) {
+      timeInPreviousStageMinutes = Math.floor(
+        (now.getTime() - contract.lifecycleChangedAt.getTime()) / 60000
+      );
+    }
+    contract.lifecycleStage = dto.stage;
+    contract.lifecycleChangedAt = now;
+    await this.contracts.save(contract);
+    await this.lifecycleEventsRepo.save(
+      this.lifecycleEventsRepo.create({
+        contractId,
+        previousStage,
+        stage: dto.stage,
+        changedById: userId,
+        comments: dto.comments,
+        decision: dto.decision,
+        relatedDocumentId: dto.relatedDocumentId,
+        relatedVersionId: dto.relatedVersionId,
+        timeInPreviousStageMinutes,
+      })
+    );
+    await this.log(contractId, userId, 'lifecycle_change', { previousStage }, { stage: dto.stage });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async deleteVersion(userId: string, contractId: string, versionId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const version = await this.versions.findOne({ where: { id: versionId, contractId } });
+    if (!version) throw new NotFoundException('Version no encontrada');
+    await this.versions.softDelete(versionId);
+    await this.log(contractId, userId, 'delete_version', undefined, { versionId });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async deleteAttachment(userId: string, contractId: string, attachmentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const attachment = await this.attachments.findOne({ where: { id: attachmentId, contractId } });
+    if (!attachment) throw new NotFoundException('Adjunto no encontrado');
+    await this.attachments.softDelete(attachmentId);
+    await this.log(contractId, userId, 'delete_attachment', undefined, { attachmentId });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async deleteObligation(userId: string, contractId: string, obligationId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const obligation = await this.obligations.findOne({ where: { id: obligationId, contractId } });
+    if (!obligation) throw new NotFoundException('Obligacion no encontrada');
+    await this.obligations.softDelete(obligationId);
+    await this.log(contractId, userId, 'delete_obligation', undefined, { obligationId });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async remindObligation(userId: string, contractId: string, obligationId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const obligation = await this.obligations.findOne({
+      where: { id: obligationId, contractId },
+      relations: ['responsibleUser'],
+    });
+    if (!obligation) throw new NotFoundException('Obligacion no encontrada');
+    const recipientId = obligation.responsibleUserId ?? userId;
+    await this.notifications.notify({
+      recipients: [{ userId: recipientId }],
+      notificationType: 'contract_obligation_pending',
+      title: `Recordatorio de obligacion: ${obligation.description.slice(0, 80)}`,
+      body: `La obligacion "${obligation.description}" vence el ${obligation.commitmentDate ?? 'sin fecha'}.`,
+      entityType: 'obligation',
+      entityId: obligation.id,
+      category: 'contract',
+      meta: { route: `/clm/${contractId}`, obligationId: obligation.id },
+      dedupeKey: `obligation-remind:${obligation.id}:${this.today()}`,
+    });
+    obligation.lastRemindedAt = new Date();
+    obligation.reminderCount = (obligation.reminderCount ?? 0) + 1;
+    await this.obligations.save(obligation);
+    await this.log(contractId, userId, 'remind_obligation', undefined, { obligationId });
+    return { ok: true, remindedAt: obligation.lastRemindedAt };
+  }
+
+  async getCalendarEvents(userId: string, contractId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const [obligations, milestones] = await Promise.all([
+      this.obligations.find({
+        where: { contractId },
+        relations: ['responsibleUser'],
+      }),
+      this.milestones.find({
+        where: { contractId },
+        relations: ['responsibleUser'],
+      }),
+    ]);
+    const events: Array<{
+      id: string;
+      type: 'obligation' | 'milestone';
+      title: string;
+      date: string;
+      status: string;
+      responsible: string | null;
+    }> = [];
+    for (const ob of obligations) {
+      if (ob.commitmentDate) {
+        events.push({
+          id: ob.id,
+          type: 'obligation',
+          title: ob.description.slice(0, 100),
+          date: ob.commitmentDate,
+          status: ob.status,
+          responsible: ob.responsibleUser?.name ?? null,
+        });
+      }
+    }
+    for (const ms of milestones) {
+      events.push({
+        id: ms.id,
+        type: 'milestone',
+        title: ms.name,
+        date: ms.milestoneDate,
+        status: ms.status,
+        responsible: ms.responsibleUser?.name ?? null,
+      });
+    }
+    events.sort((a, b) => a.date.localeCompare(b.date));
+    return events;
+  }
+
+  async deleteMilestone(userId: string, contractId: string, milestoneId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const milestone = await this.milestones.findOne({ where: { id: milestoneId, contractId } });
+    if (!milestone) throw new NotFoundException('Hito no encontrado');
+    await this.milestones.softDelete(milestoneId);
+    await this.log(contractId, userId, 'delete_milestone', undefined, { milestoneId });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async deleteComment(userId: string, contractId: string, commentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const comment = await this.comments.findOne({ where: { id: commentId, contractId } });
+    if (!comment) throw new NotFoundException('Comentario no encontrado');
+    await this.comments.softDelete(commentId);
+    await this.log(contractId, userId, 'delete_comment', undefined, { commentId });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async getRiskMatrix(userId: string, contractId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const contract = await this.contracts.findOne({ where: { id: contractId } });
+    if (!contract) throw new NotFoundException('Contrato no encontrado');
+
+    const obligations = await this.obligations.find({ where: { contractId } });
+    const payments = await this.paymentsRepo.find({ where: { contractId } });
+    const overdueObligations = obligations.filter(
+      (o) => o.status === 'overdue' || o.status === 'pending'
+    ).length;
+    const totalObligations = obligations.length || 1;
+    const overduePayments = payments.filter(
+      (p) => p.status === 'overdue' || p.status === 'pending'
+    ).length;
+
+    const amount = Number(contract.amount ?? 0);
+    const financialScore = Math.min(
+      100,
+      (amount > 1000000 ? 60 : amount > 100000 ? 30 : 10) +
+        (overduePayments / (payments.length || 1)) * 40
+    );
+
+    const legalScore = Math.min(
+      100,
+      (overdueObligations / totalObligations) * 60 + (contract.status === 'draft' ? 20 : 0)
+    );
+
+    const operationalScore = Math.min(
+      100,
+      overdueObligations > 0 ? 50 + (overdueObligations / totalObligations) * 50 : 10
+    );
+
+    const complianceScore = Math.min(
+      100,
+      contract.status === 'expired' || contract.status === 'expiring_soon'
+        ? 70
+        : contract.status === 'active'
+          ? 10
+          : 30
+    );
+
+    const reputationalScore = Math.min(100, amount > 500000 ? 40 : 20);
+
+    const weightedScore =
+      financialScore * 0.25 +
+      legalScore * 0.25 +
+      operationalScore * 0.2 +
+      complianceScore * 0.15 +
+      reputationalScore * 0.15;
+
+    const overallLevel =
+      weightedScore < 25
+        ? 'low'
+        : weightedScore < 50
+          ? 'medium'
+          : weightedScore < 75
+            ? 'high'
+            : 'critical';
+
+    return {
+      overallScore: Math.round(weightedScore),
+      overallLevel,
+      dimensions: {
+        financial: {
+          score: Math.round(financialScore),
+          weight: 0.25,
+          level:
+            financialScore < 25
+              ? 'low'
+              : financialScore < 50
+                ? 'medium'
+                : financialScore < 75
+                  ? 'high'
+                  : 'critical',
+        },
+        legal: {
+          score: Math.round(legalScore),
+          weight: 0.25,
+          level:
+            legalScore < 25
+              ? 'low'
+              : legalScore < 50
+                ? 'medium'
+                : legalScore < 75
+                  ? 'high'
+                  : 'critical',
+        },
+        operational: {
+          score: Math.round(operationalScore),
+          weight: 0.2,
+          level:
+            operationalScore < 25
+              ? 'low'
+              : operationalScore < 50
+                ? 'medium'
+                : operationalScore < 75
+                  ? 'high'
+                  : 'critical',
+        },
+        compliance: {
+          score: Math.round(complianceScore),
+          weight: 0.15,
+          level:
+            complianceScore < 25
+              ? 'low'
+              : complianceScore < 50
+                ? 'medium'
+                : complianceScore < 75
+                  ? 'high'
+                  : 'critical',
+        },
+        reputational: {
+          score: Math.round(reputationalScore),
+          weight: 0.15,
+          level:
+            reputationalScore < 25
+              ? 'low'
+              : reputationalScore < 50
+                ? 'medium'
+                : reputationalScore < 75
+                  ? 'high'
+                  : 'critical',
+        },
+      },
+      indicators: {
+        overdueObligations,
+        totalObligations,
+        overduePayments,
+        totalPayments: payments.length,
+        contractAmount: amount,
+        contractStatus: contract.status,
+      },
+    };
+  }
+
+  async listAlerts(userId: string) {
+    const projectIds = await this.scope.visibleProjectIdsForUser(userId);
+    if (!projectIds.length) return [];
+    const contracts = await this.contracts.find({
+      where: projectIds.map((id) => ({ projectId: id })),
+      relations: ['responsibleUser'],
+    });
+    const alerts: Array<{
+      id: string;
+      contractId: string;
+      contractName: string;
+      type: string;
+      severity: string;
+      message: string;
+      date: string;
+      dismissed: boolean;
+    }> = [];
+    for (const c of contracts) {
+      if (c.endDate) {
+        const alertDays = c.alertDaysBefore ?? CONTRACT_SOON_DAYS;
+        if (this.isWithinDays(c.endDate, alertDays)) {
+          alerts.push({
+            id: `expiring-${c.id}`,
+            contractId: c.id,
+            contractName: c.name,
+            type: 'contract_expiring',
+            severity: 'warning',
+            message: `El contrato "${c.name}" vence el ${c.endDate}`,
+            date: c.endDate,
+            dismissed: false,
+          });
+        }
+        if (this.isExpired(c.endDate) && c.status !== 'closed' && c.status !== 'renewed') {
+          alerts.push({
+            id: `expired-${c.id}`,
+            contractId: c.id,
+            contractName: c.name,
+            type: 'contract_expired',
+            severity: 'critical',
+            message: `El contrato "${c.name}" vencio el ${c.endDate}`,
+            date: c.endDate,
+            dismissed: false,
+          });
+        }
+      }
+      const obligations = await this.obligations.find({
+        where: { contractId: c.id, status: 'overdue' },
+      });
+      for (const ob of obligations) {
+        alerts.push({
+          id: `obligation-overdue-${ob.id}`,
+          contractId: c.id,
+          contractName: c.name,
+          type: 'obligation_overdue',
+          severity: 'critical',
+          message: `Obligacion vencida: "${ob.description.slice(0, 80)}"`,
+          date: ob.commitmentDate ?? c.endDate ?? '',
+          dismissed: false,
+        });
+      }
+    }
+    alerts.sort((a, b) => a.date.localeCompare(b.date));
+    return alerts;
+  }
+
+  async dismissAlert(userId: string, alertId: string) {
+    await this.log(`alert-${alertId}`, userId, 'dismiss_alert', undefined, { alertId });
+    return { ok: true, dismissed: true, alertId };
+  }
+
+  async generateFromTemplate(
+    userId: string,
+    templateId: string,
+    variables: Record<string, string>
+  ) {
+    const template = await this.templatesRepo.findOne({ where: { id: templateId } });
+    if (!template) throw new NotFoundException('Plantilla no encontrada');
+    if (!template.content) throw new NotFoundException('La plantilla no tiene contenido');
+    let content = template.content;
+    for (const [key, value] of Object.entries(variables)) {
+      content = content.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi'), value);
+    }
+    content = content.replace(/\{\{\s*\w+\s*\}\}/g, '');
+    return {
+      content,
+      templateId,
+      templateName: template.name,
+      usedVariables: Object.keys(variables),
+    };
+  }
+
+  async createTemplateVersion(userId: string, templateId: string, dto: CreateTemplateDto) {
+    const parent = await this.templatesRepo.findOne({ where: { id: templateId } });
+    if (!parent) throw new NotFoundException('Plantilla original no encontrada');
+    const version = await this.templatesRepo.save(
+      this.templatesRepo.create({
+        name: dto.name ?? parent.name,
+        description: dto.description ?? parent.description,
+        contractType: dto.contractType ?? parent.contractType,
+        content: dto.content,
+        version: `${Number(parent.versionNumber) + 1}.0`,
+        versionNumber: (parent.versionNumber ?? 0) + 1,
+        parentTemplateId: templateId,
+        createdById: userId,
+        isActive: false,
+      })
+    );
+    return version;
+  }
+
+  async listCounterparties(userId: string, search?: string) {
+    const projectIds = await this.scope.visibleProjectIdsForUser(userId);
+    if (!projectIds.length) return [];
+    const where: any = search
+      ? [
+          { businessName: Like(`%${search}%`) },
+          { rfc: Like(`%${search}%`) },
+          { commercialName: Like(`%${search}%`) },
+        ]
+      : {};
+    return this.counterpartiesRepo.find({ where, order: { businessName: 'ASC' } });
+  }
+
+  async createCounterparty(userId: string, dto: CreateCounterpartyDto) {
+    const existing = await this.counterpartiesRepo.findOne({ where: { rfc: dto.rfc } });
+    if (existing) throw new ForbiddenException('Ya existe una contraparte con este RFC');
+    const counterparty = await this.counterpartiesRepo.save(
+      this.counterpartiesRepo.create({
+        ...dto,
+        status: 'active',
+      })
+    );
+    return counterparty;
+  }
+
+  async getCounterparty(id: string) {
+    const counterparty = await this.counterpartiesRepo.findOne({ where: { id } });
+    if (!counterparty) throw new NotFoundException('Contraparte no encontrada');
+    const [contacts, documents] = await Promise.all([
+      this.counterpartyContactsRepo.find({ where: { counterpartyId: id } }),
+      this.counterpartyDocumentsRepo.find({ where: { counterpartyId: id } }),
+    ]);
+    return { ...counterparty, contacts, documents };
+  }
+
+  async updateCounterparty(id: string, dto: UpdateCounterpartyDto) {
+    const counterparty = await this.counterpartiesRepo.findOne({ where: { id } });
+    if (!counterparty) throw new NotFoundException('Contraparte no encontrada');
+    Object.assign(counterparty, dto);
+    await this.counterpartiesRepo.save(counterparty);
+    return this.getCounterparty(id);
+  }
+
+  async deleteCounterparty(userId: string, id: string) {
+    const counterparty = await this.counterpartiesRepo.findOne({ where: { id } });
+    if (!counterparty) throw new NotFoundException('Contraparte no encontrada');
+    await this.counterpartiesRepo.softDelete(id);
+    return { ok: true };
+  }
+
+  async listRequests(userId: string) {
+    const projectIds = await this.scope.visibleProjectIdsForUser(userId);
+    if (!projectIds.length) return [];
+    return this.requestsRepo.find({
+      where: projectIds.map((pid) => ({ projectId: pid })),
+      relations: ['project', 'responsibleUser', 'createdBy'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createRequest(userId: string, dto: CreateContractRequestDto) {
+    if (dto.projectId) {
+      await this.assertProjectAccess(userId, dto.projectId);
+    }
+    const request = await this.requestsRepo.save(
+      this.requestsRepo.create({
+        ...dto,
+        estimatedAmount: dto.estimatedAmount ? Number(dto.estimatedAmount) : undefined,
+        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        createdById: userId,
+        status: 'draft',
+      })
+    );
+    return request;
+  }
+
+  async getRequest(id: string) {
+    const request = await this.requestsRepo.findOne({
+      where: { id },
+      relations: ['project', 'responsibleUser', 'createdBy', 'reviewedBy'],
+    });
+    if (!request) throw new NotFoundException('Solicitud no encontrada');
+    return request;
+  }
+
+  async reviewRequest(userId: string, id: string, dto: ReviewContractRequestDto) {
+    const request = await this.requestsRepo.findOne({ where: { id } });
+    if (!request) throw new NotFoundException('Solicitud no encontrada');
+    request.status = dto.status;
+    request.reviewComments = dto.reviewComments;
+    request.reviewedById = userId;
+    request.reviewedAt = new Date();
+    await this.requestsRepo.save(request);
+    return this.getRequest(id);
+  }
+
+  async convertRequest(userId: string, id: string) {
+    const request = await this.requestsRepo.findOne({ where: { id } });
+    if (!request) throw new NotFoundException('Solicitud no encontrada');
+    if (request.status !== 'approved') {
+      throw new ForbiddenException('La solicitud debe estar aprobada para convertirla en contrato');
+    }
+    const contract = await this.contracts.save(
+      this.contracts.create({
+        name: `Contrato - ${request.counterpartyName ?? request.contractType}`,
+        contractType: request.contractType,
+        projectId: request.projectId ?? undefined,
+        supplierName: request.counterpartyName,
+        counterpartyRfc: request.counterpartyRfc,
+        startDate: request.startDate ? request.startDate.toISOString().slice(0, 10) : undefined,
+        endDate: request.endDate ? request.endDate.toISOString().slice(0, 10) : undefined,
+        amount: request.estimatedAmount ? String(request.estimatedAmount) : undefined,
+        currency: request.currency,
+        responsibleUserId: request.responsibleUserId,
+        status: 'draft',
+        createdById: userId,
+      })
+    );
+    await this.log(contract.id, userId, 'created_from_request', undefined, {
+      requestId: id,
+    });
+    return contract;
+  }
+
+  async handleSignatureWebhook(provider: string, payload: Record<string, unknown>) {
+    const handler = (this.signatureProvider as any).handleWebhook;
+    if (typeof handler === 'function') {
+      const result = await handler.call(this.signatureProvider, payload);
+      const providerRequestId = result.envelopeId ?? (payload as any).providerRequestId ?? '';
+      if (providerRequestId) {
+        const signature = await this.signaturesRepo.findOne({
+          where: { providerRequestId },
+          relations: ['contract'],
+        });
+        if (signature) {
+          signature.status = result.status;
+          if (result.signedAt) signature.signedAt = result.signedAt;
+          await this.signaturesRepo.save(signature);
+          if (result.status === 'completed' && signature.contract) {
+            signature.contract.status = 'active';
+            await this.contracts.save(signature.contract);
+            await this.log(signature.contractId, 'system', 'signature_completed', undefined, {
+              signatureId: signature.id,
+            });
+          }
+        }
+      }
+      return { received: true, status: result.status };
+    }
+    return { received: true };
+  }
+
+  async searchContracts(
+    userId: string,
+    query: string,
+    projectId?: string,
+    page?: string,
+    limit?: string
+  ) {
+    const projectIds = projectId ? [projectId] : await this.scope.visibleProjectIdsForUser(userId);
+    if (projectId && !(await this.scope.canAccessProject(userId, projectId))) {
+      throw new ForbiddenException('No tienes acceso a este proyecto');
+    }
+    if (!projectIds.length) {
+      return { items: [], total: 0, page: 1, limit: 10 };
+    }
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+    const offset = (pageNum - 1) * limitNum;
+    const term = `%${query}%`;
+
+    const [contractResults, total] = await this.contracts
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.project', 'project')
+      .leftJoinAndSelect('c.responsibleUser', 'responsibleUser')
+      .leftJoinAndSelect('c.tags', 'tags')
+      .where('c.projectId IN (:...projectIds)', { projectIds })
+      .andWhere('c.deletedAt IS NULL')
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('c.name LIKE :term', { term })
+            .orWhere('c.supplierName LIKE :term', { term })
+            .orWhere('c.clientName LIKE :term', { term })
+            .orWhere('c.contractType LIKE :term', { term })
+            .orWhere('c.responsibleArea LIKE :term', { term });
+        })
+      )
+      .skip(offset)
+      .take(limitNum)
+      .orderBy('c.updatedAt', 'DESC')
+      .getManyAndCount();
+
+    const items = await Promise.all(
+      contractResults.map(async (contract) => {
+        const item = await this.toListItem(contract);
+        return { ...item, snippet: null as string | null };
+      })
+    );
+
+    const textIndexMatches = await this.textIndexRepo
+      .createQueryBuilder('ti')
+      .leftJoinAndSelect('ti.contract', 'contract')
+      .leftJoinAndSelect('ti.version', 'version')
+      .where('ti.content LIKE :term', { term })
+      .andWhere('contract.projectId IN (:...projectIds)', { projectIds })
+      .andWhere('contract.deletedAt IS NULL')
+      .skip(offset)
+      .take(limitNum)
+      .orderBy('ti.createdAt', 'DESC')
+      .getMany();
+
+    for (const match of textIndexMatches) {
+      const idx = match.content.toLowerCase().indexOf(query.toLowerCase());
+      const snippet =
+        idx >= 0
+          ? '...' + match.content.slice(Math.max(0, idx - 80), idx + 120) + '...'
+          : match.content.slice(0, 200);
+      const existing = items.find((i) => i.id === match.contractId);
+      if (existing) {
+        existing.snippet = snippet;
+      } else {
+        const contract = match.contract;
+        if (contract) {
+          items.push({
+            ...(await this.toListItem(contract)),
+            snippet,
+          });
+        }
+      }
+    }
+
+    return {
+      items,
+      total: Math.max(total, textIndexMatches.length),
+      page: pageNum,
+      limit: limitNum,
+    };
+  }
+
+  async reindexContractText(contractId: string) {
+    const versions = await this.versions.find({
+      where: { contractId },
+      order: { createdAt: 'DESC' },
+    });
+    let indexed = 0;
+    await this.textIndexRepo.delete({ contractId });
+    for (const version of versions) {
+      try {
+        const buffer = await this.storage.read(version.fileKey);
+        let text = '';
+        if (version.mimeType === 'application/pdf' || version.fileExtension === 'pdf') {
+          text = Array.from(buffer.toString('latin1'), (char) => {
+            const code = char.charCodeAt(0);
+            return code < 0x20 && ![0x09, 0x0a, 0x0d].includes(code) ? ' ' : char;
+          })
+            .join('')
+            .replace(/[^\x20-\xFF]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        } else if (
+          version.mimeType ===
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          version.fileExtension === 'docx'
+        ) {
+          try {
+            const mammoth = await import('mammoth');
+            const result = await mammoth.extractRawText({ buffer });
+            text = (result.value as string) ?? '';
+          } catch {
+            text = buffer
+              .toString('utf-8')
+              .replace(/<[^>]+>/g, '')
+              .trim();
+          }
+        } else {
+          text = buffer.toString('utf-8').trim();
+        }
+        if (text.length > 0) {
+          await this.textIndexRepo.save(
+            this.textIndexRepo.create({
+              contractId,
+              versionId: version.id,
+              content: text.slice(0, 65535),
+              contentHash: createHash('sha256').update(text).digest('hex').slice(0, 64),
+            })
+          );
+          indexed++;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return { ok: true, versionsProcessed: versions.length, indexed };
   }
 
   private async listContractsForAlerts(userId: string, projectId?: string) {

@@ -9,6 +9,8 @@ export type SessionUser = {
   roles: string[];
 };
 
+const PLATFORM_ADMIN_ROLE = 'admin';
+
 const TOKEN_KEY = 'holocron_token';
 const USER_KEY = 'holocron_user';
 const LANGUAGE_KEY = 'holocron_lang';
@@ -37,7 +39,9 @@ export function getSessionUser(): SessionUser | null {
 
 export function hasPermission(permission: string): boolean {
   const user = getSessionUser();
-  return Boolean(user?.permissions?.includes(permission));
+  if (!user) return false;
+  if (user.roles?.includes(PLATFORM_ADMIN_ROLE)) return true;
+  return Boolean(user.permissions?.includes(permission));
 }
 
 export function setSession(token: string, user: SessionUser) {

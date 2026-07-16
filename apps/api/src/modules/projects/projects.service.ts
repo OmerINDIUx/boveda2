@@ -864,7 +864,6 @@ export class ProjectsService {
       workType: [],
       currentStage: [],
       priority: [],
-      status: [],
     };
 
     for (const option of options) {

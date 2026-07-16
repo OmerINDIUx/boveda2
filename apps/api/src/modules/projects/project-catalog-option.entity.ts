@@ -7,12 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export const PROJECT_CATALOG_CATEGORIES = [
-  'workType',
-  'currentStage',
-  'priority',
-  'status',
-] as const;
+export const PROJECT_CATALOG_CATEGORIES = ['workType', 'currentStage', 'priority'] as const;
 export type ProjectCatalogCategory = (typeof PROJECT_CATALOG_CATEGORIES)[number];
 
 @Entity('project_catalog_options')

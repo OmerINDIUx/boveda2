@@ -29,6 +29,12 @@ export class UsersController {
     return this.users.findProfile(user.id);
   }
 
+  @Get(':id')
+  @Permissions(PermissionKey.UsersRead)
+  findOne(@Param('id') id: string) {
+    return this.users.findOne(id);
+  }
+
   @Post()
   @Permissions(PermissionKey.UsersManage)
   create(@Body() dto: CreateUserDto) {

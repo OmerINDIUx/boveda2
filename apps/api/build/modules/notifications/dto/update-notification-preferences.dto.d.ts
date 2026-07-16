@@ -1,9 +1,9 @@
 declare class NotificationPreferenceItemDto {
-  notificationType: string;
-  inAppEnabled: boolean;
-  emailEnabled: boolean;
+    notificationType: string;
+    inAppEnabled: boolean;
+    emailEnabled: boolean;
 }
 export declare class UpdateNotificationPreferencesDto {
-  items: NotificationPreferenceItemDto[];
+    items: NotificationPreferenceItemDto[];
 }
 export {};

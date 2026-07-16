@@ -23,6 +23,24 @@ export class ContractTemplate {
   @Column({ name: 'contract_type', length: 100, nullable: true })
   contractType?: string;
 
+  @Column({ type: 'longtext', nullable: true })
+  content?: string;
+
+  @Column({ length: 20, default: '1.0' })
+  version!: string;
+
+  @Column({ default: 0 })
+  versionNumber!: number;
+
+  @Column({ name: 'parent_template_id', nullable: true })
+  parentTemplateId?: string;
+
+  @Column({ name: 'approved_at', type: 'datetime', nullable: true })
+  approvedAt?: Date;
+
+  @Column({ name: 'approved_by_id', nullable: true })
+  approvedById?: string;
+
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 

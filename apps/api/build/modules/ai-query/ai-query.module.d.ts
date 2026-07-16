@@ -1,1 +1,2 @@
-export declare class AiQueryModule {}
+export declare class AiQueryModule {
+}

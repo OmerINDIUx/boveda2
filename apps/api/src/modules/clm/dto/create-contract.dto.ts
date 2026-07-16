@@ -45,6 +45,10 @@ export class CreateContractDto {
 
   @IsOptional()
   @IsString()
+  lifecycleStage?: string;
+
+  @IsOptional()
+  @IsString()
   renewalDate?: string;
 
   @IsOptional()
@@ -80,4 +84,8 @@ export class CreateContractDto {
 
   @IsOptional()
   alertDaysBefore?: number;
+
+  @IsOptional()
+  @IsString()
+  riskLevel?: string;
 }

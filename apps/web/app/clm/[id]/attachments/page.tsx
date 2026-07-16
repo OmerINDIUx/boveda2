@@ -1,11 +1,11 @@
 import { RequirePermission } from '../../../../components/auth/require-permission';
-import { ContractAttachmentCreatePage } from '../../../../components/modules/clm-pages';
+import { ContractModuleManagePage } from '../../../../components/modules/clm';
 import { PermissionKey } from '../../../../lib/permissions';
 
 export default function Page() {
   return (
     <RequirePermission permission={PermissionKey.ContractsManage}>
-      <ContractAttachmentCreatePage />
+      <ContractModuleManagePage module="attachments" />
     </RequirePermission>
   );
 }

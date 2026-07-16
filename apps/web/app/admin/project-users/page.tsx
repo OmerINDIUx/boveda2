@@ -7,6 +7,8 @@ import { apiGet, apiPost } from '../../../lib/api';
 
 type ProjectOption = { id: string; name: string; code: string };
 type UserOption = { id: string; name: string; email: string };
+type RoleInfo = { id: string; key: string; name: string };
+type UserWithRoles = UserOption & { roles: RoleInfo[] };
 type ProjectMember = {
   id: string;
   role: string;
@@ -43,6 +45,7 @@ function getToken() {
 function ProjectUsersWorkspace() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [usersWithRoles, setUsersWithRoles] = useState<Map<string, RoleInfo[]>>(new Map());
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [form, setForm] = useState<AssignmentForm>(emptyForm);
   const [search, setSearch] = useState('');
@@ -54,14 +57,16 @@ function ProjectUsersWorkspace() {
 
     async function loadBase() {
       try {
-        const [projectsResponse, formOptionsResponse] = await Promise.all([
+        const [projectsResponse, formOptionsResponse, usersResponse] = await Promise.all([
           apiGet<ProjectOption[]>('/projects', getToken() ?? undefined),
           apiGet<FormOptionsResponse>('/projects/form-options', getToken() ?? undefined),
+          apiGet<UserWithRoles[]>('/users', getToken() ?? undefined),
         ]);
 
         if (!active) return;
         setProjects(projectsResponse);
         setUsers(formOptionsResponse.users);
+        setUsersWithRoles(new Map(usersResponse.map((u) => [u.id, u.roles])));
         setForm((current) => ({
           ...current,
           projectId: current.projectId || projectsResponse[0]?.id || '',
@@ -252,21 +257,27 @@ function ProjectUsersWorkspace() {
                 <tr>
                   <th>Usuario</th>
                   <th>Correo</th>
-                  <th>Rol</th>
+                  <th>Rol global</th>
+                  <th>Rol en proyecto</th>
                   <th>Documentos</th>
                   <th>Contratos</th>
                 </tr>
               </thead>
               <tbody>
-                {members.map((member) => (
-                  <tr key={member.id}>
-                    <td>{member.user?.name ?? 'Sin nombre'}</td>
-                    <td>{member.user?.email ?? 'Sin correo'}</td>
-                    <td>{member.role}</td>
-                    <td>{member.canManageDocuments ? 'Sí' : 'No'}</td>
-                    <td>{member.canManageContracts ? 'Sí' : 'No'}</td>
-                  </tr>
-                ))}
+                {members.map((member) => {
+                  const globalRoles = member.user ? usersWithRoles.get(member.user.id) : undefined;
+                  const globalRoleNames = globalRoles?.map((r) => r.name).join(', ') ?? '';
+                  return (
+                    <tr key={member.id}>
+                      <td>{member.user?.name ?? 'Sin nombre'}</td>
+                      <td>{member.user?.email ?? 'Sin correo'}</td>
+                      <td>{globalRoleNames || '—'}</td>
+                      <td>{member.role}</td>
+                      <td>{member.canManageDocuments ? 'Sí' : 'No'}</td>
+                      <td>{member.canManageContracts ? 'Sí' : 'No'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -22,6 +22,7 @@ import { NomenclaturesModule } from './modules/nomenclatures/nomenclatures.modul
 import { ProjectEmailsModule } from './modules/project-emails/project-emails.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ResponseTimesModule } from './modules/response-times/response-times.module';
+import { BitacorasModule } from './modules/bitacoras/bitacoras.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { ResponseTimesModule } from './modules/response-times/response-times.mod
     ProjectEmailsModule,
     UploadsModule,
     ResponseTimesModule,
+    BitacorasModule,
   ],
   providers: [
     {

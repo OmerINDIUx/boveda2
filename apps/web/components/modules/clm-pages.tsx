@@ -56,6 +56,8 @@ type ContractListItem = {
   responsibleArea?: string;
   contractType?: string;
   status: string;
+  lifecycleStage?: string;
+  lifecycleChangedAt?: string;
   startDate?: string;
   endDate?: string;
   renewalDate?: string;
@@ -158,6 +160,18 @@ type ContractDetail = ContractListItem & {
     field: { fieldKey: string; fieldLabel: string; fieldType: string };
   }>;
   childrenContracts: Array<{ id: string; name: string; status: string }>;
+  lifecycleHistory: Array<{
+    id: string;
+    previousStage?: string;
+    stage: string;
+    comments?: string;
+    decision?: string;
+    createdAt: string;
+    timeInPreviousStageMinutes?: number;
+    changedBy?: { id: string; name: string; email?: string } | null;
+    relatedDocument?: { id: string; name: string; documentNumber?: string } | null;
+    relatedVersion?: { id: string; versionLabel: string; fileName: string } | null;
+  }>;
 };
 
 type AskResponse = {
@@ -178,6 +192,19 @@ const statusOptions = [
   { value: 'closed', label: 'Cerrado' },
 ];
 
+const lifecycleStageOptions = [
+  { value: 'request', label: 'Solicitud' },
+  { value: 'drafting', label: 'Elaboración' },
+  { value: 'internal_review', label: 'Revisión interna' },
+  { value: 'negotiation', label: 'Negociación' },
+  { value: 'approval', label: 'Aprobación' },
+  { value: 'signature', label: 'Firma' },
+  { value: 'active', label: 'Contrato activo' },
+  { value: 'obligations_tracking', label: 'Seguimiento de obligaciones' },
+  { value: 'renewal_modification_termination', label: 'Renovación / modificación / terminación' },
+  { value: 'archived', label: 'Archivo' },
+];
+
 const fallbackProjects: Project[] = [
   { id: 'p1', name: 'Torre Ejecutiva Norte', code: 'HOL-PRJ-001' },
   { id: 'p2', name: 'Planta Oriente', code: 'HOL-PRJ-014' },
@@ -193,6 +220,7 @@ const fallbackContracts: ContractListItem[] = [
     responsibleArea: 'Legal',
     contractType: 'Servicios',
     status: 'expiring_soon',
+    lifecycleStage: 'obligations_tracking',
     startDate: '2026-01-01',
     endDate: '2026-07-20',
     currency: 'MXN',
@@ -201,6 +229,46 @@ const fallbackContracts: ContractListItem[] = [
     pendingObligations: 2,
   },
 ];
+
+function buildFallbackDetail(contractId?: string): ContractDetail | null {
+  const item =
+    fallbackContracts.find((contract) => contract.id === contractId) ?? fallbackContracts[0];
+  if (!item) return null;
+  return {
+    ...item,
+    versions: [],
+    attachments: [],
+    obligations: [],
+    milestones: [],
+    comments: [],
+    audit: [],
+    amendments: [],
+    payments: [],
+    signatures: [],
+    negotiations: [],
+    tags: item.tags ?? [],
+    customValues: [],
+    childrenContracts: [],
+    lifecycleHistory: item.lifecycleStage
+      ? [
+          {
+            id: 'fallback-lifecycle-1',
+            stage: item.lifecycleStage,
+            createdAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+            comments: 'Vista de respaldo sin conexión a la API.',
+            decision: 'fallback',
+            changedBy: null,
+          },
+        ]
+      : [],
+  };
+}
+
+function stripLifecycleFields<T extends Record<string, any>>(payload: T) {
+  const rest = { ...payload };
+  delete rest.lifecycleStage;
+  return rest;
+}
 
 function getToken() {
   if (typeof window === 'undefined') return undefined;
@@ -238,6 +306,20 @@ function getContractTone(status: string) {
   if (status === 'expired' || status === 'closed') return 'danger';
   if (status === 'expiring_soon' || status === 'in_review') return 'warning';
   return 'success';
+}
+
+function getLifecycleLabel(stage?: string) {
+  return (
+    lifecycleStageOptions.find((item) => item.value === stage)?.label ?? normalizeLabel(stage ?? '')
+  );
+}
+
+function formatMinutes(minutes?: number) {
+  if (!minutes || minutes < 1) return 'Sin dato';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return remaining ? `${hours} h ${remaining} min` : `${hours} h`;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -506,6 +588,7 @@ export function ClmWorkspacePage() {
                       </span>
                     </div>
                     <span>{item.supplierName ?? item.clientName ?? 'Sin contraparte'}</span>
+                    <small className="muted">{getLifecycleLabel(item.lifecycleStage)}</small>
                     <small className="muted">
                       {item.project?.code ?? item.projectId} · {formatDate(item.endDate)} ·{' '}
                       {item.pendingObligations ?? 0} pendientes
@@ -534,6 +617,9 @@ export function ClmWorkspacePage() {
                       selectedContract.clientName ??
                       'Sin contraparte'}
                   </p>
+                  <small className="muted">
+                    Etapa: {getLifecycleLabel(selectedContract.lifecycleStage)}
+                  </small>
                 </div>
                 <div className="projects-actions">
                   <span className={`pill ${getContractTone(selectedContract.status)}`}>
@@ -599,6 +685,11 @@ export function ContractDetailPage() {
   const [askResult, setAskResult] = useState<AskResponse | null>(null);
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagName, setTagName] = useState('');
+  const [lifecycleForm, setLifecycleForm] = useState({
+    stage: '',
+    comments: '',
+    decision: '',
+  });
 
   useEffect(() => {
     if (!contractId) return;
@@ -610,8 +701,16 @@ export function ContractDetailPage() {
         const response = await apiGet<ContractDetail>(`/clm/contracts/${contractId}`, getToken());
         if (!active) return;
         setDetail(response);
+        setLifecycleForm((prev) => ({ ...prev, stage: response.lifecycleStage ?? 'request' }));
       } catch (err: any) {
         if (!active) return;
+        const fallback = buildFallbackDetail(contractId);
+        if (fallback) {
+          setDetail(fallback);
+          setLifecycleForm((prev) => ({ ...prev, stage: fallback.lifecycleStage ?? 'request' }));
+          setMessage('Vista de respaldo.');
+          return;
+        }
         setMessage(err?.message ?? 'No se pudo cargar el detalle.');
       } finally {
         if (active) setLoading(false);
@@ -695,6 +794,30 @@ export function ContractDetailPage() {
     }
   }
 
+  async function submitLifecycleTransition() {
+    if (!detail || !lifecycleForm.stage) return;
+    try {
+      const response = await apiPost<ContractDetail>(
+        `/clm/contracts/${detail.id}/lifecycle`,
+        lifecycleForm,
+        getToken()
+      );
+      setDetail(response);
+      setLifecycleForm((prev) => ({
+        ...prev,
+        stage: response.lifecycleStage ?? prev.stage,
+        comments: '',
+        decision: '',
+      }));
+    } catch (error: any) {
+      if (String(error?.message ?? '').includes('Cannot POST /clm/contracts')) {
+        setMessage('La API activa todavía no expone el ciclo de vida.');
+        return;
+      }
+      setMessage('No se pudo actualizar la etapa del ciclo de vida.');
+    }
+  }
+
   if (!detail && loading)
     return (
       <section className="projects-workspace">
@@ -713,6 +836,7 @@ export function ContractDetailPage() {
     );
 
   const tabs = [
+    { key: 'lifecycle', label: 'Ciclo de vida', icon: <History size={16} /> },
     { key: 'obligations', label: 'Obligaciones', icon: <CheckSquare size={16} /> },
     { key: 'milestones', label: 'Hitos', icon: <CalendarClock size={16} /> },
     { key: 'amendments', label: 'Enmiendas', icon: <FilePlus2 size={16} /> },
@@ -760,6 +884,10 @@ export function ContractDetailPage() {
               {detail.contractType ?? 'Sin tipo'} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
               {detail.clientName ?? 'Sin cliente'}
             </p>
+            <small className="muted">
+              Etapa actual: {getLifecycleLabel(detail.lifecycleStage)}
+              {detail.lifecycleChangedAt ? ` · ${formatDate(detail.lifecycleChangedAt)}` : ''}
+            </small>
           </div>
           <div className="projects-actions">
             <button
@@ -788,6 +916,10 @@ export function ContractDetailPage() {
           <div className="state-card">
             <span>Estado</span>
             <strong>{normalizeLabel(detail.status)}</strong>
+          </div>
+          <div className="state-card">
+            <span>Ciclo de vida</span>
+            <strong>{getLifecycleLabel(detail.lifecycleStage)}</strong>
           </div>
           <div className="state-card">
             <span>Vencimiento</span>
@@ -858,6 +990,78 @@ export function ContractDetailPage() {
         ))}
       </div>
 
+      {activeTab === 'lifecycle' && (
+        <article className="card">
+          <div className="panel-header">
+            <h2>Ciclo de vida</h2>
+            <span className="pill info">{getLifecycleLabel(detail.lifecycleStage)}</span>
+          </div>
+          <div className="quick-filters-grid" style={{ marginBottom: 16 }}>
+            <div className="field span-2">
+              <label>Nueva etapa</label>
+              <select
+                value={lifecycleForm.stage}
+                onChange={(e) => setLifecycleForm({ ...lifecycleForm, stage: e.target.value })}
+              >
+                {lifecycleStageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Decisión</label>
+              <input
+                value={lifecycleForm.decision}
+                onChange={(e) => setLifecycleForm({ ...lifecycleForm, decision: e.target.value })}
+                placeholder="Aprobado, observado, enviado..."
+              />
+            </div>
+            <div className="field span-3">
+              <label>Comentarios</label>
+              <textarea
+                value={lifecycleForm.comments}
+                onChange={(e) => setLifecycleForm({ ...lifecycleForm, comments: e.target.value })}
+                rows={3}
+                placeholder="Motivo del cambio, acuerdos, contexto..."
+              />
+            </div>
+          </div>
+          <div className="projects-actions" style={{ marginBottom: 16 }}>
+            <button className="button" type="button" onClick={submitLifecycleTransition}>
+              Actualizar etapa
+            </button>
+          </div>
+          <div className="simple-document-list">
+            {(detail.lifecycleHistory ?? []).map((event) => (
+              <div key={event.id} className="simple-document-item">
+                <strong>
+                  {getLifecycleLabel(event.previousStage)} {'->'} {getLifecycleLabel(event.stage)}
+                </strong>
+                <small>
+                  {event.changedBy?.name ?? 'Sin responsable'} · {formatDate(event.createdAt)} ·{' '}
+                  Tiempo previo: {formatMinutes(event.timeInPreviousStageMinutes)}
+                </small>
+                <span>
+                  {event.decision ? `Decisión: ${event.decision}. ` : ''}
+                  {event.comments ?? 'Sin comentarios.'}
+                </span>
+                <small className="muted">
+                  {event.relatedDocument
+                    ? `Documento: ${event.relatedDocument.documentNumber ?? event.relatedDocument.name}`
+                    : event.relatedVersion
+                      ? `Versión: ${event.relatedVersion.versionLabel}`
+                      : 'Sin soporte vinculado'}
+                </small>
+              </div>
+            ))}
+            {!detail.lifecycleHistory?.length ? (
+              <div className="simple-document-item">Aún no hay historial de etapas.</div>
+            ) : null}
+          </div>
+        </article>
+      )}
       {activeTab === 'obligations' && (
         <article className="card">
           <div className="panel-header">
@@ -1352,6 +1556,7 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
     responsibleArea: '',
     contractType: '',
     status: 'draft',
+    lifecycleStage: 'request',
     startDate: '',
     endDate: '',
     renewalDate: '',
@@ -1408,6 +1613,7 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
           responsibleArea: d.responsibleArea ?? '',
           contractType: d.contractType ?? '',
           status: d.status,
+          lifecycleStage: d.lifecycleStage ?? 'request',
           startDate: d.startDate ?? '',
           endDate: d.endDate ?? '',
           renewalDate: d.renewalDate ?? '',
@@ -1441,7 +1647,18 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
     try {
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
       if (mode === 'create') {
-        const created = await apiPost<ContractDetail>('/clm/contracts', payload, getToken());
+        let created: ContractDetail;
+        try {
+          created = await apiPost<ContractDetail>('/clm/contracts', payload, getToken());
+        } catch (error: any) {
+          if (!String(error?.message ?? '').includes('lifecycleStage should not exist'))
+            throw error;
+          created = await apiPost<ContractDetail>(
+            '/clm/contracts',
+            stripLifecycleFields(payload),
+            getToken()
+          );
+        }
         if (selectedTagIds.length)
           await apiPost(
             `/clm/contracts/${created.id}/tags`,
@@ -1452,7 +1669,12 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
         return;
       }
       if (!contractId) return;
-      await apiPatch(`/clm/contracts/${contractId}`, payload, getToken());
+      try {
+        await apiPatch(`/clm/contracts/${contractId}`, payload, getToken());
+      } catch (error: any) {
+        if (!String(error?.message ?? '').includes('lifecycleStage should not exist')) throw error;
+        await apiPatch(`/clm/contracts/${contractId}`, stripLifecycleFields(payload), getToken());
+      }
       await apiPost(`/clm/contracts/${contractId}/tags`, { tagIds: selectedTagIds }, getToken());
       router.push(`/clm/${contractId}`);
     } catch (err: any) {
@@ -1533,6 +1755,19 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   onChange={(e) => setForm({ ...form, status: e.target.value })}
                 >
                   {statusOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Etapa del ciclo de vida</label>
+                <select
+                  value={form.lifecycleStage}
+                  onChange={(e) => setForm({ ...form, lifecycleStage: e.target.value })}
+                >
+                  {lifecycleStageOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>

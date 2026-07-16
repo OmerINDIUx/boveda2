@@ -8,7 +8,7 @@ import { ModuleTable } from './module-table';
 import { SectionHeader } from './section-header';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 
-type ProjectCatalogCategory = 'workType' | 'currentStage' | 'priority' | 'status';
+type ProjectCatalogCategory = 'workType' | 'currentStage' | 'priority';
 
 type CatalogOption = {
   id: string;
@@ -31,7 +31,6 @@ const categoryLabels: Record<ProjectCatalogCategory, string> = {
   workType: 'Tipo de obra',
   currentStage: 'Etapa actual',
   priority: 'Prioridad',
-  status: 'Estado',
 };
 
 function getToken() {

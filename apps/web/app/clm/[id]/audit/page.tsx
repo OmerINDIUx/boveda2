@@ -3,7 +3,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../../../../lib/api';
-import { ContractAuditSection } from '../../../../components/modules/clm-pages';
+import { ContractAuditSection } from '../../../../components/modules/clm';
 
 type ContractDetail = {
   id: string;

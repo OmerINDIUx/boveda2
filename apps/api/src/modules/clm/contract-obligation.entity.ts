@@ -50,6 +50,24 @@ export class ContractObligation {
   @Column({ type: 'text', nullable: true })
   comments?: string;
 
+  @Column({ type: 'varchar', length: 20, default: 'once' })
+  periodicity!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'medium' })
+  priority!: string;
+
+  @Column({ type: 'text', nullable: true })
+  consequence?: string;
+
+  @Column({ type: 'int', nullable: true })
+  periodicityDay?: number;
+
+  @Column({ type: 'datetime', nullable: true })
+  lastRemindedAt?: Date;
+
+  @Column({ type: 'int', default: 0 })
+  reminderCount!: number;
+
   @Column({ name: 'alert_days_before', nullable: true, default: 14 })
   alertDaysBefore?: number;
 

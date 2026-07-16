@@ -28,6 +28,10 @@ import { CreateContractAttachmentDto } from './dto/create-contract-attachment.dt
 import { CreateClauseDto } from './dto/create-clause.dto';
 import { CreateContractCommentDto } from './dto/create-contract-comment.dto';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { CreateCounterpartyDto } from './dto/create-counterparty.dto';
+import { UpdateCounterpartyDto } from './dto/update-counterparty.dto';
+import { CreateContractRequestDto } from './dto/create-contract-request.dto';
+import { ReviewContractRequestDto } from './dto/review-contract-request.dto';
 import { CreateContractMilestoneDto } from './dto/create-contract-milestone.dto';
 import { CreateContractObligationDto } from './dto/create-contract-obligation.dto';
 import { CreateContractVersionDto } from './dto/create-contract-version.dto';
@@ -45,6 +49,7 @@ import { UpdateAmendmentDto } from './dto/update-amendment.dto';
 import { UpdateContractMilestoneDto } from './dto/update-contract-milestone.dto';
 import { UpdateContractObligationDto } from './dto/update-contract-obligation.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
+import { UpdateLifecycleStageDto } from './dto/update-lifecycle-stage.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { ClmService } from './clm.service';
@@ -97,6 +102,16 @@ export class ClmController {
     return this.clm.update(user.id, id, dto);
   }
 
+  @Post('contracts/:id/lifecycle')
+  @Permissions(PermissionKey.ContractsManage)
+  updateLifecycle(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateLifecycleStageDto
+  ) {
+    return this.clm.updateLifecycleStage(user.id, id, dto);
+  }
+
   @Post('contracts/:id/versions')
   @Permissions(PermissionKey.ContractsManage)
   createVersion(
@@ -107,6 +122,16 @@ export class ClmController {
     return this.clm.createVersion(user.id, id, dto);
   }
 
+  @Delete('contracts/:id/versions/:versionId')
+  @Permissions(PermissionKey.ContractsManage)
+  deleteVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string
+  ) {
+    return this.clm.deleteVersion(user.id, id, versionId);
+  }
+
   @Post('contracts/:id/attachments')
   @Permissions(PermissionKey.ContractsManage)
   addAttachment(
@@ -115,6 +140,16 @@ export class ClmController {
     @Body() dto: CreateContractAttachmentDto
   ) {
     return this.clm.addAttachment(user.id, id, dto);
+  }
+
+  @Delete('contracts/:id/attachments/:attachmentId')
+  @Permissions(PermissionKey.ContractsManage)
+  deleteAttachment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string
+  ) {
+    return this.clm.deleteAttachment(user.id, id, attachmentId);
   }
 
   @Post('contracts/:id/obligations')
@@ -138,6 +173,32 @@ export class ClmController {
     return this.clm.updateObligation(user.id, id, obligationId, dto);
   }
 
+  @Delete('contracts/:id/obligations/:obligationId')
+  @Permissions(PermissionKey.ContractsManage)
+  deleteObligation(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('obligationId') obligationId: string
+  ) {
+    return this.clm.deleteObligation(user.id, id, obligationId);
+  }
+
+  @Post('contracts/:id/obligations/:obligationId/remind')
+  @Permissions(PermissionKey.ContractsManage)
+  remindObligation(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('obligationId') obligationId: string
+  ) {
+    return this.clm.remindObligation(user.id, id, obligationId);
+  }
+
+  @Get('contracts/:id/calendar')
+  @Permissions(PermissionKey.ContractsManage)
+  getCalendarEvents(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.clm.getCalendarEvents(user.id, id);
+  }
+
   @Post('contracts/:id/milestones')
   @Permissions(PermissionKey.ContractsManage)
   addMilestone(
@@ -159,6 +220,16 @@ export class ClmController {
     return this.clm.updateMilestone(user.id, id, milestoneId, dto);
   }
 
+  @Delete('contracts/:id/milestones/:milestoneId')
+  @Permissions(PermissionKey.ContractsManage)
+  deleteMilestone(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('milestoneId') milestoneId: string
+  ) {
+    return this.clm.deleteMilestone(user.id, id, milestoneId);
+  }
+
   @Post('contracts/:id/comments')
   @Permissions(PermissionKey.ContractsManage)
   addComment(
@@ -167,6 +238,16 @@ export class ClmController {
     @Body() dto: CreateContractCommentDto
   ) {
     return this.clm.addComment(user.id, id, dto);
+  }
+
+  @Delete('contracts/:id/comments/:commentId')
+  @Permissions(PermissionKey.ContractsManage)
+  deleteComment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string
+  ) {
+    return this.clm.deleteComment(user.id, id, commentId);
   }
 
   @Post('contracts/:id/close')
@@ -322,6 +403,12 @@ export class ClmController {
     return this.clm.importContracts(user.id, dto);
   }
 
+  @Get('contracts/:id/risk-matrix')
+  @Permissions(PermissionKey.ContractsManage)
+  getRiskMatrix(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.clm.getRiskMatrix(user.id, id);
+  }
+
   @Get('contracts/:id/export')
   @Permissions(PermissionKey.ClmExport)
   exportContract(@CurrentUser() user: RequestUser, @Param('id') id: string) {
@@ -332,6 +419,18 @@ export class ClmController {
   @Permissions(PermissionKey.ContractsManage)
   syncAlerts(@CurrentUser() user: RequestUser, @Query('projectId') projectId?: string) {
     return this.clm.synchronizeAlerts(user.id, projectId);
+  }
+
+  @Get('alerts')
+  @Permissions(PermissionKey.ContractsManage)
+  listAlerts(@CurrentUser() user: RequestUser) {
+    return this.clm.listAlerts(user.id);
+  }
+
+  @Post('alerts/:id/dismiss')
+  @Permissions(PermissionKey.ContractsManage)
+  dismissAlert(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.clm.dismissAlert(user.id, id);
   }
 
   @Get('dashboard')
@@ -400,6 +499,26 @@ export class ClmController {
     return this.clm.getTemplateDetail(id);
   }
 
+  @Post('templates/:id/generate')
+  @Permissions(PermissionKey.ContractsManage)
+  generateFromTemplate(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: Record<string, string>
+  ) {
+    return this.clm.generateFromTemplate(user.id, id, dto);
+  }
+
+  @Post('templates/:id/new-version')
+  @Permissions(PermissionKey.ContractsManage)
+  createTemplateVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateTemplateDto
+  ) {
+    return this.clm.createTemplateVersion(user.id, id, dto);
+  }
+
   @Get('clauses')
   @Permissions(PermissionKey.ClmTemplates)
   listClauses(@Query('category') category?: string) {
@@ -416,5 +535,92 @@ export class ClmController {
   @Permissions(PermissionKey.ClmImport)
   importLogs(@CurrentUser() user: RequestUser) {
     return this.clm.listImportLogs(user.id);
+  }
+
+  @Get('counterparties')
+  @Permissions(PermissionKey.ContractsManage)
+  listCounterparties(@CurrentUser() user: RequestUser, @Query('search') search?: string) {
+    return this.clm.listCounterparties(user.id, search);
+  }
+
+  @Post('counterparties')
+  @Permissions(PermissionKey.ContractsManage)
+  createCounterparty(@CurrentUser() user: RequestUser, @Body() dto: CreateCounterpartyDto) {
+    return this.clm.createCounterparty(user.id, dto);
+  }
+
+  @Get('counterparties/:id')
+  @Permissions(PermissionKey.ContractsManage)
+  getCounterparty(@Param('id') id: string) {
+    return this.clm.getCounterparty(id);
+  }
+
+  @Patch('counterparties/:id')
+  @Permissions(PermissionKey.ContractsManage)
+  updateCounterparty(@Param('id') id: string, @Body() dto: UpdateCounterpartyDto) {
+    return this.clm.updateCounterparty(id, dto);
+  }
+
+  @Delete('counterparties/:id')
+  @Permissions(PermissionKey.ContractsManage)
+  deleteCounterparty(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.clm.deleteCounterparty(user.id, id);
+  }
+
+  @Get('requests')
+  @Permissions(PermissionKey.ContractsManage)
+  listRequests(@CurrentUser() user: RequestUser) {
+    return this.clm.listRequests(user.id);
+  }
+
+  @Post('requests')
+  @Permissions(PermissionKey.ContractsManage)
+  createRequest(@CurrentUser() user: RequestUser, @Body() dto: CreateContractRequestDto) {
+    return this.clm.createRequest(user.id, dto);
+  }
+
+  @Get('requests/:id')
+  @Permissions(PermissionKey.ContractsManage)
+  getRequest(@Param('id') id: string) {
+    return this.clm.getRequest(id);
+  }
+
+  @Patch('requests/:id/review')
+  @Permissions(PermissionKey.ContractsManage)
+  reviewRequest(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ReviewContractRequestDto
+  ) {
+    return this.clm.reviewRequest(user.id, id, dto);
+  }
+
+  @Post('requests/:id/convert')
+  @Permissions(PermissionKey.ContractsManage)
+  convertRequest(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.clm.convertRequest(user.id, id);
+  }
+
+  @Post('signatures/webhook/docusign')
+  docusignWebhook(@Body() payload: Record<string, unknown>) {
+    return this.clm.handleSignatureWebhook('docusign', payload);
+  }
+
+  @Get('search')
+  @Permissions(PermissionKey.ContractsManage)
+  searchContracts(
+    @CurrentUser() user: RequestUser,
+    @Query('q') query: string,
+    @Query('projectId') projectId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ) {
+    return this.clm.searchContracts(user.id, query, projectId, page, limit);
+  }
+
+  @Post('contracts/:id/reindex')
+  @Permissions(PermissionKey.ContractsManage)
+  reindexContract(@Param('id') id: string) {
+    return this.clm.reindexContractText(id);
   }
 }

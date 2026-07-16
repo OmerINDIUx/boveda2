@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { StorageService } from '../../storage/storage.service';
 import { DocumentChunk } from '../documents/document-chunk.entity';
@@ -5,36 +6,48 @@ import { DocumentEmbedding } from '../documents/document-embedding.entity';
 import { DocumentRecord } from '../documents/document.entity';
 import { DocumentVersion } from '../versions/document-version.entity';
 type IndexedChunk = {
-  chunk: DocumentChunk;
-  embedding: number[];
-  score: number;
+    chunk: DocumentChunk;
+    embedding: number[];
+    score: number;
 };
 export declare class DocumentIndexingService {
-  private readonly versions;
-  private readonly chunks;
-  private readonly embeddings;
-  private readonly storage;
-  constructor(
-    versions: Repository<DocumentVersion>,
-    chunks: Repository<DocumentChunk>,
-    embeddings: Repository<DocumentEmbedding>,
-    storage: StorageService
-  );
-  ensureVersionIndexed(document: DocumentRecord, version: DocumentVersion): Promise<void>;
-  searchVisibleChunks(
-    documentIds: string[],
-    question: string,
-    limit?: number
-  ): Promise<IndexedChunk[]>;
-  private extractText;
-  private runPython;
-  private buildChunks;
-  private splitLongText;
-  private createEmbedding;
-  private cosineSimilarity;
-  private keywordBoost;
-  private tokenize;
-  private normalizeWhitespace;
-  private estimateTokenCount;
+    private readonly versions;
+    private readonly chunks;
+    private readonly embeddings;
+    private readonly storage;
+    private readonly config;
+    constructor(versions: Repository<DocumentVersion>, chunks: Repository<DocumentChunk>, embeddings: Repository<DocumentEmbedding>, storage: StorageService, config: ConfigService);
+    ensureVersionIndexed(document: DocumentRecord, version: DocumentVersion): Promise<void>;
+    searchVisibleChunks(documentIds: string[], question: string, limit?: number): Promise<IndexedChunk[]>;
+    private extractText;
+    private extractDocxWithMammoth;
+    private runPython;
+    private extractWithPdftotext;
+    private extractPdfText;
+    private buildPdfUnicodeMaps;
+    private decodePdfStream;
+    private extractPdfTextFromStream;
+    private decodePdfArrayText;
+    private decodePdfHexString;
+    private decodePdfLiteralString;
+    private decodePdfCharCodes;
+    private decodePdfUnicodeHex;
+    private codesToText;
+    private scoreDecodedPdfText;
+    private buildChunks;
+    private splitLongText;
+    private prefixChunkMetadata;
+    private createHashEmbedding;
+    private createOllamaEmbedding;
+    private cosineSimilarity;
+    private keywordBoost;
+    private keywordMatchCount;
+    private isBroadDocumentQuestion;
+    private isInvoiceQuestion;
+    private isAmountQuestion;
+    private expandQuestion;
+    private tokenize;
+    private normalizeWhitespace;
+    private estimateTokenCount;
 }
 export {};

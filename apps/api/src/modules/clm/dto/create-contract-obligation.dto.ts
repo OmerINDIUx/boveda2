@@ -26,4 +26,20 @@ export class CreateContractObligationDto {
 
   @IsOptional()
   alertDaysBefore?: number;
+
+  @IsOptional()
+  @IsString()
+  periodicity?: string;
+
+  @IsOptional()
+  @IsString()
+  priority?: string;
+
+  @IsOptional()
+  @IsString()
+  consequence?: string;
+
+  @IsOptional()
+  @IsString()
+  periodicityDay?: string;
 }

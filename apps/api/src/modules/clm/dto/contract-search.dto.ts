@@ -48,4 +48,12 @@ export class ContractSearchDto {
   @IsOptional()
   @IsString()
   sortOrder?: 'ASC' | 'DESC';
+
+  @IsOptional()
+  @IsString()
+  page?: string;
+
+  @IsOptional()
+  @IsString()
+  limit?: string;
 }

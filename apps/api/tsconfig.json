@@ -10,6 +10,7 @@
     "sourceMap": true,
     "outDir": "../../.npm-cache/api-build",
     "baseUrl": "./",
+    "tsBuildInfoFile": "../../.npm-cache/api-build/tsconfig.tsbuildinfo",
     "incremental": true,
     "strict": true,
     "skipLibCheck": true

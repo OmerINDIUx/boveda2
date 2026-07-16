@@ -4,6 +4,8 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { RequestUser } from '../interfaces/request-user.interface';
 
+const PLATFORM_ADMIN_ROLE = 'admin';
+
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -25,6 +27,9 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<{ user?: RequestUser }>();
+    if (request.user?.roles?.includes(PLATFORM_ADMIN_ROLE)) {
+      return true;
+    }
     const permissions = new Set(request.user?.permissions ?? []);
     return required.every((permission) => permissions.has(permission));
   }

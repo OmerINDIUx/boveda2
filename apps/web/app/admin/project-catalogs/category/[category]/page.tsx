@@ -3,7 +3,7 @@ import { RequirePermission } from '../../../../../components/auth/require-permis
 import { ProjectCatalogsListPage } from '../../../../../components/modules/project-admin-pages';
 import { PermissionKey } from '../../../../../lib/permissions';
 
-const VALID_CATEGORIES = ['workType', 'currentStage', 'priority', 'status'];
+const VALID_CATEGORIES = ['workType', 'currentStage', 'priority'];
 
 export default async function AdminProjectCatalogCategoryPage({
   params,
@@ -18,9 +18,7 @@ export default async function AdminProjectCatalogCategoryPage({
 
   return (
     <RequirePermission permission={PermissionKey.ProjectsManage}>
-      <ProjectCatalogsListPage
-        category={category as 'workType' | 'currentStage' | 'priority' | 'status'}
-      />
+      <ProjectCatalogsListPage category={category as 'workType' | 'currentStage' | 'priority'} />
     </RequirePermission>
   );
 }

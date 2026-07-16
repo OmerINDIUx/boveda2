@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
@@ -111,7 +112,7 @@ type DisciplineOption = {
   description?: string;
 };
 
-type ProjectCatalogCategory = 'workType' | 'currentStage' | 'priority' | 'status';
+type ProjectCatalogCategory = 'workType' | 'currentStage' | 'priority';
 
 type CatalogOption = {
   id: string;
@@ -572,8 +573,8 @@ export function ProjectsListPage() {
 
               <div className="project-state-grid">
                 <div className="state-card">
-                  <span>Estado</span>
-                  <strong>{normalizeLabel(project.status)}</strong>
+                  <span>Documentos</span>
+                  <Link href={`/documents?projectId=${project.id}`}>Ver documentos</Link>
                 </div>
                 <div className="state-card">
                   <span>Etapa</span>
@@ -716,6 +717,10 @@ export function ProjectDetailPage() {
           <Link className="button secondary" href={`/rfis/new?projectId=${detail.project.id}`}>
             <MessageSquare size={18} />
             Nuevo RFI
+          </Link>
+          <Link className="button secondary" href={`/projects/${detail.project.id}/bitacoras`}>
+            <BookOpen size={18} />
+            Bitácora
           </Link>
           {canManage ? (
             <Link className="button secondary" href="/admin/project-users">
@@ -1071,7 +1076,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [formOptions, setFormOptions] = useState<FormOptionsResponse>({
     users: [],
     disciplines: [],
-    catalogs: { workType: [], currentStage: [], priority: [], status: [] },
+    catalogs: { workType: [], currentStage: [], priority: [] },
   });
 
   const [codeTouched, setCodeTouched] = useState(false);
@@ -1190,32 +1195,6 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 value: 'critica',
                 label: 'Crítica',
                 sortOrder: 40,
-                isActive: true,
-              },
-            ],
-            status: [
-              {
-                id: 'status-1',
-                category: 'status',
-                value: 'planificacion',
-                label: 'Planificación',
-                sortOrder: 10,
-                isActive: true,
-              },
-              {
-                id: 'status-2',
-                category: 'status',
-                value: 'en_ejecucion',
-                label: 'En ejecución',
-                sortOrder: 20,
-                isActive: true,
-              },
-              {
-                id: 'status-3',
-                category: 'status',
-                value: 'en_riesgo',
-                label: 'En riesgo',
-                sortOrder: 30,
                 isActive: true,
               },
             ],

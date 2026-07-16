@@ -1,46 +1,146 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { RequirePermission } from '../../../components/auth/require-permission';
 import { SectionHeader } from '../../../components/modules/section-header';
-import { PermissionKey, permissionCatalog } from '../../../lib/permissions';
+import { PermissionKey } from '../../../lib/permissions';
+import { apiGet, apiPatch } from '../../../lib/api';
+import { getSessionToken } from '../../../lib/auth';
 
-const roles = ['Administrador', 'Gerente de proyecto', 'Consulta'];
+type PermissionInfo = { id: string; key: string; label: string; module: string };
+type RoleInfo = { id: string; key: string; name: string; permissions: PermissionInfo[] };
+
+function getToken() {
+  return getSessionToken();
+}
 
 export default function PermissionMatrixPage() {
+  const [roles, setRoles] = useState<RoleInfo[]>([]);
+  const [allPermissions, setAllPermissions] = useState<PermissionInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const [rolesData, permissionsData] = await Promise.all([
+          apiGet<RoleInfo[]>('/roles', getToken()),
+          apiGet<PermissionInfo[]>('/roles/permissions', getToken()),
+        ]);
+        if (!active) return;
+        setRoles(rolesData);
+        setAllPermissions(permissionsData);
+      } catch {
+        if (active) setError('No fue posible cargar la matriz de permisos.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function isAssigned(role: RoleInfo, permissionId: string) {
+    return role.permissions.some((p) => p.id === permissionId);
+  }
+
+  async function togglePermission(role: RoleInfo, permissionId: string) {
+    const newIds = isAssigned(role, permissionId)
+      ? role.permissions.filter((p) => p.id !== permissionId).map((p) => p.id)
+      : [...role.permissions.map((p) => p.id), permissionId];
+
+    setSaving(role.id);
+    setError('');
+    setSuccess('');
+    try {
+      await apiPatch(`/roles/${role.id}/permissions`, { permissionIds: newIds }, getToken());
+      setRoles((prev) =>
+        prev.map((r) =>
+          r.id === role.id
+            ? {
+                ...r,
+                permissions: allPermissions.filter((p) => newIds.includes(p.id)),
+              }
+            : r
+        )
+      );
+      setSuccess(`Permisos actualizados para "${role.name}"`);
+    } catch {
+      setError(`No fue posible actualizar los permisos de "${role.name}".`);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const sortedRoles = [...roles].sort((a, b) => a.key.localeCompare(b.key));
+  const groupedPermissions = allPermissions.reduce(
+    (acc, p) => {
+      (acc[p.module] ??= []).push(p);
+      return acc;
+    },
+    {} as Record<string, PermissionInfo[]>
+  );
+
   return (
     <RequirePermission permission={PermissionKey.RolesManage}>
       <SectionHeader
         title="Matriz de permisos"
-        description="Permisos por accion para roles del sistema."
+        description="Permisos por acción para roles del sistema. Marca o desmarca para asignar."
       />
+      {error ? (
+        <div className="card muted" style={{ color: 'var(--accent)' }}>
+          {error}
+        </div>
+      ) : null}
+      {success ? (
+        <div className="card muted" style={{ color: 'var(--primary)' }}>
+          {success}
+        </div>
+      ) : null}
       <div className="card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Modulo</th>
-              <th>Accion</th>
-              {roles.map((role) => (
-                <th key={role}>{role}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {permissionCatalog.map((permission) => (
-              <tr key={permission.key}>
-                <td>{permission.module}</td>
-                <td>{permission.label}</td>
-                {roles.map((role, index) => (
-                  <td key={role}>
-                    <input
-                      type="checkbox"
-                      defaultChecked={
-                        index === 0 || (index === 1 && permission.module !== 'Auditoria')
-                      }
-                    />
-                  </td>
+        {loading ? (
+          <p className="muted">Cargando matriz de permisos...</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Módulo</th>
+                <th>Acción</th>
+                {sortedRoles.map((role) => (
+                  <th key={role.id} style={{ textAlign: 'center' }}>
+                    {role.name}
+                    {saving === role.id ? ' ⏳' : null}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Object.entries(groupedPermissions).map(([module, perms]) =>
+                perms.map((permission) => (
+                  <tr key={permission.id}>
+                    <td>{module}</td>
+                    <td>{permission.label}</td>
+                    {sortedRoles.map((role) => (
+                      <td key={role.id} style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isAssigned(role, permission.id)}
+                          onChange={() => togglePermission(role, permission.id)}
+                          disabled={saving === role.id}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </RequirePermission>
   );

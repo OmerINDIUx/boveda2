@@ -33,6 +33,14 @@ export class UsersService {
     return this.serializeUser(user);
   }
 
+  async findOne(id: string) {
+    const user = await this.users.findOne({ where: { id }, relations: ['roles'] });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    return this.serializeUser(user);
+  }
+
   findByEmailWithRoles(email: string) {
     return this.users.findOne({ where: { email }, relations: ['roles', 'roles.permissions'] });
   }

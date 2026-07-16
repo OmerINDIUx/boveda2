@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json && node scripts/start-build.mjs",
+    "dev": "node scripts/start-build.mjs",
     "dev:simple": "node dev-server.js",
     "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json",
     "start": "node scripts/start-build.mjs",

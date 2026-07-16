@@ -1,1 +1,2 @@
-export declare class FoldersModule {}
+export declare class FoldersModule {
+}

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StorageModule } from '../../storage/storage.module';
 import { DocumentRecord } from '../documents/document.entity';
@@ -14,6 +15,7 @@ import { ContractComment } from './contract-comment.entity';
 import { ContractCustomField } from './entities/contract-custom-field.entity';
 import { ContractCustomValue } from './entities/contract-custom-value.entity';
 import { ContractImportLog } from './entities/contract-import-log.entity';
+import { ContractLifecycleEvent } from './entities/contract-lifecycle-event.entity';
 import { Contract } from './contract.entity';
 import { ContractMilestone } from './contract-milestone.entity';
 import { ContractNegotiation } from './entities/contract-negotiation.entity';
@@ -23,8 +25,15 @@ import { ContractSignatureRequest } from './entities/contract-signature-request.
 import { ContractTemplate } from './entities/contract-template.entity';
 import { ContractVersion } from './contract-version.entity';
 import { Tag } from './entities/tag.entity';
+import { ContractRequest } from './entities/contract-request.entity';
+import { Counterparty } from './entities/counterparty.entity';
+import { CounterpartyContact } from './entities/counterparty-contact.entity';
+import { CounterpartyDocument } from './entities/counterparty-document.entity';
+import { ContractTextIndex } from './entities/contract-text-index.entity';
 import { DocumentVersion } from '../versions/document-version.entity';
 import { ReportGeneratorService } from './reports/report-generator.service';
+import { StubSignatureProvider } from './signature/stub-signature.provider';
+import { DocuSignSignatureProvider } from './signature/docusign-signature.provider';
 
 @Module({
   imports: [
@@ -39,6 +48,7 @@ import { ReportGeneratorService } from './reports/report-generator.service';
       ContractMilestone,
       ContractComment,
       ContractAuditLog,
+      ContractLifecycleEvent,
       ContractAmendment,
       ContractPayment,
       ContractSignatureRequest,
@@ -49,12 +59,31 @@ import { ReportGeneratorService } from './reports/report-generator.service';
       ContractCustomValue,
       ContractImportLog,
       Tag,
+      ContractRequest,
+      ContractTextIndex,
+      Counterparty,
+      CounterpartyContact,
+      CounterpartyDocument,
       DocumentRecord,
       DocumentVersion,
     ]),
   ],
   controllers: [ClmController],
-  providers: [ClmService, ReportGeneratorService],
+  providers: [
+    ClmService,
+    ReportGeneratorService,
+    {
+      provide: 'SIGNATURE_PROVIDER',
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const provider = config.get<string>('SIGNATURE_PROVIDER') ?? 'stub';
+        if (provider === 'docusign') {
+          return new DocuSignSignatureProvider(config);
+        }
+        return new StubSignatureProvider();
+      },
+    },
+  ],
   exports: [ClmService],
 })
 export class ClmModule {}

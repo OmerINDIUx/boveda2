@@ -17,6 +17,8 @@ import { User } from '../users/user.entity';
 import { ContractAmendment } from './entities/contract-amendment.entity';
 import { ContractAttachment } from './contract-attachment.entity';
 import { ContractAuditLog } from './contract-audit-log.entity';
+import { ContractLifecycleEvent } from './entities/contract-lifecycle-event.entity';
+import { ContractTextIndex } from './entities/contract-text-index.entity';
 import { ContractComment } from './contract-comment.entity';
 import { ContractMilestone } from './contract-milestone.entity';
 import { ContractNegotiation } from './entities/contract-negotiation.entity';
@@ -25,6 +27,7 @@ import { ContractPayment } from './entities/contract-payment.entity';
 import { ContractSignatureRequest } from './entities/contract-signature-request.entity';
 import { ContractVersion } from './contract-version.entity';
 import { Tag } from './entities/tag.entity';
+import { Counterparty } from './entities/counterparty.entity';
 
 @Entity('contracts')
 export class Contract {
@@ -78,6 +81,12 @@ export class Contract {
     | 'expired'
     | 'renewed'
     | 'closed';
+
+  @Column({ name: 'lifecycle_stage', length: 80, default: 'request' })
+  lifecycleStage!: string;
+
+  @Column({ name: 'lifecycle_changed_at', type: 'datetime', nullable: true })
+  lifecycleChangedAt?: Date;
 
   @Column({ name: 'responsible_user_id', nullable: true })
   responsibleUserId?: string;
@@ -143,6 +152,12 @@ export class Contract {
   @OneToMany(() => ContractAuditLog, (log) => log.contract)
   auditLogs!: ContractAuditLog[];
 
+  @OneToMany(() => ContractTextIndex, (ti) => ti.contract)
+  textIndexes!: ContractTextIndex[];
+
+  @OneToMany(() => ContractLifecycleEvent, (event) => event.contract)
+  lifecycleEvents!: ContractLifecycleEvent[];
+
   @OneToMany(() => ContractAmendment, (amendment) => amendment.contract)
   amendments!: ContractAmendment[];
 
@@ -162,6 +177,26 @@ export class Contract {
     inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
   })
   tags!: Tag[];
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  riskLevel?: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  counterpartyRfc?: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  supplierCounterpartyId?: string;
+
+  @ManyToOne(() => Counterparty, { nullable: true })
+  @JoinColumn({ name: 'supplierCounterpartyId' })
+  supplierCounterparty?: Counterparty;
+
+  @Column({ type: 'uuid', nullable: true })
+  clientCounterpartyId?: string;
+
+  @ManyToOne(() => Counterparty, { nullable: true })
+  @JoinColumn({ name: 'clientCounterpartyId' })
+  clientCounterparty?: Counterparty;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

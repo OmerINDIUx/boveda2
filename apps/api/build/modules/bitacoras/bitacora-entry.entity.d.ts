@@ -1,0 +1,33 @@
+import { User } from '../users/user.entity';
+import { Project } from '../projects/project.entity';
+import { Bitacora } from './bitacora.entity';
+export declare class BitacoraEntry {
+    id: string;
+    bitacoraId: string;
+    bitacora: Bitacora;
+    projectId: string;
+    project: Project;
+    folio: number;
+    fecha: string;
+    turno: string;
+    clima?: Record<string, unknown>;
+    descripcionGeneral?: string;
+    actividades?: Record<string, unknown>;
+    personal?: Record<string, unknown>;
+    equipos?: Record<string, unknown>;
+    materialesRecibidos?: Record<string, unknown>;
+    incidentes?: Record<string, unknown>;
+    seguridad?: string;
+    calidad?: string;
+    observaciones?: string;
+    avanceEstimado?: number;
+    estado: string;
+    firmadoPorId?: string;
+    firmadoPor?: User;
+    firmadoEn?: Date;
+    createdById: string;
+    createdBy: User;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt?: Date;
+}

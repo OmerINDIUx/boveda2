@@ -3,7 +3,7 @@ import { RequirePermission } from '../../../../../../components/auth/require-per
 import { ProjectCatalogFormPage } from '../../../../../../components/modules/project-admin-pages';
 import { PermissionKey } from '../../../../../../lib/permissions';
 
-const VALID_CATEGORIES = ['workType', 'currentStage', 'priority', 'status'];
+const VALID_CATEGORIES = ['workType', 'currentStage', 'priority'];
 
 export default async function NewProjectCatalogCategoryPage({
   params,

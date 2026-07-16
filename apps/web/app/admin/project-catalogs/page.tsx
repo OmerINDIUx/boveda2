@@ -15,11 +15,6 @@ const catalogs = [
     description: 'Planificación, coordinación IFC, construcción, cierre.',
   },
   { key: 'priority', label: 'Prioridad', description: 'Baja, media, alta, crítica.' },
-  {
-    key: 'status',
-    label: 'Estado',
-    description: 'Planificación, en ejecución, en riesgo, cerrado.',
-  },
 ] as const;
 
 export default function AdminProjectCatalogsPage() {

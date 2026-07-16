@@ -1,5 +1,5 @@
 import { RequirePermission } from '../../../../../components/auth/require-permission';
-import { ContractCommentCreatePage } from '../../../../../components/modules/clm-pages';
+import { ContractCommentCreatePage } from '../../../../../components/modules/clm';
 import { PermissionKey } from '../../../../../lib/permissions';
 
 export default function NewContractCommentPage() {
