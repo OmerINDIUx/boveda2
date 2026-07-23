@@ -21,7 +21,7 @@ export default function AdminProjectCatalogsPage() {
   return (
     <RequirePermission permission={PermissionKey.ProjectsManage}>
       <SectionHeader
-        title="Catálogos de proyecto"
+        title="Catálogos de centros de costos"
         description="Cada catálogo tiene su propia página con CRUD independiente."
       />
       <section className="grid">

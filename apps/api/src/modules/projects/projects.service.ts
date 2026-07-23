@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -7,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentRecord } from '../documents/document.entity';
@@ -171,7 +172,7 @@ export class ProjectsService {
               role: 'system',
               content:
                 'Eres un asistente que identifica sinonimos o terminos muy similares en espanol ' +
-                'para catalogos de proyectos de construccion. ' +
+                'para catalogos de centros de costos de construccion. ' +
                 'Considera sinonimos reales (edificio/edificacion, obra/construccion, planificacion/planeacion), ' +
                 'plurales, variaciones ortograficas y conceptos equivalentes. ' +
                 'Responde UNICAMENTE con el numero del termino existente mas parecido, o "0" si no hay.',
@@ -263,7 +264,7 @@ export class ProjectsService {
               role: 'system',
               content:
                 'Eres un asistente que encuentra terminos semanticamente relacionados ' +
-                'en espanol para catalogos de proyectos de construccion. ' +
+                'en espanol para catalogos de centros de costos de construccion. ' +
                 'Responde UNICAMENTE con numeros separados por comas, o "0" si no hay coincidencias.',
             },
             { role: 'user', content: userPrompt },
@@ -403,7 +404,7 @@ export class ProjectsService {
       relations: ['responsibleUser'],
     });
     if (!project) {
-      throw new NotFoundException('Proyecto no encontrado');
+      throw new NotFoundException('Centro de costos no encontrado');
     }
 
     const [members, folderList, disciplineCatalog] = await Promise.all([
@@ -452,33 +453,79 @@ export class ProjectsService {
 
   async create(dto: CreateProjectDto, ownerId: string) {
     const isDraft = dto.isDraft === 'true' || dto.isDraft === true;
+    const assignedUserIds = this.normalizeIds(dto.assignedUserIds);
+    const disciplineIds = this.normalizeIds(dto.disciplineIds);
+    const responsibleUserId = this.optionalValue(dto.responsibleUserId) ?? ownerId;
 
-    const project = await this.projects.save(
-      this.projects.create({
-        ...dto,
-        ownerId,
-        responsibleUserId: dto.responsibleUserId ?? ownerId,
-        priority: dto.priority ?? 'media',
-        status: isDraft ? 'borrador' : (dto.status ?? 'planificacion'),
-        isActive: true,
-        isDraft,
-        disciplineIds: dto.disciplineIds ?? [],
-      })
+    await this.assertValidProjectReferences(
+      ownerId,
+      responsibleUserId,
+      assignedUserIds,
+      disciplineIds
     );
 
-    await this.members.save(
-      this.members.create({
-        projectId: project.id,
-        userId: ownerId,
-        role: 'owner',
-        canManageDocuments: true,
-        canManageContracts: true,
-      })
-    );
+    const projectInput = {
+      name: dto.name.trim(),
+      code: dto.code.trim().toUpperCase(),
+      description: this.optionalValue(dto.description),
+      workType: this.optionalValue(dto.workType),
+      currentStage: this.optionalValue(dto.currentStage),
+      targetDate: this.optionalValue(dto.targetDate),
+      ownerId,
+      responsibleUserId,
+      priority: dto.priority ?? 'media',
+      status: isDraft ? 'borrador' : (this.optionalValue(dto.status) ?? 'planificacion'),
+      isActive: true,
+      isDraft,
+      disciplineIds,
+    };
+
+    let project: Project;
+    const existingProject = await this.projects.findOne({ where: { code: projectInput.code } });
+    if (existingProject) {
+      const canResume =
+        existingProject.ownerId === ownerId &&
+        existingProject.isDraft === isDraft &&
+        (await this.folders.count({ where: { projectId: existingProject.id } })) === 0;
+      if (!canResume) {
+        throw new ConflictException(
+          'Ya existe un centro de costos con ese código interno. Cambia el código e intenta de nuevo.'
+        );
+      }
+
+      Object.assign(existingProject, projectInput);
+      project = await this.projects.save(existingProject);
+    } else {
+      try {
+        project = await this.projects.save(this.projects.create(projectInput));
+      } catch (error) {
+        if (this.isDuplicateProjectCode(error)) {
+          throw new ConflictException(
+            'Ya existe un centro de costos con ese código interno. Cambia el código e intenta de nuevo.'
+          );
+        }
+        throw error;
+      }
+    }
+
+    const ownerMembership = await this.members.findOne({
+      where: { projectId: project.id, userId: ownerId },
+    });
+    if (!ownerMembership) {
+      await this.members.save(
+        this.members.create({
+          projectId: project.id,
+          userId: ownerId,
+          role: 'owner',
+          canManageDocuments: true,
+          canManageContracts: true,
+        })
+      );
+    }
 
     if (!isDraft) {
-      await this.syncAssignedUsers(project.id, ownerId, dto.assignedUserIds ?? []);
-      await this.ensureProjectFolderStructure(project.id, ownerId, dto.disciplineIds ?? []);
+      await this.syncAssignedUsers(project.id, ownerId, assignedUserIds);
+      await this.ensureProjectFolderStructure(project.id, ownerId, disciplineIds);
       await this.audit.record({
         actorId: ownerId,
         action: 'project.create',
@@ -489,6 +536,60 @@ export class ProjectsService {
     }
 
     return this.getDetail(ownerId, project.id);
+  }
+
+  private optionalValue(value?: string | null) {
+    const normalized = value?.trim();
+    return normalized ? normalized : undefined;
+  }
+
+  private normalizeIds(ids?: string[]) {
+    return [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
+  }
+
+  private async assertValidProjectReferences(
+    ownerId: string,
+    responsibleUserId: string,
+    assignedUserIds: string[],
+    disciplineIds: string[]
+  ) {
+    const requestedUserIds = [
+      ...new Set([responsibleUserId, ...assignedUserIds].filter((userId) => userId !== ownerId)),
+    ];
+
+    if (requestedUserIds.length) {
+      const validUsers = await this.users.find({
+        where: { id: In(requestedUserIds), active: true },
+        select: ['id'],
+      });
+      if (validUsers.length !== requestedUserIds.length) {
+        throw new BadRequestException(
+          'Uno o más usuarios seleccionados ya no existen o están inactivos. Recarga el formulario e intenta de nuevo.'
+        );
+      }
+    }
+
+    if (disciplineIds.length) {
+      const validDisciplines = await this.disciplines.find({
+        where: { id: In(disciplineIds) },
+        select: ['id'],
+      });
+      if (validDisciplines.length !== disciplineIds.length) {
+        throw new BadRequestException(
+          'Una o más disciplinas seleccionadas ya no existen. Recarga el formulario e intenta de nuevo.'
+        );
+      }
+    }
+  }
+
+  private isDuplicateProjectCode(error: unknown) {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+    const databaseError = error.driverError as
+      { code?: string; sqlMessage?: string; message?: string } | undefined;
+    const message = databaseError?.sqlMessage ?? databaseError?.message ?? error.message;
+    return databaseError?.code === 'ER_DUP_ENTRY' || message.includes('Duplicate entry');
   }
 
   async listDrafts(userId: string) {
@@ -502,10 +603,10 @@ export class ProjectsService {
   async publishDraft(requesterId: string, projectId: string) {
     const project = await this.projects.findOne({ where: { id: projectId } });
     if (!project) {
-      throw new NotFoundException('Proyecto no encontrado');
+      throw new NotFoundException('Centro de costos no encontrado');
     }
     if (!project.isDraft) {
-      throw new BadRequestException('El proyecto no es un borrador');
+      throw new BadRequestException('El centro de costos no es un borrador');
     }
 
     project.isDraft = false;
@@ -528,7 +629,7 @@ export class ProjectsService {
     await this.assertAccess(requesterId, projectId);
     const project = await this.projects.findOne({ where: { id: projectId } });
     if (!project) {
-      throw new NotFoundException('Proyecto no encontrado');
+      throw new NotFoundException('Centro de costos no encontrado');
     }
 
     const before = {
@@ -569,7 +670,7 @@ export class ProjectsService {
     await this.assertAccess(requesterId, projectId);
     const project = await this.projects.findOne({ where: { id: projectId } });
     if (!project) {
-      throw new NotFoundException('Proyecto no encontrado');
+      throw new NotFoundException('Centro de costos no encontrado');
     }
 
     project.isActive = false;
@@ -610,7 +711,7 @@ export class ProjectsService {
 
   async assertAccess(userId: string, projectId: string) {
     if (!(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
   }
 
@@ -864,10 +965,18 @@ export class ProjectsService {
       workType: [],
       currentStage: [],
       priority: [],
+      status: [],
     };
 
     for (const option of options) {
-      categories[option.category].push(option);
+      const category = categories[option.category];
+      if (category) {
+        category.push(option);
+      } else {
+        this.logger.warn(
+          `Categoria de catalogo del centro de costos no reconocida: ${option.category}`
+        );
+      }
     }
 
     return categories;

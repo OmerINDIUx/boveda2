@@ -20,14 +20,14 @@ export class FoldersService {
 
   async list(userId: string, projectId: string) {
     if (!(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     return this.folders.find({ where: { projectId } });
   }
 
   async create(userId: string, dto: CreateFolderDto) {
     if (!(await this.scope.canAccessProject(userId, dto.projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     const parent = dto.parentId
       ? await this.folders.findOne({ where: { id: dto.parentId, projectId: dto.projectId } })

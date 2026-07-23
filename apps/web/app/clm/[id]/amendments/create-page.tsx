@@ -44,7 +44,7 @@ export default function AmendmentCreatePage() {
     <section className="projects-workspace">
       <div className="topbar">
         <div>
-          <h1>Nueva enmienda</h1>
+          <h1>Nuevo convenio modificatorio</h1>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href={`/clm/${contractId}/amendments`}>
@@ -55,7 +55,7 @@ export default function AmendmentCreatePage() {
       {error ? <article className="card muted">{error}</article> : null}
       <article className="card">
         <div className="field">
-          <label>Número de enmienda</label>
+          <label>Número de convenio</label>
           <input
             value={form.amendmentNumber}
             onChange={(e) => setForm({ ...form, amendmentNumber: e.target.value })}
@@ -93,7 +93,7 @@ export default function AmendmentCreatePage() {
         </div>
         <div className="projects-actions" style={{ marginTop: 12 }}>
           <button className="button" type="button" onClick={submit} disabled={saving}>
-            {saving ? 'Guardando...' : 'Crear enmienda'}
+            {saving ? 'Guardando...' : 'Crear convenio'}
           </button>
         </div>
       </article>

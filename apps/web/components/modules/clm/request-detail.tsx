@@ -145,7 +145,8 @@ export function ContractRequestDetailPage() {
               {normalizeLabel(detail.status)}
             </span>
             <p className="muted">
-              {detail.project?.name ?? 'Sin proyecto'} · {detail.requestingArea ?? 'Sin área'}
+              {detail.project?.name ?? 'Sin centro de costos'} ·{' '}
+              {detail.requestingArea ?? 'Sin área'}
             </p>
           </div>
         </div>

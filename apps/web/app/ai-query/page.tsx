@@ -324,7 +324,7 @@ export default function AiQueryPage() {
   return (
     <RequirePermission permission={PermissionKey.AiQuery}>
       <SectionHeader
-        title="Consulta IA"
+        title="Consulta con G.OTA"
         description="Conversa con tus documentos. Pregunta solo sobre contenido autorizado."
       />
 
@@ -374,7 +374,7 @@ export default function AiQueryPage() {
               </div>
 
               <div className="field">
-                <label style={{ fontSize: 12 }}>Proyecto</label>
+                <label style={{ fontSize: 12 }}>Centro de costos</label>
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}

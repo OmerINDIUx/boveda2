@@ -24,13 +24,13 @@ import { clearSession, getSessionUser } from '../../lib/auth';
 
 const searchItems = [
   { href: '/dashboard', label: 'Panel', icon: Gauge, section: 'Principal' },
-  { href: '/projects', label: 'Proyectos', icon: FolderKanban, section: 'Gestión' },
+  { href: '/projects', label: 'Centros de costos', icon: FolderKanban, section: 'Gestión' },
   { href: '/documents', label: 'Documentos', icon: FileText, section: 'Gestión' },
   { href: '/rfis', label: 'Consultas', icon: FileQuestion, section: 'Gestión' },
   { href: '/approvals', label: 'Aprobaciones', icon: ClipboardCheck, section: 'Gestión' },
   { href: '/clm', label: 'Contratos', icon: Landmark, section: 'Gestión' },
   { href: '/notifications', label: 'Notificaciones', icon: Bell, section: 'Utilidades' },
-  { href: '/ai-query', label: 'Consulta IA', icon: Bot, section: 'Utilidades' },
+  { href: '/ai-query', label: 'Consulta con G.OTA', icon: Bot, section: 'Utilidades' },
   { href: '/admin/users', label: 'Usuarios', icon: ShieldCheck, section: 'Administración' },
   { href: '/admin/roles', label: 'Roles', icon: ShieldCheck, section: 'Administración' },
   {

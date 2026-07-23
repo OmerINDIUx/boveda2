@@ -54,7 +54,7 @@ type DashboardData = {
 const KPI_CONFIG = [
   {
     key: 'activeProjects',
-    label: 'Proyectos activos',
+    label: 'Centros de costos activos',
     icon: FolderKanban,
     color: '#0f766e',
     href: '/projects',
@@ -442,15 +442,15 @@ export function ExecutiveDashboard() {
             }}
           >
             <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-              Indicadores por proyecto
+              Indicadores por centro de costos
             </h2>
-            <Badge>{data?.projects.length ?? 0} proyectos</Badge>
+            <Badge>{data?.projects.length ?? 0} centros de costos</Badge>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table" style={{ fontSize: '0.8125rem' }}>
               <thead>
                 <tr>
-                  <th>Proyecto</th>
+                  <th>Centro de costos</th>
                   <th>Documentos</th>
                   <th>Aprob.</th>
                   <th>Revisión</th>

@@ -4,43 +4,140 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { apiPost } from '../../../lib/api';
-import { FilePayload } from './types';
-import { fileToPayload, getErrorMessage, TextField } from './utils';
+import { getSessionToken } from '../../../lib/auth';
+import { uploadFile } from '../../../lib/upload';
+import { ContractDetail } from './types';
+import { friendlyFileName, getErrorMessage, TextField } from './utils';
 
-export function ContractVersionCreatePage() {
-  const params = useParams<{ id: string }>();
-  const contractId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+function formatUploadSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'Tamaño no disponible';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** unit).toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+export function ContractVersionUploadPanel({
+  contractId,
+  original = false,
+  onCancel,
+}: {
+  contractId: string;
+  original?: boolean;
+  onCancel?: () => void;
+}) {
   const router = useRouter();
-  const [form, setForm] = useState({ versionLabel: '', changeSummary: '' });
-  const [file, setFile] = useState<FilePayload | null>(null);
+  const [form, setForm] = useState({
+    versionLabel: original ? 'Original' : '',
+    changeSummary: original ? 'Contrato original' : '',
+  });
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  async function onSelectFile(fileList: FileList | null) {
-    const next = fileList?.[0];
-    if (!next) return;
-    setFile(await fileToPayload(next));
-  }
+
   async function submit() {
     if (!contractId || !file) {
-      setError('Selecciona el archivo.');
+      setError('Selecciona el archivo del contrato.');
       return;
     }
     setSaving(true);
     setError('');
     try {
-      await apiPost(`/clm/contracts/${contractId}/versions`, {
-        versionLabel: form.versionLabel || `Rev-${Date.now()}`,
-        changeSummary: form.changeSummary,
-        ...file,
-        sizeBytes: String(file.sizeBytes),
-      });
-      router.push(`/clm/${contractId}`);
+      const uploaded = await uploadFile(file, () => getSessionToken() ?? null);
+      const response = await apiPost<ContractDetail & { createdVersionId?: string }>(
+        `/clm/contracts/${contractId}/versions`,
+        {
+          versionLabel: form.versionLabel.trim() || `Rev-${Date.now()}`,
+          changeSummary: form.changeSummary,
+          fileKey: uploaded.fileKey,
+          fileName: uploaded.fileName,
+          mimeType: uploaded.mimeType,
+          sizeBytes: String(uploaded.sizeBytes),
+        }
+      );
+      const createdVersionId =
+        response.createdVersionId ??
+        response.currentVersionId ??
+        response.currentVersion?.id ??
+        response.versions?.[0]?.id;
+      if (!createdVersionId) {
+        throw new Error(
+          'La versión se guardó, pero la API no devolvió su identificador. Reinicia la API y abre la versión desde el historial.'
+        );
+      }
+      router.push(`/clm/${contractId}/versions/${createdVersionId}/review`);
     } catch (e) {
       setError(getErrorMessage(e, 'Error al subir.'));
     } finally {
       setSaving(false);
     }
   }
+
+  return (
+    <article className="card">
+      <div className="panel-header">
+        <div>
+          <small className="muted">{original ? 'Documento base' : 'Control de versiones'}</small>
+          <h2>{original ? 'Subir contrato original' : 'Subir nueva versión'}</h2>
+          <p className="muted">
+            El archivo se cargará de forma segura y después iniciará la extracción con IA.
+          </p>
+        </div>
+      </div>
+      {error ? (
+        <div className="card muted" role="alert">
+          {error}
+        </div>
+      ) : null}
+      <div className="quick-filters-grid">
+        <TextField
+          label="Etiqueta de versión"
+          value={form.versionLabel}
+          onChange={(value) => setForm({ ...form, versionLabel: value })}
+        />
+        <TextField
+          label={original ? 'Descripción' : 'Resumen de cambios'}
+          value={form.changeSummary}
+          onChange={(value) => setForm({ ...form, changeSummary: value })}
+        />
+        <div className="field">
+          <label>Archivo del contrato</label>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            disabled={saving}
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+          {file ? (
+            <small className="muted">
+              {friendlyFileName(file.name)} · {formatUploadSize(file.size)}
+            </small>
+          ) : (
+            <small className="muted">PDF, Word o texto.</small>
+          )}
+        </div>
+      </div>
+      <div className="projects-actions" style={{ marginTop: 16 }}>
+        {onCancel ? (
+          <button className="button secondary" type="button" onClick={onCancel} disabled={saving}>
+            Cancelar
+          </button>
+        ) : null}
+        <button className="button" type="button" onClick={() => void submit()} disabled={saving}>
+          {saving
+            ? 'Subiendo e iniciando análisis...'
+            : original
+              ? 'Subir contrato original y analizar con IA'
+              : 'Subir y analizar con IA'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+export function ContractVersionCreatePage() {
+  const params = useParams<{ id: string }>();
+  const contractId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+
   return (
     <section className="projects-workspace">
       <div className="topbar">
@@ -53,28 +150,7 @@ export function ContractVersionCreatePage() {
           </Link>
         </div>
       </div>
-      {error ? <article className="card muted">{error}</article> : null}
-      <article className="card">
-        <TextField
-          label="Etiqueta"
-          value={form.versionLabel}
-          onChange={(v) => setForm({ ...form, versionLabel: v })}
-        />
-        <TextField
-          label="Resumen de cambios"
-          value={form.changeSummary}
-          onChange={(v) => setForm({ ...form, changeSummary: v })}
-        />
-        <div className="field">
-          <label>Archivo</label>
-          <input type="file" onChange={(e) => void onSelectFile(e.target.files)} />
-        </div>
-        <div className="projects-actions" style={{ marginTop: 12 }}>
-          <button className="button" type="button" onClick={submit} disabled={saving}>
-            {saving ? 'Subiendo...' : 'Subir versión'}
-          </button>
-        </div>
-      </article>
+      {contractId ? <ContractVersionUploadPanel contractId={contractId} /> : null}
     </section>
   );
 }

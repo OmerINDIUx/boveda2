@@ -1,4 +1,4 @@
-import { ContractListItem, ContractDetail, FilePayload, Project } from './types';
+import { FilePayload } from './types';
 import { normalizeLabel } from '../../../lib/labels';
 
 export const statusOptions = [
@@ -25,66 +25,7 @@ export const lifecycleStageOptions = [
   { value: 'archived', label: 'Archivo' },
 ];
 
-export const fallbackProjects: Project[] = [
-  { id: 'p1', name: 'Torre Ejecutiva Norte', code: 'HOL-PRJ-001' },
-  { id: 'p2', name: 'Planta Oriente', code: 'HOL-PRJ-014' },
-];
-
-export const fallbackContracts: ContractListItem[] = [
-  {
-    id: 'c1',
-    name: 'Contrato marco de servicios',
-    projectId: 'p1',
-    supplierName: 'Proveedor A',
-    clientName: 'Holocron',
-    responsibleArea: 'Legal',
-    contractType: 'Servicios',
-    status: 'expiring_soon',
-    lifecycleStage: 'obligations_tracking',
-    startDate: '2026-01-01',
-    endDate: '2026-07-20',
-    currency: 'MXN',
-    amount: '1200000.00',
-    project: fallbackProjects[0],
-    pendingObligations: 2,
-  },
-];
-
-export function buildFallbackDetail(contractId?: string): ContractDetail | null {
-  const item =
-    fallbackContracts.find((contract) => contract.id === contractId) ?? fallbackContracts[0];
-  if (!item) return null;
-  return {
-    ...item,
-    versions: [],
-    attachments: [],
-    obligations: [],
-    milestones: [],
-    comments: [],
-    audit: [],
-    amendments: [],
-    payments: [],
-    signatures: [],
-    negotiations: [],
-    tags: item.tags ?? [],
-    customValues: [],
-    childrenContracts: [],
-    lifecycleHistory: item.lifecycleStage
-      ? [
-          {
-            id: 'fallback-lifecycle-1',
-            stage: item.lifecycleStage,
-            createdAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
-            comments: 'Vista de respaldo sin conexión a la API.',
-            decision: 'fallback',
-            changedBy: null,
-          },
-        ]
-      : [],
-  };
-}
-
-export function stripLifecycleFields<T extends Record<string, any>>(payload: T) {
+export function stripLifecycleFields<T extends Record<string, unknown>>(payload: T) {
   const rest = { ...payload };
   delete rest.lifecycleStage;
   return rest;
@@ -115,6 +56,16 @@ export function formatCurrency(amount?: string, currency = 'MXN') {
 export function formatDate(value?: string) {
   if (!value) return 'Sin fecha';
   return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(new Date(value));
+}
+
+export function friendlyFileName(fileName: string, fallback = 'Documento') {
+  const withoutStoragePrefix = fileName.replace(/^[0-9a-f-]{36}-/i, '');
+  const extension = withoutStoragePrefix.match(/\.[a-z0-9]+$/i)?.[0] ?? '';
+  const baseName = withoutStoragePrefix.slice(0, extension ? -extension.length : undefined);
+  if (!baseName || /^[0-9a-f-]{36}$/i.test(baseName)) {
+    return `${fallback}${extension.toLowerCase()}`;
+  }
+  return withoutStoragePrefix.replaceAll('_', ' ');
 }
 
 export function getContractTone(status: string) {

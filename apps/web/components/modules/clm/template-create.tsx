@@ -6,11 +6,13 @@ import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../../../lib/api';
 import { TextField } from './utils';
 
+type Clause = { id: string; title: string };
+
 export function ClmTemplateCreatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const parentId = searchParams.get('parentId');
-  const [clauses, setClauses] = useState<any[]>([]);
+  const [clauses, setClauses] = useState<Clause[]>([]);
   const [form, setForm] = useState({
     name: parentId ? '' : '',
     description: '',
@@ -23,7 +25,7 @@ export function ClmTemplateCreatePage() {
   useEffect(() => {
     async function load() {
       try {
-        const c = await apiGet<any[]>('/clm/clauses');
+        const c = await apiGet<Clause[]>('/clm/clauses');
         setClauses(c);
       } catch {
         setClauses([]);

@@ -8,6 +8,9 @@ import {
 
 @Injectable()
 export class StubSignatureProvider implements SignatureProvider {
+  readonly name = 'stub';
+  readonly configured = true;
+
   private requests = new Map<
     string,
     {

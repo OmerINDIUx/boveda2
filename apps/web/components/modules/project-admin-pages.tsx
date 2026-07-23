@@ -74,7 +74,9 @@ export function ProjectCatalogsListPage({ category }: { category: ProjectCatalog
         setItems(response);
       } catch (nextError) {
         if (!active) return;
-        setError(getErrorMessage(nextError, 'No fue posible cargar los catálogos del proyecto.'));
+        setError(
+          getErrorMessage(nextError, 'No fue posible cargar los catálogos del centro de costos.')
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -730,7 +732,7 @@ export function ProjectDisciplinesListPage() {
     <>
       <SectionHeader
         title="Disciplinas"
-        description="Mantenimiento separado de disciplinas para los proyectos."
+        description="Mantenimiento separado de disciplinas para los centros de costos."
       />
       <div className="projects-actions" style={{ marginBottom: 16 }}>
         <Link className="button" href="/admin/project-disciplines/new">

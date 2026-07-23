@@ -383,7 +383,7 @@ export class DashboardService {
     return [...counts.entries()]
       .map(([projectId, value]) => ({
         key: projectId,
-        label: projectMap.get(projectId)?.name ?? 'Proyecto',
+        label: projectMap.get(projectId)?.name ?? 'Centro de costos',
         value,
       }))
       .sort((a, b) => b.value - a.value);

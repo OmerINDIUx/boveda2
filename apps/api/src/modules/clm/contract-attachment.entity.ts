@@ -25,6 +25,15 @@ export class ContractAttachment {
   @Column({ length: 180 })
   name!: string;
 
+  @Column({ name: 'attachment_group_id' })
+  attachmentGroupId!: string;
+
+  @Column({ name: 'version_label', length: 40, default: '1' })
+  versionLabel!: string;
+
+  @Column({ name: 'is_current', default: true })
+  isCurrent!: boolean;
+
   @Column({ name: 'file_key' })
   fileKey!: string;
 

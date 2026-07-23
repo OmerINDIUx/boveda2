@@ -20,14 +20,30 @@ export async function uploadFile(
     const chunk = file.slice(start, end);
     const form = new FormData();
     form.append('chunk', chunk, `chunk-${i}`);
-    await fetch(buildBrowserApiUrl(`/uploads/${uploadId}/chunks/${i}`), {
+    const response = await fetch(buildBrowserApiUrl(`/uploads/${uploadId}/chunks/${i}`), {
       method: 'POST',
       headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
       body: form,
     });
+    if (!response.ok) {
+      throw new Error(await readUploadError(response));
+    }
   }
 
   return apiPost(buildBrowserApiUrl(`/uploads/${uploadId}/complete`), {}, getToken);
+}
+
+async function readUploadError(response: Response) {
+  try {
+    const payload = await response.json();
+    const message = Array.isArray(payload?.message) ? payload.message.join(', ') : payload?.message;
+    if (typeof message === 'string' && message.trim()) {
+      return `No fue posible subir el archivo: ${message}`;
+    }
+  } catch {
+    // The fallback below still gives the request status when the API did not return JSON.
+  }
+  return `No fue posible subir el archivo (${response.status} ${response.statusText}).`;
 }
 
 async function apiPost<T>(url: string, body: unknown, getToken: () => string | null): Promise<T> {
@@ -41,7 +57,7 @@ async function apiPost<T>(url: string, body: unknown, getToken: () => string | n
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Upload failed: ${res.statusText}`);
+    throw new Error(await readUploadError(res));
   }
   return res.json();
 }

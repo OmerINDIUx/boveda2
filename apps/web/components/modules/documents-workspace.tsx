@@ -768,7 +768,7 @@ export function DocumentsWorkspace() {
                     </button>
                     <Link className="button" href={`/ai-query?documentId=${detail.id}`}>
                       <Bot size={18} />
-                      Consultar con IA
+                      Consulta con G.OTA
                     </Link>
                   </div>
                 </div>
@@ -1033,7 +1033,7 @@ export function DocumentsWorkspace() {
               {uploadMode === 'new' ? (
                 <>
                   <SelectField
-                    label="Proyecto"
+                    label="Centro de costos"
                     value={uploadForm.projectId}
                     onChange={(value) =>
                       setUploadForm((current) => ({ ...current, projectId: value }))
@@ -1230,7 +1230,7 @@ export function DocumentsWorkspace() {
                   marginBottom: '0.375rem',
                 }}
               >
-                Proyecto
+                Centro de costos
               </label>
               <select
                 value={bulkSelectedProject}

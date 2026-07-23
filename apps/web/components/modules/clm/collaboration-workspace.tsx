@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   CircleDashed,
+  FileSignature,
   FileText,
   MessageSquare,
   Scale,
@@ -15,19 +16,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiGet, apiPost } from '../../../lib/api';
 import { normalizeLabel } from '../../../lib/labels';
 import type { ContractDetail } from './types';
-import { buildFallbackDetail, formatDate, getLifecycleLabel } from './utils';
+import { SectionLoadWarning } from './section-load-warning';
+import { friendlyFileName, formatDate, getErrorMessage, getLifecycleLabel } from './utils';
 
 function getBlockers(detail: ContractDetail) {
   const blockers: string[] = [];
   if (!detail.supplierName || !detail.clientName)
     blockers.push('Definir claramente las partes del contrato.');
   if (!detail.amount || !detail.endDate) blockers.push('Completar monto y vigencia del acuerdo.');
-  if (!detail.versions.length)
-    blockers.push('Subir una version base para empezar la colaboracion.');
-  if (!detail.negotiations.length)
-    blockers.push('Abrir al menos una ronda de negociacion o acuerdos.');
-  if (!detail.signatures.length) blockers.push('Preparar la ruta de firma del documento final.');
-  if (!detail.obligations.length && !detail.milestones.length) {
+  if (!(detail.versions ?? []).length)
+    blockers.push('Subir una versión base para empezar la colaboración.');
+  if (!(detail.negotiations ?? []).length)
+    blockers.push('Abrir al menos una ronda de negociación o acuerdos.');
+  if (!(detail.signatures ?? []).length)
+    blockers.push('Preparar la ruta de firma del documento final.');
+  if (!(detail.obligations ?? []).length && !(detail.milestones ?? []).length) {
     blockers.push('Traducir el contrato a obligaciones e hitos medibles.');
   }
   return blockers;
@@ -39,11 +42,11 @@ function getParticipants(detail: ContractDetail) {
     seen.set(`client:${detail.clientName}`, { label: detail.clientName, role: 'Cliente' });
   if (detail.supplierName)
     seen.set(`supplier:${detail.supplierName}`, { label: detail.supplierName, role: 'Proveedor' });
-  for (const item of detail.comments) {
+  for (const item of detail.comments ?? []) {
     if (item.author?.name)
       seen.set(`comment:${item.author.name}`, { label: item.author.name, role: 'Colaborador' });
   }
-  for (const item of detail.lifecycleHistory) {
+  for (const item of detail.lifecycleHistory ?? []) {
     if (item.changedBy?.name)
       seen.set(`life:${item.changedBy.name}`, { label: item.changedBy.name, role: 'Decision' });
   }
@@ -69,15 +72,10 @@ export function ContractCollaborationWorkspacePage() {
         const result = await apiGet<ContractDetail>(`/clm/contracts/${contractId}`);
         if (!active) return;
         setDetail(result);
-      } catch (error: any) {
+      } catch (error) {
         if (!active) return;
-        const fallback = buildFallbackDetail(contractId);
-        if (fallback) {
-          setDetail(fallback);
-          setMessage('Vista de respaldo del workspace.');
-          return;
-        }
-        setMessage(error?.message ?? 'No se pudo cargar el workspace.');
+        setDetail(null);
+        setMessage(getErrorMessage(error, 'No se pudo cargar el workspace.'));
       } finally {
         if (active) setLoading(false);
       }
@@ -98,8 +96,8 @@ export function ContractCollaborationWorkspacePage() {
       });
       setDetail(updated);
       setCommentBody('');
-    } catch (error: any) {
-      setMessage(error?.message ?? 'No se pudo registrar el comentario.');
+    } catch (error) {
+      setMessage(getErrorMessage(error, 'No se pudo registrar el comentario.'));
     } finally {
       setSavingComment(false);
     }
@@ -110,6 +108,8 @@ export function ContractCollaborationWorkspacePage() {
   const latestVersion = detail?.versions?.[0] ?? null;
   const latestNegotiation = detail?.negotiations?.[0] ?? null;
   const latestSignature = detail?.signatures?.[0] ?? null;
+  const lifecycleHistory = detail?.lifecycleHistory ?? [];
+  const comments = detail?.comments ?? [];
   const pendingItems = [
     ...blockers.map((item, index) => ({
       id: `blocker-${index}`,
@@ -121,7 +121,7 @@ export function ContractCollaborationWorkspacePage() {
       .slice(0, 4)
       .map((item) => ({
         id: item.id,
-        label: `Obligacion: ${item.description}`,
+        label: `Obligación: ${item.description}`,
         type: 'obligation' as const,
       })),
   ];
@@ -148,6 +148,14 @@ export function ContractCollaborationWorkspacePage() {
 
   return (
     <section className="projects-workspace">
+      {Object.keys(detail.sectionErrors ?? {}).map((section) => (
+        <SectionLoadWarning
+          key={section}
+          detail={detail}
+          section={section}
+          label={`la sección ${normalizeLabel(section)}`}
+        />
+      ))}
       <div className="topbar">
         <div>
           <h1>Workspace colaborativo</h1>
@@ -189,7 +197,7 @@ export function ContractCollaborationWorkspacePage() {
                 <strong>{getLifecycleLabel(detail.lifecycleStage)}</strong>
                 <small>Etapa activa desde {formatDate(detail.lifecycleChangedAt)}</small>
               </div>
-              {detail.lifecycleHistory.slice(0, 3).map((item) => (
+              {lifecycleHistory.slice(0, 3).map((item) => (
                 <div key={item.id} className="simple-document-item">
                   <strong>{getLifecycleLabel(item.stage)}</strong>
                   <small>
@@ -214,7 +222,7 @@ export function ContractCollaborationWorkspacePage() {
             <small className="muted">Mesa de trabajo</small>
             <h2 style={{ marginBottom: 8 }}>{detail.name}</h2>
             <p className="muted" style={{ marginBottom: 12 }}>
-              {detail.contractType ?? 'Sin tipo'} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
+              {normalizeLabel(detail.contractType)} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
               {detail.clientName ?? 'Sin cliente'}
             </p>
             <div className="projects-actions">
@@ -232,7 +240,7 @@ export function ContractCollaborationWorkspacePage() {
               {latestVersion ? (
                 <div className="simple-document-item">
                   <strong>{latestVersion.versionLabel}</strong>
-                  <small>{latestVersion.fileName}</small>
+                  <small>{friendlyFileName(latestVersion.fileName, 'Versión contractual')}</small>
                   <span>{latestVersion.changeSummary ?? 'Sin resumen de cambios.'}</span>
                 </div>
               ) : (
@@ -242,12 +250,20 @@ export function ContractCollaborationWorkspacePage() {
                 <Link className="button secondary" href={`/clm/${detail.id}/versions`}>
                   Gestionar versiones
                 </Link>
+                {latestVersion ? (
+                  <Link
+                    className="button"
+                    href={`/clm/${detail.id}/signatures/new?versionId=${latestVersion.id}`}
+                  >
+                    <FileSignature size={16} /> Mandar a firma
+                  </Link>
+                ) : null}
               </div>
             </article>
 
             <article className="card span-6" style={{ padding: 16 }}>
               <div className="panel-header">
-                <h2>Acuerdos y negociacion</h2>
+                <h2>Acuerdos y negociación</h2>
                 <Scale size={18} />
               </div>
               {latestNegotiation ? (
@@ -260,12 +276,12 @@ export function ContractCollaborationWorkspacePage() {
                 </div>
               ) : (
                 <div className="simple-document-item">
-                  Aun no hay rondas de negociacion registradas.
+                  Aún no hay rondas de negociación registradas.
                 </div>
               )}
               <div className="projects-actions" style={{ marginTop: 12 }}>
                 <Link className="button secondary" href={`/clm/${detail.id}/negotiations`}>
-                  Gestionar negociacion
+                  Gestionar negociación
                 </Link>
               </div>
             </article>
@@ -299,14 +315,14 @@ export function ContractCollaborationWorkspacePage() {
               </Link>
             </div>
             <div className="simple-document-list" style={{ marginTop: 12 }}>
-              {detail.comments.slice(0, 6).map((item) => (
+              {comments.slice(0, 6).map((item) => (
                 <div key={item.id} className="simple-document-item">
                   <strong>{item.author?.name ?? 'Usuario'}</strong>
                   <small>{new Date(item.createdAt).toLocaleString()}</small>
                   <span>{item.body}</span>
                 </div>
               ))}
-              {!detail.comments.length ? (
+              {!comments.length ? (
                 <div className="simple-document-item">Todavia no hay conversacion registrada.</div>
               ) : null}
             </div>

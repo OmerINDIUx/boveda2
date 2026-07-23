@@ -6,9 +6,16 @@ import { SectionHeader } from '../section-header';
 import { apiPost } from '../../../lib/api';
 import { getErrorMessage, formatCurrency } from './utils';
 
+type ReportResult = {
+  title: string;
+  generatedAt: string;
+  total: number;
+  rows: Array<{ label: string; value: string | number }>;
+};
+
 export function ClmReportsPage() {
   const [type, setType] = useState('contracts_by_status');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   async function generate() {
@@ -16,7 +23,7 @@ export function ClmReportsPage() {
     setError('');
     setResult(null);
     try {
-      const r = await apiPost<any>('/clm/reports', { type });
+      const r = await apiPost<ReportResult>('/clm/reports', { type });
       setResult(r);
     } catch (e) {
       setError(getErrorMessage(e, 'Error al generar reporte.'));
@@ -66,7 +73,7 @@ export function ClmReportsPage() {
                 Generado: {new Date(result.generatedAt).toLocaleString()} · Total: {result.total}
               </small>
             </div>
-            {result.rows.map((row: any, i: number) => (
+            {result.rows.map((row, i) => (
               <div
                 key={i}
                 className="simple-document-item"

@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   CircleDashed,
   DollarSign,
-  FilePlus2,
   FileSignature,
   FileText,
   History,
@@ -24,7 +23,6 @@ import {
   Send,
   ShieldCheck,
   Download,
-  Upload,
   Tags,
   Users,
 } from 'lucide-react';
@@ -42,11 +40,14 @@ import {
 } from 'recharts';
 import { apiGet, apiPatch, apiPost } from '../../../lib/api';
 import { normalizeLabel } from '../../../lib/labels';
+import { Skeleton } from '../../ui/skeleton';
 import { ContractDetail, AskResponse, RiskMatrix } from './types';
 import {
-  buildFallbackDetail,
   formatCurrency,
   formatDate,
+  friendlyFileName,
+  getContractTone,
+  getErrorMessage,
   formatMinutes,
   getLifecycleLabel,
   lifecycleStageOptions,
@@ -419,13 +420,15 @@ export function ContractDetailPage() {
   const contractId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [detail, setDetail] = useState<ContractDetail | null>(null);
+  const [detail, setDetail] = useState<ContractDetail>(null as unknown as ContractDetail);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [message, setMessage] = useState('');
-  const [riskMatrix, setRiskMatrix] = useState<RiskMatrix | null>(null);
-  const activeTab = searchParams.get('tab') ?? 'route';
+  const [riskMatrix, setRiskMatrix] = useState<RiskMatrix>(null as unknown as RiskMatrix);
+  const requestedTab = searchParams.get('tab') ?? 'route';
+  const activeTab = ['route', 'lifecycle', 'risk'].includes(requestedTab) ? requestedTab : 'route';
   const [askQuestion, setAskQuestion] = useState('');
-  const [askResult, setAskResult] = useState<AskResponse | null>(null);
+  const [askResult, setAskResult] = useState<AskResponse>(null as unknown as AskResponse);
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagName, setTagName] = useState('');
   const [lifecycleForm, setLifecycleForm] = useState({
@@ -452,16 +455,14 @@ export function ContractDetailPage() {
         if (!active) return;
         setDetail(response);
         setLifecycleForm((prev) => ({ ...prev, stage: response.lifecycleStage ?? 'request' }));
-      } catch (err: any) {
+      } catch (err) {
         if (!active) return;
-        const fallback = buildFallbackDetail(contractId);
-        if (fallback) {
-          setDetail(fallback);
-          setLifecycleForm((prev) => ({ ...prev, stage: fallback.lifecycleStage ?? 'request' }));
-          setMessage('Vista de respaldo.');
-          return;
-        }
-        setMessage(err?.message ?? 'No se pudo cargar el detalle.');
+        setMessage(
+          `No se pudo cargar el detalle del contrato. Motivo: ${getErrorMessage(
+            err,
+            'Error desconocido de la API.'
+          )}`
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -470,7 +471,7 @@ export function ContractDetailPage() {
     return () => {
       active = false;
     };
-  }, [contractId]);
+  }, [contractId, reloadKey]);
 
   useEffect(() => {
     if (!contractId || activeTab !== 'risk') return;
@@ -480,7 +481,7 @@ export function ContractDetailPage() {
         const matrix = await apiGet<RiskMatrix>(`/clm/contracts/${contractId}/risk-matrix`);
         if (active) setRiskMatrix(matrix);
       } catch {
-        if (active) setRiskMatrix(null);
+        if (active) setRiskMatrix(null as unknown as RiskMatrix);
       }
     }
     void load();
@@ -531,7 +532,7 @@ export function ContractDetailPage() {
       });
       setAskResult(response);
     } catch {
-      setMessage('No se pudo consultar con IA.');
+      setMessage('No se pudo consultar con G.OTA.');
     }
   }
 
@@ -563,8 +564,8 @@ export function ContractDetailPage() {
         comments: '',
         decision: '',
       }));
-    } catch (error: any) {
-      if (String(error?.message ?? '').includes('Cannot POST /clm/contracts')) {
+    } catch (error) {
+      if (getErrorMessage(error, '').includes('Cannot POST /clm/contracts')) {
         setMessage('La API activa todavía no expone el ciclo de vida.');
         return;
       }
@@ -572,44 +573,253 @@ export function ContractDetailPage() {
     }
   }
 
+  async function requestApproval() {
+    if (!detail?.mainDocumentId) {
+      setMessage('El contrato necesita un documento principal antes de enviarse a aprobación.');
+      return;
+    }
+    try {
+      await apiPost('/approvals/requests', { documentId: detail.mainDocumentId });
+      setMessage('Solicitud de aprobación enviada al flujo configurado.');
+    } catch (error) {
+      setMessage(getErrorMessage(error, 'No se pudo iniciar la solicitud de aprobación.'));
+    }
+  }
+
   if (!detail && loading)
     return (
-      <section className="projects-workspace">
-        <article className="card">
-          <p className="muted">Cargando...</p>
+      <section className="projects-workspace" aria-busy="true" aria-label="Cargando contrato">
+        <article className="card" style={{ display: 'grid', gap: 16 }}>
+          <Skeleton variant="text" width="8rem" />
+          <Skeleton variant="title" width="65%" />
+          <Skeleton variant="text" width="45%" />
+          <div className="project-state-grid">
+            <Skeleton variant="card" count={4} />
+          </div>
         </article>
+        <div className="project-state-grid" style={{ marginTop: 16 }}>
+          <Skeleton variant="card" count={3} />
+        </div>
+        <span className="sr-only">Cargando el detalle y sus módulos.</span>
       </section>
     );
   if (!detail)
     return (
       <section className="projects-workspace">
-        <article className="card">
+        <article className="card" role="alert">
+          <h1>No se pudo abrir el contrato</h1>
           <p className="muted">{message || 'Contrato no encontrado.'}</p>
+          <button
+            className="button"
+            type="button"
+            onClick={() => setReloadKey((value) => value + 1)}
+          >
+            <RefreshCcw size={18} /> Reintentar
+          </button>
         </article>
       </section>
     );
 
+  const pendingObligations = (detail.obligations ?? []).filter((item) =>
+    ['pending', 'overdue'].includes(String(item.status).toLowerCase())
+  );
+  const pendingMilestones = (detail.milestones ?? []).filter((item) =>
+    ['pending', 'overdue'].includes(String(item.status).toLowerCase())
+  );
+  const nextAction = !detail.mainDocumentId
+    ? { label: 'Completar documento principal', href: `/clm/${detail.id}/edit` }
+    : !detail.versions?.length
+      ? { label: 'Subir versión inicial', href: `/clm/${detail.id}/versions/new` }
+      : pendingObligations.length
+        ? {
+            label: `Atender ${pendingObligations.length} obligaciones`,
+            href: `/clm/${detail.id}/obligations`,
+          }
+        : !detail.signatures?.length &&
+            ['approval', 'signature'].includes(detail.lifecycleStage ?? '')
+          ? { label: 'Preparar firma', href: `/clm/${detail.id}/signatures/new` }
+          : { label: 'Revisar expediente', href: `/clm/${detail.id}/audit` };
+  const alertItems = [
+    pendingObligations.length ? `${pendingObligations.length} obligaciones pendientes` : null,
+    pendingMilestones.length ? `${pendingMilestones.length} hitos pendientes` : null,
+    detail.endDate ? `Vencimiento: ${formatDate(detail.endDate)}` : 'Falta fecha de vencimiento',
+    !detail.signatures?.length ? 'Firma aún no iniciada' : null,
+  ].filter(Boolean) as string[];
+  const moduleLinks = [
+    { label: 'Documento', href: `/clm/${detail.id}/versions`, icon: <FileText size={16} /> },
+    {
+      label: 'Obligaciones',
+      href: `/clm/${detail.id}/obligations`,
+      icon: <CheckSquare size={16} />,
+    },
+    { label: 'Hitos', href: `/clm/${detail.id}/milestones`, icon: <CalendarClock size={16} /> },
+    {
+      label: 'Negociación',
+      href: `/clm/${detail.id}/negotiations`,
+      icon: <MessageSquare size={16} />,
+    },
+    { label: 'Firma', href: `/clm/${detail.id}/signatures`, icon: <FileSignature size={16} /> },
+    { label: 'Finanzas', href: `/clm/${detail.id}/payments`, icon: <DollarSign size={16} /> },
+    { label: 'Auditoría', href: `/clm/${detail.id}/audit`, icon: <ShieldCheck size={16} /> },
+  ];
+
+  return (
+    <section className="projects-workspace">
+      <div className="topbar">
+        <div>
+          <small className="muted">{detail.project?.code ?? detail.projectId}</small>
+          <h1>{detail.name}</h1>
+          <p className="muted">
+            {normalizeLabel(detail.contractType)} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
+            {detail.clientName ?? 'Sin cliente'}
+          </p>
+        </div>
+        <div className="projects-actions">
+          <Link className="button" href={nextAction.href}>
+            {nextAction.label}
+          </Link>
+          <Link className="button secondary" href={`/clm/${detail.id}/edit`}>
+            Editar
+          </Link>
+          <Link className="button secondary" href={`/clm/${detail.id}/audit`}>
+            Auditoría
+          </Link>
+        </div>
+      </div>
+      {message ? <article className="card muted">{message}</article> : null}
+      {detail.isPartial && detail.sectionErrors ? (
+        <article className="card" role="alert" style={{ borderColor: 'var(--warning)' }}>
+          <div className="panel-header">
+            <div>
+              <h2 style={{ margin: 0 }}>El expediente se cargó parcialmente</h2>
+              <p className="muted" style={{ marginBottom: 0 }}>
+                El resto de la información sigue disponible. Reintenta las secciones indicadas.
+              </p>
+            </div>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => setReloadKey((value) => value + 1)}
+            >
+              <RefreshCcw size={18} /> Reintentar
+            </button>
+          </div>
+          <ul style={{ marginBottom: 0 }}>
+            {Object.entries(detail.sectionErrors).map(([section, error]) => (
+              <li key={section}>
+                <strong>{normalizeLabel(section)}:</strong> {error}
+              </li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+
+      <article className="card" style={{ display: 'grid', gap: 16 }}>
+        <div className="panel-header">
+          <div>
+            <small className="muted">Próxima acción</small>
+            <h2 style={{ margin: 0 }}>{nextAction.label}</h2>
+          </div>
+          <span className={`pill ${getContractTone(detail.status)}`}>
+            {normalizeLabel(detail.status)}
+          </span>
+        </div>
+        <div className="project-state-grid">
+          <div className="state-card">
+            <span>Etapa</span>
+            <strong>{getLifecycleLabel(detail.lifecycleStage)}</strong>
+          </div>
+          <div className="state-card">
+            <span>Responsable</span>
+            <strong>{detail.responsibleArea ?? 'Sin asignar'}</strong>
+          </div>
+          <div className="state-card">
+            <span>Vencimiento</span>
+            <strong>{formatDate(detail.endDate)}</strong>
+          </div>
+          <div className="state-card">
+            <span>Monto</span>
+            <strong>{formatCurrency(detail.amount, detail.currency)}</strong>
+          </div>
+        </div>
+      </article>
+
+      <div className="grid" style={{ marginTop: 16 }}>
+        <article className="card span-6">
+          <div className="panel-header">
+            <h2>Alertas</h2>
+            <AlertTriangle size={18} />
+          </div>
+          <div className="simple-document-list">
+            {alertItems.map((item) => (
+              <div key={item} className="simple-document-item">
+                {item}
+              </div>
+            ))}
+            {!alertItems.length ? (
+              <div className="simple-document-item">Sin alertas pendientes.</div>
+            ) : null}
+          </div>
+        </article>
+        <article className="card span-6">
+          <div className="panel-header">
+            <h2>Datos principales</h2>
+            <FileText size={18} />
+          </div>
+          <div className="simple-document-list">
+            <div className="simple-document-item">
+              <strong>Área responsable</strong>
+              <span>{detail.responsibleArea ?? 'Sin asignar'}</span>
+            </div>
+            <div className="simple-document-item">
+              <strong>Renovable</strong>
+              <span>{detail.renewable ? 'Sí' : 'No definido'}</span>
+            </div>
+            <div className="simple-document-item">
+              <strong>Riesgo</strong>
+              <span>No evaluado</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <article className="card" style={{ marginTop: 16 }}>
+        <div className="panel-header">
+          <h2>Módulos del contrato</h2>
+          <span className="muted">Abrir una página de trabajo</span>
+        </div>
+        <div className="projects-actions" style={{ flexWrap: 'wrap' }}>
+          {moduleLinks.map((item) => (
+            <Link key={item.href} className="button secondary" href={item.href}>
+              {item.icon} {item.label}
+            </Link>
+          ))}
+        </div>
+      </article>
+    </section>
+  );
+
   const tabs = [
     { key: 'route', label: 'Ruta al contrato', icon: <Route size={16} /> },
     { key: 'lifecycle', label: 'Ciclo de vida', icon: <History size={16} /> },
-    { key: 'obligations', label: 'Obligaciones', icon: <CheckSquare size={16} /> },
-    { key: 'milestones', label: 'Hitos', icon: <CalendarClock size={16} /> },
-    { key: 'amendments', label: 'Enmiendas', icon: <FilePlus2 size={16} /> },
-    { key: 'payments', label: 'Pagos', icon: <DollarSign size={16} /> },
-    { key: 'signatures', label: 'Firmas', icon: <FileSignature size={16} /> },
-    { key: 'negotiations', label: 'Negociación', icon: <MessageSquare size={16} /> },
-    { key: 'versions', label: 'Versiones', icon: <FileText size={16} /> },
-    { key: 'attachments', label: 'Anexos', icon: <Upload size={16} /> },
-    { key: 'comments', label: 'Comentarios', icon: <MessageSquare size={16} /> },
     { key: 'risk', label: 'Matriz de riesgo', icon: <AlertTriangle size={16} /> },
   ];
   const readiness = buildReadiness(detail, riskMatrix);
   const healthScore = computeHealthScore(detail, riskMatrix, readiness);
-  const nextDeadline = getNextDeadline(detail);
+  const nextDeadline = getNextDeadline(detail) ?? {
+    label: 'Sin fecha',
+    date: '',
+    daysUntil: 0,
+    type: 'Pendiente',
+  };
   const timeline = buildTimeline(detail);
   const currentStageIndex = lifecycleStageOptions.findIndex(
     (item) => item.value === detail.lifecycleStage
   );
+  const canApprove = detail.status === 'draft' || detail.status === 'in_review';
+  const canActivate = detail.status === 'approved';
+  const canRenew = ['active', 'expiring_soon', 'expired', 'closed'].includes(detail.status);
+  const canClose = detail.status !== 'closed';
   const riskDimensionCards = riskMatrix
     ? Object.entries(riskMatrix.dimensions).map(([key, dim]) => (
         <div key={key} className="field span-3">
@@ -850,7 +1060,7 @@ export function ContractDetailPage() {
             <div className="project-code">{detail.project?.code ?? detail.projectId}</div>
             <h2>{detail.name}</h2>
             <p className="muted">
-              {detail.contractType ?? 'Sin tipo'} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
+              {normalizeLabel(detail.contractType)} · {detail.supplierName ?? 'Sin proveedor'} ·{' '}
               {detail.clientName ?? 'Sin cliente'}
             </p>
             <small className="muted">
@@ -859,26 +1069,39 @@ export function ContractDetailPage() {
             </small>
           </div>
           <div className="projects-actions">
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => updateStatus('approved')}
-            >
-              <ShieldCheck size={18} /> Aprobar
-            </button>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => updateStatus('active')}
-            >
-              <Landmark size={18} /> Vigente
-            </button>
-            <button className="button secondary" type="button" onClick={runRenew}>
-              <RefreshCcw size={18} /> Renovar
-            </button>
-            <button className="button secondary" type="button" onClick={runClose}>
-              <CalendarClock size={18} /> Cerrar
-            </button>
+            {['internal_review', 'approval'].includes(detail.lifecycleStage ?? '') ? (
+              <button className="button secondary" type="button" onClick={requestApproval}>
+                <ShieldCheck size={18} /> Solicitar aprobación
+              </button>
+            ) : null}
+            {canApprove ? (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => updateStatus('approved')}
+              >
+                <ShieldCheck size={18} /> Aprobar
+              </button>
+            ) : null}
+            {canActivate ? (
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => updateStatus('active')}
+              >
+                <Landmark size={18} /> Activar
+              </button>
+            ) : null}
+            {canRenew ? (
+              <button className="button secondary" type="button" onClick={runRenew}>
+                <RefreshCcw size={18} /> Renovar
+              </button>
+            ) : null}
+            {canClose ? (
+              <button className="button secondary" type="button" onClick={runClose}>
+                <CalendarClock size={18} /> Cerrar
+              </button>
+            ) : null}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 20 }}>
@@ -1581,7 +1804,7 @@ export function ContractDetailPage() {
       {activeTab === 'amendments' && (
         <article className="card">
           <div className="panel-header">
-            <h2>Enmiendas</h2>
+            <h2>Convenios modificatorios</h2>
             <Link className="button" href={`/clm/${detail.id}/amendments`}>
               Gestionar
             </Link>
@@ -1617,7 +1840,9 @@ export function ContractDetailPage() {
                 <div style={{ marginBottom: 8 }}>
                   <strong style={{ fontSize: '1.5rem' }}>
                     {formatCurrency(
-                      String(detail.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)),
+                      String(
+                        detail.payments.reduce((s, p) => s + (parseFloat(p.amount ?? '0') || 0), 0)
+                      ),
                       detail.currency
                     )}
                   </strong>
@@ -1631,7 +1856,7 @@ export function ContractDetailPage() {
                       const byStatus: Record<string, number> = {};
                       for (const p of detail.payments)
                         byStatus[p.status] =
-                          (byStatus[p.status] ?? 0) + (parseFloat(p.amount) || 0);
+                          (byStatus[p.status] ?? 0) + (parseFloat(p.amount ?? '0') || 0);
                       return Object.entries(byStatus).map(([status, total], i) => ({
                         name: normalizeLabel(status),
                         total,
@@ -1642,9 +1867,7 @@ export function ContractDetailPage() {
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip
-                      formatter={(value: any) =>
-                        formatCurrency(String(value ?? 0), detail.currency)
-                      }
+                      formatter={(value) => formatCurrency(String(value ?? 0), detail.currency)}
                     />
                     <Bar dataKey="total" radius={[4, 4, 0, 0]}>
                       {detail.payments
@@ -1665,11 +1888,18 @@ export function ContractDetailPage() {
                   <div key={p.id} className="simple-document-item">
                     <strong>{p.concept}</strong>
                     <small>
-                      {formatCurrency(p.amount, p.currency)} ·{' '}
-                      {p.invoiceNumber ? `Factura: ${p.invoiceNumber}` : ''} ·{' '}
+                      {p.amount
+                        ? formatCurrency(p.amount, p.currency)
+                        : p.percentage
+                          ? `${Number(p.percentage)}%`
+                          : 'Sin importe'}{' '}
+                      · {p.invoiceNumber ? `Factura: ${p.invoiceNumber}` : ''} ·{' '}
                       {normalizeLabel(p.status)}
                     </small>
-                    <span>Vence: {formatDate(p.dueDate)}</span>
+                    <span>
+                      {p.paymentCondition ? `Condición: ${p.paymentCondition} · ` : ''}Vence:{' '}
+                      {formatDate(p.dueDate)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1716,7 +1946,7 @@ export function ContractDetailPage() {
       {activeTab === 'versions' && (
         <article className="card">
           <div className="panel-header">
-            <h2>Versiones</h2>
+            <h2>Contratos</h2>
             <Link className="button" href={`/clm/${detail.id}/versions`}>
               Gestionar
             </Link>
@@ -1725,7 +1955,7 @@ export function ContractDetailPage() {
             {(detail.versions ?? []).map((v) => (
               <div key={v.id} className="simple-document-item">
                 <strong>{v.versionLabel}</strong>
-                <small>{v.fileName}</small>
+                <small>{friendlyFileName(v.fileName, 'Versión contractual')}</small>
                 <span>{v.changeSummary ?? ''}</span>
               </div>
             ))}
@@ -1741,13 +1971,17 @@ export function ContractDetailPage() {
             </Link>
           </div>
           <div className="simple-document-list">
-            {(detail.attachments ?? []).map((a) => (
-              <div key={a.id} className="simple-document-item">
-                <strong>{a.name}</strong>
-                <small>{a.fileName}</small>
-                <span>{a.notes ?? ''}</span>
-              </div>
-            ))}
+            {(detail.attachments ?? [])
+              .filter((attachment) => attachment.isCurrent ?? true)
+              .map((a) => (
+                <div key={a.id} className="simple-document-item">
+                  <strong>{a.name}</strong>
+                  <small>
+                    Versión {a.versionLabel || '1'} · {friendlyFileName(a.fileName, 'Anexo')}
+                  </small>
+                  <span>{a.notes ?? ''}</span>
+                </div>
+              ))}
           </div>
         </article>
       )}
@@ -1773,7 +2007,7 @@ export function ContractDetailPage() {
       {riskSection}
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
-          <h2>Consulta IA del contrato</h2>
+          <h2>Consulta con G.OTA</h2>
           <Bot size={18} />
         </div>
         <div className="field">

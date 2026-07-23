@@ -6,14 +6,25 @@ import { apiGet } from '../../../lib/api';
 import { normalizeLabel } from '../../../lib/labels';
 import { formatCurrency } from './utils';
 
+type DashboardMetric = { key: string; label: string; value: number };
+type DashboardData = {
+  contractsByStatus: DashboardMetric[];
+  contractsByType: DashboardMetric[];
+  expiringThisMonth: number;
+  totalAmount: number;
+  pendingObligations: number;
+  activeContracts: number;
+  totalContracts: number;
+};
+
 export function ClmDashboardPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const d = await apiGet('/clm/dashboard');
+        const d = await apiGet<DashboardData>('/clm/dashboard');
         if (active) setData(d);
       } catch {
         if (active)
@@ -75,7 +86,7 @@ export function ClmDashboardPage() {
             <h2>Contratos por estado</h2>
           </div>
           <div className="simple-document-list">
-            {(data?.contractsByStatus ?? []).map((item: any) => (
+            {(data?.contractsByStatus ?? []).map((item) => (
               <div
                 key={item.key}
                 className="simple-document-item"
@@ -92,7 +103,7 @@ export function ClmDashboardPage() {
             <h2>Contratos por tipo</h2>
           </div>
           <div className="simple-document-list">
-            {(data?.contractsByType ?? []).map((item: any, i: number) => (
+            {(data?.contractsByType ?? []).map((item, i) => (
               <div
                 key={i}
                 className="simple-document-item"

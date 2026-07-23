@@ -57,6 +57,18 @@ const LABEL_MAP: Record<string, string> = {
   provider: 'Proveedor',
   self: 'Interno',
   external: 'Externo',
+  accepted: 'Aceptado',
+  delivered: 'Entregado',
+  scheduled: 'Programado',
+  paid: 'Pagado',
+  waived: 'Exento',
+  delayed: 'Retrasado',
+  prestacion_servicios: 'Prestación de servicios',
+  suministro: 'Suministro',
+  obra: 'Obra',
+  arrendamiento: 'Arrendamiento',
+  consultoria: 'Consultoría',
+  confidencialidad: 'Confidencialidad',
 };
 
 export function normalizeLabel(value?: string | null): string {

@@ -1,8 +1,10 @@
 'use client';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
-import { apiPost } from '../../../../lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { apiGet, apiPost } from '../../../../lib/api';
+import type { ContractDetail } from '../../../../components/modules/clm/types';
+import { friendlyFileName } from '../../../../components/modules/clm/utils';
 
 function getToken() {
   if (typeof window === 'undefined') return undefined;
@@ -13,11 +15,46 @@ export default function SignatureCreatePage() {
   const params = useParams<{ id: string }>();
   const contractId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const versionId = searchParams.get('versionId') ?? undefined;
+  const attachmentId = searchParams.get('attachmentId') ?? undefined;
+  const [detail, setDetail] = useState<ContractDetail | null>(null);
   const [signers, setSigners] = useState<Array<{ name: string; email: string }>>([
     { name: '', email: '' },
   ]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!contractId) return;
+    void apiGet<ContractDetail>(`/clm/contracts/${contractId}`)
+      .then(setDetail)
+      .catch(() => setDetail(null));
+  }, [contractId]);
+
+  const sourceDocument = useMemo(() => {
+    if (attachmentId) {
+      const attachment = detail?.attachments.find((item) => item.id === attachmentId);
+      return attachment
+        ? {
+            type: 'Anexo',
+            name: friendlyFileName(attachment.fileName, attachment.name),
+            version: attachment.versionLabel,
+          }
+        : { type: 'Anexo', name: 'Anexo seleccionado', version: '' };
+    }
+    const version =
+      detail?.versions.find((item) => item.id === versionId) ??
+      detail?.currentVersion ??
+      detail?.versions[0];
+    return version
+      ? {
+          type: 'Contrato',
+          name: friendlyFileName(version.fileName, 'Documento contractual'),
+          version: version.versionLabel,
+        }
+      : { type: 'Contrato', name: 'Versión vigente', version: '' };
+  }, [attachmentId, detail, versionId]);
 
   function addSigner() {
     setSigners([...signers, { name: '', email: '' }]);
@@ -39,7 +76,11 @@ export default function SignatureCreatePage() {
     setSaving(true);
     setError('');
     try {
-      await apiPost(`/clm/contracts/${contractId}/signatures`, { signers }, getToken());
+      await apiPost(
+        `/clm/contracts/${contractId}/signatures`,
+        { signers, versionId, attachmentId },
+        getToken()
+      );
       router.push(`/clm/${contractId}/signatures`);
     } catch {
       setError('Error al enviar a firma.');
@@ -61,6 +102,14 @@ export default function SignatureCreatePage() {
         </div>
       </div>
       {error ? <article className="card muted">{error}</article> : null}
+      <article className="card">
+        <small className="muted">Documento seleccionado</small>
+        <h2 style={{ margin: '6px 0' }}>{sourceDocument.name}</h2>
+        <span className="pill info">
+          {sourceDocument.type}
+          {sourceDocument.version ? ` · Versión ${sourceDocument.version}` : ''}
+        </span>
+      </article>
       <article className="card">
         <div className="panel-header">
           <h2>Firmantes</h2>

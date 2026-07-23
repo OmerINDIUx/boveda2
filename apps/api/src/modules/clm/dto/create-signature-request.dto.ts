@@ -5,6 +5,10 @@ export class CreateSignatureRequestDto {
   @IsString()
   versionId?: string;
 
+  @IsOptional()
+  @IsString()
+  attachmentId?: string;
+
   @IsArray()
   signers!: Array<{ name: string; email: string; order?: number }>;
 

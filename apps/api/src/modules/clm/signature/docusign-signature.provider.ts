@@ -1,4 +1,4 @@
-import { createPrivateKey, sign } from 'crypto';
+import { createHmac, createPrivateKey, sign, timingSafeEqual } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -6,16 +6,21 @@ import {
   SignatureSendRequest,
   SignatureSendResponse,
   SignatureStatusResponse,
+  SignatureWebhookResponse,
 } from './signature-provider.interface';
 
 @Injectable()
 export class DocuSignSignatureProvider implements SignatureProvider {
+  readonly name = 'docusign';
+  readonly configured: boolean;
   private readonly logger = new Logger(DocuSignSignatureProvider.name);
   private readonly baseUrl: string;
   private readonly accountId: string;
   private readonly clientId: string;
   private readonly privateKey: string;
   private readonly userId: string;
+  private readonly authServer: string;
+  private readonly webhookSecret: string;
   private accessToken: string | null = null;
   private tokenExpiresAt = 0;
 
@@ -25,6 +30,11 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     this.clientId = config.get<string>('DOCUSIGN_CLIENT_ID') ?? '';
     this.privateKey = config.get<string>('DOCUSIGN_PRIVATE_KEY') ?? '';
     this.userId = config.get<string>('DOCUSIGN_USER_ID') ?? '';
+    this.authServer = config.get<string>('DOCUSIGN_AUTH_SERVER') ?? 'account-d.docusign.com';
+    this.webhookSecret = config.get<string>('DOCUSIGN_WEBHOOK_HMAC_SECRET') ?? '';
+    this.configured = Boolean(
+      this.accountId && this.clientId && this.privateKey && this.userId && this.webhookSecret
+    );
   }
 
   async send(request: SignatureSendRequest): Promise<SignatureSendResponse> {
@@ -32,7 +42,7 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     const envelope = this.buildEnvelope(request);
     const url = `${this.baseUrl}/v2.1/accounts/${this.accountId}/envelopes`;
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -62,7 +72,7 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     const token = await this.getAccessToken();
     const url = `${this.baseUrl}/v2.1/accounts/${this.accountId}/envelopes/${providerRequestId}`;
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -102,7 +112,7 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     const token = await this.getAccessToken();
     const url = `${this.baseUrl}/v2.1/accounts/${this.accountId}/envelopes/${providerRequestId}`;
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -117,21 +127,47 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     }
   }
 
-  async handleWebhook(payload: Record<string, unknown>): Promise<{
-    envelopeId: string;
-    status: string;
-    signedAt?: Date;
-  }> {
-    const envelopeId = (payload as any).envelopeId ?? (payload as any).envelope_id ?? '';
-    const status = (payload as any).status ?? '';
+  async handleWebhook(payload: Record<string, unknown>): Promise<SignatureWebhookResponse> {
+    const docuSignPayload = payload as {
+      envelopeId?: string;
+      envelope_id?: string;
+      status?: string;
+      completedDateTime?: string;
+      completed_date_time?: string;
+      data?: {
+        envelopeSummary?: {
+          envelopeId?: string;
+          status?: string;
+          completedDateTime?: string;
+        };
+      };
+    };
+    const summary = docuSignPayload.data?.envelopeSummary;
+    const envelopeId =
+      docuSignPayload.envelopeId ?? docuSignPayload.envelope_id ?? summary?.envelopeId ?? '';
+    const status = docuSignPayload.status ?? summary?.status ?? '';
     const completedDateTime =
-      (payload as any).completedDateTime ?? (payload as any).completed_date_time;
+      docuSignPayload.completedDateTime ??
+      docuSignPayload.completed_date_time ??
+      summary?.completedDateTime;
 
     return {
       envelopeId,
       status: this.mapDocuSignStatus(status),
       signedAt: completedDateTime ? new Date(completedDateTime) : undefined,
     };
+  }
+
+  verifyWebhook(rawBody: Buffer, signature: string) {
+    if (!this.webhookSecret || !signature) return false;
+    const expected = createHmac('sha256', this.webhookSecret).update(rawBody).digest();
+    let received: Buffer;
+    try {
+      received = Buffer.from(signature, 'base64');
+    } catch {
+      return false;
+    }
+    return received.length === expected.length && timingSafeEqual(received, expected);
   }
 
   private buildEnvelope(request: SignatureSendRequest): Record<string, unknown> {
@@ -172,6 +208,8 @@ export class DocuSignSignatureProvider implements SignatureProvider {
       eventNotification: {
         url: `${this.config.get<string>('API_BASE_URL') ?? 'http://localhost:3001'}/api/clm/signatures/webhook/docusign`,
         loggingEnabled: 'true',
+        requireAcknowledgment: 'true',
+        includeHMAC: this.webhookSecret ? 'true' : 'false',
         envelopeEvents: [
           { envelopeEventStatusCode: 'completed' },
           { envelopeEventStatusCode: 'declined' },
@@ -212,7 +250,7 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     const jwtPayload = {
       iss: this.clientId,
       sub: this.userId,
-      aud: 'account-d.docusign.com',
+      aud: this.authServer,
       iat: now,
       exp: now + 3600,
       scope: 'signature impersonation',
@@ -231,7 +269,7 @@ export class DocuSignSignatureProvider implements SignatureProvider {
     const signature = sign(null, Buffer.from(signingInput), privateKey);
     const jwt = `${signingInput}.${signature.toString('base64url')}`;
 
-    const tokenResponse = await fetch('https://account-d.docusign.com/oauth/token', {
+    const tokenResponse = await this.fetchWithRetry(`https://${this.authServer}/oauth/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -267,5 +305,25 @@ export class DocuSignSignatureProvider implements SignatureProvider {
       expired: 'expired',
     };
     return map[docusignStatus.toLowerCase()] ?? 'pending';
+  }
+
+  private async fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        const response = await fetch(url, init);
+        if (response.status !== 429 && response.status < 500) return response;
+        lastError = new Error(`DocuSign respondió ${response.status}`);
+      } catch (error) {
+        lastError = error;
+      }
+
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+      }
+    }
+
+    this.logger.error('DocuSign no respondió después de varios intentos', lastError);
+    throw lastError instanceof Error ? lastError : new Error('DocuSign no disponible');
   }
 }

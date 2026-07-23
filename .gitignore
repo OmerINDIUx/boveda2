@@ -9,3 +9,9 @@ storage
 .npm-cache/
 .pnpm-store/
 node_modules/
+
+# Local runtime files and generated artifacts
+.tmp/
+.backups/
+tmp/
+*.tsbuildinfo

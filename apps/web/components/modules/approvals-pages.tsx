@@ -464,7 +464,7 @@ export function ApprovalsInboxPage() {
             <input
               value={inboxSearch}
               onChange={(e) => setInboxSearch(e.target.value)}
-              placeholder="Buscar doc, nombre, disciplina, proyecto..."
+              placeholder="Buscar doc, nombre, disciplina, centro de costos..."
             />
           </div>
 
@@ -473,7 +473,7 @@ export function ApprovalsInboxPage() {
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
           >
-            <option value="">Todos los proyectos</option>
+            <option value="">Todos los centros de costos</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} - {p.name}
@@ -579,7 +579,9 @@ export function ApprovalsInboxPage() {
                 <div className="active-request-meta-row">
                   <span className="active-request-meta-item">
                     <FolderKanban />
-                    {item.project?.name ?? projectMap.get(item.projectId)?.name ?? 'Sin proyecto'}
+                    {item.project?.name ??
+                      projectMap.get(item.projectId)?.name ??
+                      'Sin centro de costos'}
                     {item.project?.code ? (
                       <span className="muted" style={{ marginLeft: 4 }}>
                         ({item.project.code})
@@ -650,7 +652,7 @@ export function ApprovalFlowsListPage() {
         setSelectedProjectId((current) => current || response[0]?.id || '');
       } catch (nextError) {
         if (!active) return;
-        setError(getErrorMessage(nextError, 'No fue posible cargar los proyectos.'));
+        setError(getErrorMessage(nextError, 'No fue posible cargar los centros de costos.'));
       }
     }
     void loadProjects();
@@ -713,7 +715,7 @@ export function ApprovalFlowsListPage() {
       <article className="card">
         <div className="quick-filters-grid">
           <SelectField
-            label="Proyecto"
+            label="Centro de costos"
             value={selectedProjectId}
             onChange={setSelectedProjectId}
             options={projects.map((project) => ({
@@ -761,7 +763,7 @@ export function ApprovalFlowsListPage() {
         ))}
         {!loading && !flows.length ? (
           <article className="card span-12">
-            <p className="muted">No hay flujos para este proyecto.</p>
+            <p className="muted">No hay flujos para este centro de costos.</p>
           </article>
         ) : null}
       </div>
@@ -819,7 +821,9 @@ export function ApprovalRequestCreatePage() {
         setFlows(response);
       } catch (nextError) {
         if (!active) return;
-        setError(getErrorMessage(nextError, 'No fue posible cargar los flujos del proyecto.'));
+        setError(
+          getErrorMessage(nextError, 'No fue posible cargar los flujos del centro de costos.')
+        );
       }
     }
     void loadFlows();
@@ -861,7 +865,9 @@ export function ApprovalRequestCreatePage() {
       <div className="topbar">
         <div>
           <h1>Enviar documento a aprobación</h1>
-          <p className="muted">Selecciona el proyecto, el archivo y el flujo que mejor aplique.</p>
+          <p className="muted">
+            Selecciona el centro de costos, el archivo y el flujo que mejor aplique.
+          </p>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href="/approvals">
@@ -873,7 +879,7 @@ export function ApprovalRequestCreatePage() {
       <article className="card">
         <div className="quick-filters-grid">
           <SelectField
-            label="Proyecto"
+            label="Centro de costos"
             value={projectId}
             onChange={setProjectId}
             options={projects.map((project) => ({
@@ -1335,11 +1341,11 @@ export function ApprovalRequestDetailPage() {
                   </div>
                   <div className="simple-document-list">
                     <div className="simple-document-item">
-                      <strong>Proyecto</strong>
+                      <strong>Centro de costos</strong>
                       <span>
                         {documentDetail?.project
                           ? `${documentDetail.project.code} · ${documentDetail.project.name}`
-                          : 'Sin proyecto'}
+                          : 'Sin centro de costos'}
                       </span>
                     </div>
                     <div className="simple-document-item">

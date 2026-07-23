@@ -1,7 +1,15 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHash } from 'crypto';
-import { Repository, Brackets, Like } from 'typeorm';
+import { createHash, randomUUID } from 'crypto';
+import { Repository, Brackets, FindOptionsWhere, In, IsNull, Like } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { StorageService } from '../../storage/storage.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -14,6 +22,7 @@ import { CloseContractDto } from './dto/close-contract.dto';
 import { ContractSearchDto } from './dto/contract-search.dto';
 import { CreateAmendmentDto } from './dto/create-amendment.dto';
 import { CreateContractAttachmentDto } from './dto/create-contract-attachment.dto';
+import { CreateContractAttachmentVersionDto } from './dto/create-contract-attachment-version.dto';
 import { CreateContractCommentDto } from './dto/create-contract-comment.dto';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CreateContractMilestoneDto } from './dto/create-contract-milestone.dto';
@@ -59,6 +68,7 @@ import { Tag } from './entities/tag.entity';
 import { SignatureProvider } from './signature/signature-provider.interface';
 import { ReportGeneratorService } from './reports/report-generator.service';
 import { ReportType } from './reports/report-types';
+import { ErpIntegration } from './integration/erp-integration.interface';
 import { ContractAttachment } from './contract-attachment.entity';
 import { ContractAuditLog } from './contract-audit-log.entity';
 import { ContractComment } from './contract-comment.entity';
@@ -67,11 +77,45 @@ import { ContractObligation } from './contract-obligation.entity';
 import { ContractVersion } from './contract-version.entity';
 import { Contract } from './contract.entity';
 import { CreateReportDto } from './dto/create-report.dto';
+import { ContractExtractionService } from './contract-extraction.service';
+import { ContractExtractionFact } from './entities/contract-extraction-run.entity';
+import { AskGotaQueryDto } from './dto/ask-gota-query.dto';
+import {
+  CreateContractDeliverableDto,
+  UpdateContractDeliverableDto,
+} from './dto/contract-deliverable.dto';
+import { ContractDeliverable } from './entities/contract-deliverable.entity';
 
 const CONTRACT_SOON_DAYS = 30;
 
+const LIFECYCLE_TRANSITIONS: Record<string, string[]> = {
+  request: ['drafting'],
+  drafting: ['internal_review', 'request'],
+  internal_review: ['negotiation', 'approval', 'drafting'],
+  negotiation: ['approval', 'internal_review'],
+  approval: ['signature', 'negotiation', 'internal_review'],
+  signature: ['active', 'approval'],
+  active: ['obligations_tracking', 'renewal_modification_termination'],
+  obligations_tracking: ['renewal_modification_termination', 'archived'],
+  renewal_modification_termination: ['active', 'signature', 'archived'],
+  archived: ['obligations_tracking'],
+};
+
+const STATUS_TRANSITIONS: Record<Contract['status'], Contract['status'][]> = {
+  draft: ['in_review', 'closed'],
+  in_review: ['approved', 'draft', 'closed'],
+  approved: ['active', 'in_review', 'closed'],
+  active: ['expiring_soon', 'renewed', 'closed'],
+  expiring_soon: ['renewed', 'closed'],
+  expired: ['renewed', 'closed'],
+  renewed: ['active', 'closed'],
+  closed: ['renewed'],
+};
+
 @Injectable()
 export class ClmService {
+  private readonly logger = new Logger(ClmService.name);
+
   constructor(
     @InjectRepository(Contract) private readonly contracts: Repository<Contract>,
     @InjectRepository(ContractVersion) private readonly versions: Repository<ContractVersion>,
@@ -80,6 +124,8 @@ export class ClmService {
     @InjectRepository(ContractObligation)
     private readonly obligations: Repository<ContractObligation>,
     @InjectRepository(ContractMilestone) private readonly milestones: Repository<ContractMilestone>,
+    @InjectRepository(ContractDeliverable)
+    private readonly deliverables: Repository<ContractDeliverable>,
     @InjectRepository(ContractComment) private readonly comments: Repository<ContractComment>,
     @InjectRepository(ContractAuditLog) private readonly auditLogs: Repository<ContractAuditLog>,
     @InjectRepository(ContractAmendment)
@@ -118,7 +164,9 @@ export class ClmService {
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService,
     private readonly reportGenerator: ReportGeneratorService,
-    @Inject('SIGNATURE_PROVIDER') private readonly signatureProvider: SignatureProvider
+    private readonly contractExtraction: ContractExtractionService,
+    @Inject('SIGNATURE_PROVIDER') private readonly signatureProvider: SignatureProvider,
+    @Inject('ERP_INTEGRATION') private readonly erpIntegration: ErpIntegration
   ) {}
 
   async list(userId: string, search?: ContractSearchDto) {
@@ -126,7 +174,7 @@ export class ClmService {
       ? [search.projectId]
       : await this.scope.visibleProjectIdsForUser(userId);
     if (search?.projectId && !(await this.scope.canAccessProject(userId, search.projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     if (!projectIds.length) {
       return [];
@@ -200,6 +248,12 @@ export class ClmService {
 
   async create(userId: string, dto: CreateContractDto) {
     await this.assertProjectAccess(userId, dto.projectId);
+    if (
+      dto.lifecycleStage &&
+      !Object.prototype.hasOwnProperty.call(LIFECYCLE_TRANSITIONS, dto.lifecycleStage)
+    ) {
+      throw new BadRequestException(`Etapa de ciclo de vida no reconocida: ${dto.lifecycleStage}`);
+    }
     await this.assertDocumentBelongsToProject(dto.projectId, dto.mainDocumentId);
 
     const contract = await this.contracts.save(
@@ -225,77 +279,133 @@ export class ClmService {
 
   async getDetail(userId: string, contractId: string, logView = true) {
     const contract = await this.assertContractAccess(userId, contractId);
-    const [
-      versions,
-      attachments,
-      obligations,
-      milestones,
-      comments,
-      audit,
-      amendments,
-      payments,
-      signatures,
-      negotiations,
-      tags,
-      customValues,
-      children,
-    ] = await Promise.all([
-      this.versions.find({
-        where: { contractId },
-        relations: ['uploadedBy'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.attachments.find({
-        where: { contractId },
-        relations: ['uploadedBy'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.obligations.find({
-        where: { contractId },
-        relations: ['responsibleUser', 'evidenceDocument'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.milestones.find({
-        where: { contractId },
-        relations: ['responsibleUser', 'evidenceDocument'],
-        order: { milestoneDate: 'ASC' },
-      }),
-      this.comments.find({
-        where: { contractId },
-        relations: ['author'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.auditLogs.find({
-        where: { contractId },
-        relations: ['actor'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.amendmentsRepo.find({ where: { contractId }, order: { createdAt: 'DESC' } }),
-      this.paymentsRepo.find({ where: { contractId }, order: { createdAt: 'DESC' } }),
-      this.signaturesRepo.find({
-        where: { contractId },
-        relations: ['createdBy'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.negotiationsRepo.find({
-        where: { contractId },
-        relations: ['createdBy'],
-        order: { createdAt: 'DESC' },
-      }),
-      this.tagsRepo
-        .createQueryBuilder('t')
-        .innerJoin('contract_tags', 'ct', 'ct.tag_id = t.id')
-        .where('ct.contract_id = :contractId', { contractId })
-        .getMany(),
-      this.customValuesRepo.find({ where: { contractId }, relations: ['field'] }),
-      this.contracts.find({
-        where: { parentContractId: contractId },
-        order: { createdAt: 'DESC' },
-      }),
-    ]);
+    const loaders = {
+      versions: () =>
+        this.versions.find({
+          where: { contractId },
+          relations: ['uploadedBy'],
+          order: { createdAt: 'DESC' },
+        }),
+      attachments: () =>
+        this.attachments.find({
+          where: { contractId },
+          relations: ['uploadedBy'],
+          order: { createdAt: 'DESC' },
+        }),
+      obligations: () =>
+        this.obligations.find({
+          where: { contractId },
+          relations: ['responsibleUser', 'evidenceDocument'],
+          order: { createdAt: 'DESC' },
+        }),
+      milestones: () =>
+        this.milestones.find({
+          where: { contractId },
+          relations: ['responsibleUser', 'evidenceDocument'],
+          order: { milestoneDate: 'ASC' },
+        }),
+      deliverables: () =>
+        this.deliverables.find({
+          where: { contractId },
+          relations: ['responsibleUser'],
+          order: { dueDate: 'ASC', createdAt: 'DESC' },
+        }),
+      comments: () =>
+        this.comments.find({
+          where: { contractId },
+          relations: ['author'],
+          order: { createdAt: 'DESC' },
+        }),
+      audit: () =>
+        this.auditLogs.find({
+          where: { contractId },
+          relations: ['actor'],
+          order: { createdAt: 'DESC' },
+        }),
+      amendments: () =>
+        this.amendmentsRepo.find({ where: { contractId }, order: { createdAt: 'DESC' } }),
+      payments: () =>
+        this.paymentsRepo.find({ where: { contractId }, order: { createdAt: 'DESC' } }),
+      signatures: () =>
+        this.signaturesRepo.find({
+          where: { contractId },
+          relations: ['createdBy', 'version', 'attachment'],
+          order: { createdAt: 'DESC' },
+        }),
+      negotiations: () =>
+        this.negotiationsRepo.find({
+          where: { contractId },
+          relations: ['createdBy'],
+          order: { createdAt: 'DESC' },
+        }),
+      tags: () =>
+        this.tagsRepo
+          .createQueryBuilder('t')
+          .innerJoin('contract_tags', 'ct', 'ct.tag_id = t.id')
+          .where('ct.contract_id = :contractId', { contractId })
+          .getMany(),
+      customValues: () =>
+        this.customValuesRepo.find({ where: { contractId }, relations: ['field'] }),
+      children: () =>
+        this.contracts.find({
+          where: { parentContractId: contractId },
+          order: { createdAt: 'DESC' },
+        }),
+      lifecycleHistory: () =>
+        this.lifecycleEventsRepo.find({
+          where: { contractId },
+          relations: ['changedBy', 'relatedDocument', 'relatedVersion'],
+          order: { createdAt: 'ASC' },
+        }),
+    };
+
+    const loaderEntries = Object.entries(loaders);
+    const settledSections = await Promise.allSettled(loaderEntries.map(([, loader]) => loader()));
+    const loadedSections: Record<string, unknown[]> = {};
+    const sectionErrors: Record<string, string> = {};
+
+    settledSections.forEach((result, index) => {
+      const section = loaderEntries[index][0];
+      if (result.status === 'fulfilled') {
+        loadedSections[section] = result.value;
+        return;
+      }
+
+      loadedSections[section] = [];
+      sectionErrors[section] =
+        'No se pudo cargar esta sección. Puedes reintentar sin perder el resto.';
+      this.logger.error(
+        `Error loading CLM detail section ${section} for contract ${contractId}`,
+        result.reason instanceof Error ? result.reason.stack : String(result.reason)
+      );
+    });
+
+    const versions = loadedSections.versions as ContractVersion[];
+    const attachments = loadedSections.attachments as ContractAttachment[];
+    const obligations = loadedSections.obligations as ContractObligation[];
+    const milestones = loadedSections.milestones as ContractMilestone[];
+    const deliverables = loadedSections.deliverables as ContractDeliverable[];
+    const comments = loadedSections.comments as ContractComment[];
+    const audit = loadedSections.audit as ContractAuditLog[];
+    const amendments = loadedSections.amendments as ContractAmendment[];
+    const payments = loadedSections.payments as ContractPayment[];
+    const signatures = loadedSections.signatures as ContractSignatureRequest[];
+    const negotiations = loadedSections.negotiations as ContractNegotiation[];
+    const tags = loadedSections.tags as Tag[];
+    const customValues = loadedSections.customValues as ContractCustomValue[];
+    const children = loadedSections.children as Contract[];
+    const lifecycleHistory = loadedSections.lifecycleHistory as ContractLifecycleEvent[];
 
     if (logView) {
-      await this.log(contractId, userId, 'view');
+      try {
+        await this.log(contractId, userId, 'view');
+      } catch (error) {
+        sectionErrors.activityLog = 'La vista se cargó, pero no se pudo registrar en auditoría.';
+        this.logger.error(
+          `Error logging CLM contract view for ${contractId}`,
+          error instanceof Error ? error.stack : String(error)
+        );
+      }
     }
 
     const currentVersion =
@@ -308,6 +418,7 @@ export class ClmService {
       attachments,
       obligations,
       milestones,
+      deliverables,
       comments: comments.map((comment) => ({
         id: comment.id,
         body: comment.body,
@@ -321,27 +432,52 @@ export class ClmService {
       payments,
       signatures: signatures.map((s) => ({
         id: s.id,
+        versionId: s.versionId,
+        attachmentId: s.attachmentId,
         provider: s.provider,
         status: s.status,
         signersJson: s.signersJson,
         signedAt: s.signedAt,
         createdAt: s.createdAt,
         createdBy: s.createdBy ? { id: s.createdBy.id, name: s.createdBy.name } : null,
+        version: s.version
+          ? {
+              id: s.version.id,
+              versionLabel: s.version.versionLabel,
+              fileName: s.version.fileName,
+            }
+          : null,
+        attachment: s.attachment
+          ? {
+              id: s.attachment.id,
+              name: s.attachment.name,
+              versionLabel: s.attachment.versionLabel,
+              fileName: s.attachment.fileName,
+            }
+          : null,
       })),
       negotiations,
       tags,
       customValues,
+      lifecycleHistory,
       childrenContracts: children.map((c) => ({ id: c.id, name: c.name, status: c.status })),
+      isPartial: Object.keys(sectionErrors).length > 0,
+      sectionErrors,
     };
   }
 
   async update(userId: string, contractId: string, dto: UpdateContractDto) {
     const contract = await this.assertContractAccess(userId, contractId);
+    if (dto.status && dto.status !== contract.status) {
+      this.assertStatusTransition(contract.status, dto.status);
+    }
     await this.assertDocumentBelongsToProject(contract.projectId, dto.mainDocumentId);
     const before = { ...contract };
 
+    const contractFields = { ...dto };
+    delete contractFields.lifecycleStage;
     Object.assign(contract, {
-      ...dto,
+      ...contractFields,
       renewalNoticeDays: dto.renewalNoticeDays
         ? Number(dto.renewalNoticeDays)
         : contract.renewalNoticeDays,
@@ -368,7 +504,16 @@ export class ClmService {
 
   async createVersion(userId: string, contractId: string, dto: CreateContractVersionDto) {
     const contract = await this.assertContractAccess(userId, contractId);
-    const stored = await this.storeBase64File(dto.base64Content, dto.fileName, dto.mimeType);
+    const previousVersionId = contract.currentVersionId;
+    let stored: { fileKey: string; sizeBytes: number };
+    if (dto.fileKey) {
+      const buffer = await this.storage.read(dto.fileKey);
+      stored = { fileKey: dto.fileKey, sizeBytes: buffer.byteLength };
+    } else if (dto.base64Content) {
+      stored = await this.storeBase64File(dto.base64Content, dto.fileName, dto.mimeType);
+    } else {
+      throw new BadRequestException('Selecciona el archivo del contrato.');
+    }
     const version = await this.versions.save(
       this.versions.create({
         contractId,
@@ -391,19 +536,143 @@ export class ClmService {
       contractId,
       userId,
       'upload_new_version',
-      { previousVersionId: contract.currentVersionId },
+      { previousVersionId },
       { versionId: version.id }
     );
-    return this.getDetail(userId, contractId, false);
+    const extraction = await this.contractExtraction.createAndStart(contractId, version.id, userId);
+    return {
+      ...(await this.getDetail(userId, contractId, false)),
+      createdVersionId: version.id,
+      extractionRunId: extraction.id,
+      extractionStatus: extraction.status,
+    };
+  }
+
+  async getVersionExtraction(userId: string, contractId: string, versionId: string) {
+    await this.assertContractAccess(userId, contractId);
+    return this.contractExtraction.get(contractId, versionId);
+  }
+
+  async startVersionExtraction(userId: string, contractId: string, versionId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const version = await this.versions.findOne({ where: { id: versionId, contractId } });
+    if (!version) throw new NotFoundException('Version no encontrada');
+    return this.contractExtraction.createAndStart(
+      contractId,
+      versionId,
+      version.uploadedById ?? userId
+    );
+  }
+
+  async retryVersionExtraction(userId: string, contractId: string, versionId: string) {
+    await this.assertContractAccess(userId, contractId);
+    return this.contractExtraction.retry(contractId, versionId, userId);
+  }
+
+  async updateVersionExtraction(
+    userId: string,
+    contractId: string,
+    versionId: string,
+    facts: ContractExtractionFact[]
+  ) {
+    await this.assertContractAccess(userId, contractId);
+    return this.contractExtraction.updateDraft(contractId, versionId, userId, facts);
+  }
+
+  async approveVersionExtraction(
+    userId: string,
+    contractId: string,
+    versionId: string,
+    password: string,
+    facts: ContractExtractionFact[]
+  ) {
+    await this.assertContractAccess(userId, contractId);
+    const result = await this.contractExtraction.approve(
+      contractId,
+      versionId,
+      userId,
+      password,
+      facts
+    );
+    const contract = await this.contracts.findOne({ where: { id: contractId } });
+    if (contract) await this.syncAlerts(contract);
+    return result;
+  }
+
+  async getAttachmentExtraction(userId: string, contractId: string, attachmentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    return this.contractExtraction.getAttachmentExtraction(contractId, attachmentId);
+  }
+
+  async startAttachmentExtraction(userId: string, contractId: string, attachmentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const attachment = await this.attachments.findOne({ where: { id: attachmentId, contractId } });
+    if (!attachment) throw new NotFoundException('Anexo no encontrado');
+    return this.contractExtraction.createAttachmentAndStart(
+      contractId,
+      attachmentId,
+      attachment.uploadedById ?? userId
+    );
+  }
+
+  async retryAttachmentExtraction(userId: string, contractId: string, attachmentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    return this.contractExtraction.retryAttachment(contractId, attachmentId, userId);
+  }
+
+  async updateAttachmentExtraction(
+    userId: string,
+    contractId: string,
+    attachmentId: string,
+    facts: ContractExtractionFact[]
+  ) {
+    await this.assertContractAccess(userId, contractId);
+    return this.contractExtraction.updateAttachmentDraft(contractId, attachmentId, userId, facts);
+  }
+
+  async approveAttachmentExtraction(
+    userId: string,
+    contractId: string,
+    attachmentId: string,
+    password: string,
+    facts: ContractExtractionFact[]
+  ) {
+    await this.assertContractAccess(userId, contractId);
+    const result = await this.contractExtraction.approveAttachment(
+      contractId,
+      attachmentId,
+      userId,
+      password,
+      facts
+    );
+    const contract = await this.contracts.findOne({ where: { id: contractId } });
+    if (contract) await this.syncAlerts(contract);
+    return result;
+  }
+
+  async getVersionFile(userId: string, contractId: string, versionId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const version = await this.versions.findOne({ where: { id: versionId, contractId } });
+    if (!version) throw new NotFoundException('Version no encontrada');
+
+    return {
+      buffer: await this.storage.read(version.fileKey),
+      fileName: version.fileName,
+      mimeType: version.mimeType || 'application/octet-stream',
+    };
   }
 
   async addAttachment(userId: string, contractId: string, dto: CreateContractAttachmentDto) {
     await this.assertContractAccess(userId, contractId);
     const stored = await this.storeBase64File(dto.base64Content, dto.fileName, dto.mimeType);
+    const attachmentGroupId = randomUUID();
     const attachment = await this.attachments.save(
       this.attachments.create({
         contractId,
         name: dto.name,
+        attachmentGroupId,
+        versionLabel: '1',
+        isCurrent: true,
         fileKey: stored.fileKey,
         fileName: dto.fileName,
         fileExtension: this.getExtension(dto.fileName),
@@ -417,7 +686,68 @@ export class ClmService {
       attachmentId: attachment.id,
       fileName: attachment.fileName,
     });
+    await this.contractExtraction.createAttachmentAndStart(contractId, attachment.id, userId);
     return this.getDetail(userId, contractId, false);
+  }
+
+  async addAttachmentVersion(
+    userId: string,
+    contractId: string,
+    attachmentId: string,
+    dto: CreateContractAttachmentVersionDto
+  ) {
+    await this.assertContractAccess(userId, contractId);
+    const attachment = await this.attachments.findOne({ where: { id: attachmentId, contractId } });
+    if (!attachment) throw new NotFoundException('Anexo no encontrado');
+
+    const attachmentGroupId = attachment.attachmentGroupId || attachment.id;
+    const duplicateLabel = await this.attachments.findOne({
+      where: { contractId, attachmentGroupId, versionLabel: dto.versionLabel },
+    });
+    if (duplicateLabel) {
+      throw new BadRequestException(`La versión ${dto.versionLabel} ya existe para este anexo`);
+    }
+    const stored = await this.storeBase64File(dto.base64Content, dto.fileName, dto.mimeType);
+    await this.attachments.update({ contractId, attachmentGroupId }, { isCurrent: false });
+    const version = await this.attachments.save(
+      this.attachments.create({
+        contractId,
+        name: attachment.name,
+        attachmentGroupId,
+        versionLabel: dto.versionLabel,
+        isCurrent: true,
+        fileKey: stored.fileKey,
+        fileName: dto.fileName,
+        fileExtension: this.getExtension(dto.fileName),
+        mimeType: dto.mimeType,
+        sizeBytes: Number(dto.sizeBytes ?? stored.sizeBytes),
+        uploadedById: userId,
+        notes: dto.notes,
+      })
+    );
+    await this.log(contractId, userId, 'add_attachment_version', undefined, {
+      attachmentGroupId,
+      previousVersionId: attachment.id,
+      attachmentVersionId: version.id,
+      versionLabel: version.versionLabel,
+      fileName: version.fileName,
+    });
+    await this.contractExtraction.createAttachmentAndStart(contractId, version.id, userId);
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async getAttachmentFile(userId: string, contractId: string, attachmentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const attachment = await this.attachments.findOne({
+      where: { id: attachmentId, contractId },
+    });
+    if (!attachment) throw new NotFoundException('Adjunto no encontrado');
+
+    return {
+      buffer: await this.storage.read(attachment.fileKey),
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType || 'application/octet-stream',
+    };
   }
 
   async addObligation(userId: string, contractId: string, dto: CreateContractObligationDto) {
@@ -518,6 +848,57 @@ export class ClmService {
       milestone as unknown as Record<string, unknown>
     );
     await this.syncAlerts(contract);
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async addDeliverable(userId: string, contractId: string, dto: CreateContractDeliverableDto) {
+    await this.assertContractAccess(userId, contractId);
+    const deliverable = await this.deliverables.save(
+      this.deliverables.create({
+        ...dto,
+        dueDate: dto.dueDate || undefined,
+        contractId,
+        status: dto.status ?? 'pending',
+      })
+    );
+    await this.log(contractId, userId, 'add_deliverable', undefined, {
+      deliverableId: deliverable.id,
+      name: deliverable.name,
+    });
+    return this.getDetail(userId, contractId, false);
+  }
+
+  async updateDeliverable(
+    userId: string,
+    contractId: string,
+    deliverableId: string,
+    dto: UpdateContractDeliverableDto
+  ) {
+    await this.assertContractAccess(userId, contractId);
+    const deliverable = await this.deliverables.findOne({
+      where: { id: deliverableId, contractId },
+    });
+    if (!deliverable) throw new NotFoundException('Entregable no encontrado');
+    const before = { ...deliverable };
+    Object.assign(deliverable, {
+      ...dto,
+      ...(dto.dueDate !== undefined ? { dueDate: dto.dueDate || undefined } : {}),
+    });
+    if (dto.status === 'delivered' && !deliverable.deliveredAt)
+      deliverable.deliveredAt = new Date();
+    if (dto.status === 'accepted' && !deliverable.acceptedAt) deliverable.acceptedAt = new Date();
+    if (dto.status && !['delivered', 'accepted'].includes(dto.status)) {
+      deliverable.deliveredAt = undefined;
+    }
+    if (dto.status && dto.status !== 'accepted') deliverable.acceptedAt = undefined;
+    await this.deliverables.save(deliverable);
+    await this.log(
+      contractId,
+      userId,
+      'edit_deliverable',
+      before as unknown as Record<string, unknown>,
+      deliverable as unknown as Record<string, unknown>
+    );
     return this.getDetail(userId, contractId, false);
   }
 
@@ -702,7 +1083,19 @@ export class ClmService {
   }
 
   async ask(userId: string, contractId: string, dto: AskContractQueryDto) {
-    await this.assertContractAccess(userId, contractId);
+    const contract = await this.assertContractAccess(userId, contractId);
+    const currentVersion = contract.currentVersionId
+      ? await this.versions.findOne({ where: { id: contract.currentVersionId, contractId } })
+      : null;
+    const indexedAnswer = await this.contractExtraction.ask(contract, currentVersion, dto.question);
+    if (indexedAnswer) {
+      await this.log(contractId, userId, 'ask_ai', undefined, {
+        question: dto.question,
+        citations: indexedAnswer.citations.length,
+        source: 'persisted_contract_index',
+      });
+      return indexedAnswer;
+    }
     const detail = await this.getDetail(userId, contractId, false);
     const chunks = this.buildKnowledgeChunks(detail);
     const scored = chunks
@@ -735,6 +1128,143 @@ export class ClmService {
     };
   }
 
+  async askGota(userId: string, dto: AskGotaQueryDto) {
+    const visibleProjectIds = await this.scope.visibleProjectIdsForUser(userId);
+    if (!visibleProjectIds.length) {
+      return this.contractExtraction.askAcross([], dto.question);
+    }
+
+    const requestedIds = [...new Set(dto.documentIds ?? dto.versionIds ?? [])];
+    const contracts = await this.contracts.find({
+      where: {
+        projectId: In(visibleProjectIds),
+      },
+      order: { updatedAt: 'DESC' },
+    });
+    const contractIds = contracts.map((contract) => contract.id);
+    const [versions, attachments] = contractIds.length
+      ? await Promise.all([
+          this.versions.find({
+            where: {
+              contractId: In(contractIds),
+              ...(requestedIds.length ? { id: In(requestedIds) } : {}),
+            },
+            order: { createdAt: 'DESC' },
+          }),
+          this.attachments.find({
+            where: {
+              contractId: In(contractIds),
+              ...(requestedIds.length ? { id: In(requestedIds) } : {}),
+            },
+            order: { createdAt: 'DESC' },
+          }),
+        ])
+      : [[], []];
+    if (requestedIds.length && versions.length + attachments.length !== requestedIds.length) {
+      throw new ForbiddenException('Uno o más documentos no están dentro de tu alcance.');
+    }
+    const contractsById = new Map(contracts.map((contract) => [contract.id, contract]));
+    const versionSources = versions.flatMap((version) => {
+      const contract = contractsById.get(version.contractId);
+      return contract ? [{ sourceType: 'version' as const, contract, version }] : [];
+    });
+    const attachmentSources = attachments.flatMap((attachment) => {
+      const contract = contractsById.get(attachment.contractId);
+      return contract ? [{ sourceType: 'attachment' as const, contract, attachment }] : [];
+    });
+    const sources = [...versionSources, ...attachmentSources];
+
+    const response = await this.contractExtraction.askAcross(sources, dto.question);
+    if (contracts[0]) {
+      await this.log(contracts[0].id, userId, 'ask_gota', undefined, {
+        question: dto.question,
+        documentsRequested: requestedIds.length || sources.length,
+        documentsAvailable: sources.length,
+      });
+    }
+    return response;
+  }
+
+  async listGotaSources(userId: string) {
+    const visibleProjectIds = await this.scope.visibleProjectIdsForUser(userId);
+    if (!visibleProjectIds.length) return [];
+    const contracts = await this.contracts.find({
+      where: { projectId: In(visibleProjectIds) },
+      order: { updatedAt: 'DESC' },
+    });
+    if (!contracts.length) return [];
+    const contractIds = contracts.map((contract) => contract.id);
+    const [versions, attachments] = await Promise.all([
+      this.versions.find({
+        where: { contractId: In(contractIds) },
+        order: { createdAt: 'DESC' },
+      }),
+      this.attachments.find({
+        where: { contractId: In(contractIds) },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+    const byId = new Map(contracts.map((contract) => [contract.id, contract]));
+    const versionSources = versions.map((version) => {
+      const contract = byId.get(version.contractId)!;
+      return {
+        id: version.id,
+        sourceType: 'version' as const,
+        contractId: contract.id,
+        contractName: contract.name,
+        versionLabel: version.versionLabel,
+        fileName: version.fileName,
+        createdAt: version.createdAt,
+        isCurrent: contract.currentVersionId === version.id,
+      };
+    });
+    const attachmentSources = attachments.map((attachment) => {
+      const contract = byId.get(attachment.contractId)!;
+      return {
+        id: attachment.id,
+        sourceType: 'attachment' as const,
+        contractId: contract.id,
+        contractName: contract.name,
+        versionLabel: attachment.versionLabel || '1',
+        documentName: attachment.name,
+        fileName: attachment.fileName,
+        createdAt: attachment.createdAt,
+        isCurrent: attachment.isCurrent ?? true,
+        attachmentGroupId: attachment.attachmentGroupId || attachment.id,
+      };
+    });
+    return [...versionSources, ...attachmentSources].sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    );
+  }
+
+  async getGotaKnowledge(userId: string, documentId: string) {
+    const version = await this.versions.findOne({ where: { id: documentId } });
+    if (version) {
+      await this.assertContractAccess(userId, version.contractId);
+      return this.contractExtraction.getKnowledge(version.contractId, version.id);
+    }
+    const attachment = await this.attachments.findOne({ where: { id: documentId } });
+    if (!attachment) throw new NotFoundException('Documento contractual no encontrado');
+    await this.assertContractAccess(userId, attachment.contractId);
+    return this.contractExtraction.getAttachmentKnowledge(attachment.contractId, attachment.id);
+  }
+
+  async normalizeGotaTranscription(userId: string, documentId: string) {
+    const version = await this.versions.findOne({ where: { id: documentId } });
+    if (version) {
+      await this.assertContractAccess(userId, version.contractId);
+      return this.contractExtraction.normalizeStoredTranscription(version.contractId, version.id);
+    }
+    const attachment = await this.attachments.findOne({ where: { id: documentId } });
+    if (!attachment) throw new NotFoundException('Documento contractual no encontrado');
+    await this.assertContractAccess(userId, attachment.contractId);
+    return this.contractExtraction.normalizeStoredAttachmentTranscription(
+      attachment.contractId,
+      attachment.id
+    );
+  }
+
   async addAmendment(userId: string, contractId: string, dto: CreateAmendmentDto) {
     await this.assertContractAccess(userId, contractId);
     const amendment = await this.amendmentsRepo.save(
@@ -764,8 +1294,15 @@ export class ClmService {
 
   async addPayment(userId: string, contractId: string, dto: CreatePaymentDto) {
     await this.assertContractAccess(userId, contractId);
+    const payload = this.buildPaymentPayload(dto);
     const payment = await this.paymentsRepo.save(
-      this.paymentsRepo.create({ contractId, ...dto, createdById: userId })
+      this.paymentsRepo.create({
+        contractId,
+        ...payload,
+        concept: payload.concept ?? dto.concept,
+        amount: payload.amount ?? dto.amount,
+        createdById: userId,
+      })
     );
     await this.log(contractId, userId, 'add_payment', undefined, {
       paymentId: payment.id,
@@ -783,46 +1320,215 @@ export class ClmService {
     await this.assertContractAccess(userId, contractId);
     const payment = await this.paymentsRepo.findOne({ where: { id: paymentId, contractId } });
     if (!payment) throw new NotFoundException('Pago no encontrado');
-    Object.assign(payment, dto);
+    Object.assign(payment, this.buildPaymentPayload(dto, payment));
     await this.paymentsRepo.save(payment);
     await this.log(contractId, userId, 'edit_payment', undefined, { paymentId });
     return this.getDetail(userId, contractId, false);
   }
 
+  async getPaymentProof(userId: string, contractId: string, paymentId: string) {
+    await this.assertContractAccess(userId, contractId);
+    const payment = await this.paymentsRepo.findOne({ where: { id: paymentId, contractId } });
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (!payment.invoiceFileKey) {
+      throw new NotFoundException('El pago no tiene comprobante cargado');
+    }
+
+    return {
+      buffer: await this.storage.read(payment.invoiceFileKey),
+      fileName: this.paymentProofFileName(payment),
+      mimeType: 'application/octet-stream',
+    };
+  }
+
+  getIntegrationStatus() {
+    return {
+      signature: {
+        provider: this.signatureProvider.name,
+        configured: this.signatureProvider.configured,
+        simulated: this.signatureProvider.name === 'stub',
+      },
+      erp: {
+        provider: this.erpIntegration.name,
+        configured: this.erpIntegration.configured,
+        simulated: this.erpIntegration.name === 'stub',
+      },
+    };
+  }
+
+  testErpConnection() {
+    return this.erpIntegration.testConnection();
+  }
+
+  async syncPaymentToErp(userId: string, contractId: string, paymentId: string) {
+    const contract = await this.assertContractAccess(userId, contractId);
+    const payment = await this.paymentsRepo.findOne({ where: { id: paymentId, contractId } });
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (!payment.amount) {
+      throw new BadRequestException(
+        'Define el importe del pago antes de sincronizarlo con el ERP.'
+      );
+    }
+    if (!this.erpIntegration.configured) {
+      throw new BadRequestException('La integración ERP no está configurada');
+    }
+    if (payment.erpSyncStatus === 'synced' && payment.erpExternalId) {
+      return { payment, duplicate: true };
+    }
+
+    const fingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          paymentId: payment.id,
+          concept: payment.concept,
+          amount: payment.amount,
+          currency: payment.currency,
+          paymentDate: payment.paymentDate,
+          dueDate: payment.dueDate,
+          invoiceNumber: payment.invoiceNumber,
+        })
+      )
+      .digest('hex')
+      .slice(0, 24);
+    const idempotencyKey = `clm-payment-${payment.id}-${fingerprint}`;
+
+    payment.erpSyncStatus = 'syncing';
+    payment.erpSyncError = null;
+    await this.paymentsRepo.save(payment);
+
+    const result =
+      payment.status === 'paid' && payment.paymentDate
+        ? await this.erpIntegration.syncPayment({
+            idempotencyKey,
+            contractName: contract.name,
+            concept: payment.concept,
+            amount: payment.amount,
+            currency: payment.currency,
+            paidAt: payment.paymentDate,
+          })
+        : payment.invoiceNumber && payment.dueDate
+          ? await this.erpIntegration.syncInvoice({
+              idempotencyKey,
+              invoiceNumber: payment.invoiceNumber,
+              contractName: contract.name,
+              amount: payment.amount,
+              currency: payment.currency,
+              issuedAt: payment.paymentDate ?? payment.createdAt.toISOString().slice(0, 10),
+              dueAt: payment.dueDate,
+            })
+          : null;
+
+    if (!result) {
+      payment.erpSyncStatus = 'failed';
+      payment.erpSyncError = 'Registra fecha de pago o factura con fecha de vencimiento';
+      await this.paymentsRepo.save(payment);
+      throw new BadRequestException(payment.erpSyncError);
+    }
+
+    payment.erpSyncStatus = result.success ? 'synced' : 'failed';
+    payment.erpExternalId = result.externalId ?? null;
+    payment.erpSyncError = result.errorMessage ?? null;
+    payment.erpSyncedAt = result.success ? new Date() : null;
+    await this.paymentsRepo.save(payment);
+    await this.log(
+      contractId,
+      userId,
+      result.success ? 'erp_payment_synced' : 'erp_payment_failed',
+      undefined,
+      {
+        paymentId,
+        provider: this.erpIntegration.name,
+        externalId: result.externalId,
+        error: result.errorMessage,
+      }
+    );
+
+    if (!result.success) {
+      throw new BadRequestException(result.errorMessage ?? 'No se pudo sincronizar con el ERP');
+    }
+    return { payment, duplicate: false };
+  }
+
   async sendForSignature(userId: string, contractId: string, dto: CreateSignatureRequestDto) {
     await this.assertContractAccess(userId, contractId);
-    const version = dto.versionId
-      ? await this.versions.findOne({ where: { id: dto.versionId, contractId } })
-      : await this.versions.findOne({ where: { contractId }, order: { createdAt: 'DESC' } });
+    if (dto.versionId && dto.attachmentId) {
+      throw new BadRequestException('Selecciona un contrato o un anexo para firmar, no ambos');
+    }
 
-    if (!version) throw new NotFoundException('No hay version del contrato para firmar');
+    const attachment = dto.attachmentId
+      ? await this.attachments.findOne({ where: { id: dto.attachmentId, contractId } })
+      : null;
+    const version = attachment
+      ? null
+      : dto.versionId
+        ? await this.versions.findOne({ where: { id: dto.versionId, contractId } })
+        : await this.versions.findOne({ where: { contractId }, order: { createdAt: 'DESC' } });
+    const document = attachment ?? version;
 
-    const fileBuffer = await this.storage.read(version.fileKey);
+    if (!document) {
+      throw new NotFoundException(
+        dto.attachmentId
+          ? 'No se encontró el anexo seleccionado para firmar'
+          : 'No hay versión del contrato para firmar'
+      );
+    }
+
+    const fileBuffer = await this.storage.read(document.fileKey);
     const base64Content = fileBuffer.toString('base64');
+    const documentHash = createHash('sha256').update(fileBuffer).digest('hex');
+    const normalizedSigners = [...dto.signers]
+      .map((signer, index) => ({
+        name: signer.name.trim(),
+        email: signer.email.trim().toLowerCase(),
+        order: signer.order ?? index + 1,
+      }))
+      .sort((left, right) => left.order - right.order || left.email.localeCompare(right.email));
+    const activeRequests = await this.signaturesRepo.find({
+      where: {
+        contractId,
+        versionId: version?.id ?? IsNull(),
+        attachmentId: attachment?.id ?? IsNull(),
+        provider: this.signatureProvider.name,
+        documentHash,
+        status: In(['pending', 'sent', 'delivered']),
+      },
+      order: { createdAt: 'DESC' },
+    });
+    const existingRequest = activeRequests.find(
+      (request) => JSON.stringify(request.signersJson) === JSON.stringify(normalizedSigners)
+    );
+    if (existingRequest) {
+      return { signature: existingRequest, reused: true };
+    }
 
     const result = await this.signatureProvider.send({
       contractId,
-      versionId: version.id,
+      versionId: version?.id,
       documentBase64: base64Content,
-      fileName: version.fileName,
-      signers: dto.signers,
+      fileName: document.fileName,
+      signers: normalizedSigners,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
     });
 
     const signature = await this.signaturesRepo.save(
       this.signaturesRepo.create({
         contractId,
-        versionId: version.id,
-        provider: 'stub',
+        versionId: version?.id,
+        attachmentId: attachment?.id,
+        provider: this.signatureProvider.name,
         providerRequestId: result.providerRequestId,
         status: result.status,
-        signersJson: dto.signers as unknown as Record<string, unknown>,
+        signersJson: normalizedSigners as unknown as Record<string, unknown>,
+        documentHash,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
         createdById: userId,
       })
     );
 
     await this.log(contractId, userId, 'send_for_signature', undefined, {
       signatureId: signature.id,
+      versionId: version?.id,
+      attachmentId: attachment?.id,
       providerRequestId: result.providerRequestId,
     });
     return { signature, signingUrl: result.signingUrl };
@@ -834,9 +1540,11 @@ export class ClmService {
     if (!signature) throw new NotFoundException('Solicitud de firma no encontrada');
     if (signature.providerRequestId) {
       const status = await this.signatureProvider.checkStatus(signature.providerRequestId);
-      if (status.status === 'completed' && signature.status !== 'completed') {
-        signature.status = 'completed';
-        signature.signedAt = status.signedAt ?? new Date();
+      if (status.status !== signature.status || status.signedAt) {
+        signature.status = status.status;
+        if (status.status === 'completed') {
+          signature.signedAt = status.signedAt ?? signature.signedAt ?? new Date();
+        }
         await this.signaturesRepo.save(signature);
       }
     }
@@ -944,7 +1652,7 @@ export class ClmService {
       ? [dto.projectId]
       : await this.scope.visibleProjectIdsForUser(userId);
     if (dto.projectId && !(await this.scope.canAccessProject(userId, dto.projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     return this.reportGenerator.generate(
       {
@@ -960,7 +1668,7 @@ export class ClmService {
   async getDashboard(userId: string, projectId?: string) {
     const projectIds = projectId ? [projectId] : await this.scope.visibleProjectIdsForUser(userId);
     if (projectId && !(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     if (!projectIds.length) {
       return {
@@ -1102,7 +1810,15 @@ export class ClmService {
 
   async updateLifecycleStage(userId: string, contractId: string, dto: UpdateLifecycleStageDto) {
     const contract = await this.assertContractAccess(userId, contractId);
+    if (!Object.prototype.hasOwnProperty.call(LIFECYCLE_TRANSITIONS, dto.stage)) {
+      throw new BadRequestException(`Etapa de ciclo de vida no reconocida: ${dto.stage}`);
+    }
     const previousStage = contract.lifecycleStage;
+    if (previousStage !== dto.stage && !LIFECYCLE_TRANSITIONS[previousStage]?.includes(dto.stage)) {
+      throw new BadRequestException(
+        `Transición no permitida: ${previousStage || 'sin etapa'} → ${dto.stage}`
+      );
+    }
     const now = new Date();
     let timeInPreviousStageMinutes: number | undefined;
     if (contract.lifecycleChangedAt) {
@@ -1143,8 +1859,17 @@ export class ClmService {
     await this.assertContractAccess(userId, contractId);
     const attachment = await this.attachments.findOne({ where: { id: attachmentId, contractId } });
     if (!attachment) throw new NotFoundException('Adjunto no encontrado');
-    await this.attachments.softDelete(attachmentId);
-    await this.log(contractId, userId, 'delete_attachment', undefined, { attachmentId });
+    const attachmentGroupId = attachment.attachmentGroupId || attachment.id;
+    const versions = await this.attachments.find({ where: { contractId, attachmentGroupId } });
+    for (const version of versions) {
+      await this.contractExtraction.deleteAttachmentIndex(contractId, version.id);
+    }
+    await this.attachments.softDelete(versions.map((version) => version.id));
+    await this.log(contractId, userId, 'delete_attachment', undefined, {
+      attachmentId,
+      attachmentGroupId,
+      versionsDeleted: versions.length,
+    });
     return this.getDetail(userId, contractId, false);
   }
 
@@ -1495,13 +2220,13 @@ export class ClmService {
   async listCounterparties(userId: string, search?: string) {
     const projectIds = await this.scope.visibleProjectIdsForUser(userId);
     if (!projectIds.length) return [];
-    const where: any = search
+    const where: FindOptionsWhere<Counterparty>[] | undefined = search
       ? [
           { businessName: Like(`%${search}%`) },
           { rfc: Like(`%${search}%`) },
           { commercialName: Like(`%${search}%`) },
         ]
-      : {};
+      : undefined;
     return this.counterpartiesRepo.find({ where, order: { businessName: 'ASC' } });
   }
 
@@ -1617,17 +2342,39 @@ export class ClmService {
     return contract;
   }
 
-  async handleSignatureWebhook(provider: string, payload: Record<string, unknown>) {
-    const handler = (this.signatureProvider as any).handleWebhook;
+  async handleSignatureWebhook(
+    provider: string,
+    payload: Record<string, unknown>,
+    rawBody: Buffer,
+    signatureHeader: string
+  ) {
+    if (provider !== this.signatureProvider.name) {
+      throw new BadRequestException(`Proveedor de firma no activo: ${provider}`);
+    }
+    const verifyWebhook = this.signatureProvider.verifyWebhook;
+    if (
+      typeof verifyWebhook === 'function' &&
+      !verifyWebhook.call(this.signatureProvider, rawBody, signatureHeader)
+    ) {
+      throw new UnauthorizedException('Firma HMAC del webhook inválida');
+    }
+    const handler = this.signatureProvider.handleWebhook;
     if (typeof handler === 'function') {
       const result = await handler.call(this.signatureProvider, payload);
-      const providerRequestId = result.envelopeId ?? (payload as any).providerRequestId ?? '';
+      const providerRequestId =
+        result.envelopeId ?? (payload as { providerRequestId?: string }).providerRequestId ?? '';
       if (providerRequestId) {
         const signature = await this.signaturesRepo.findOne({
           where: { providerRequestId },
           relations: ['contract'],
         });
         if (signature) {
+          const duplicate =
+            signature.status === result.status &&
+            (!result.signedAt || signature.signedAt?.getTime() === result.signedAt.getTime());
+          if (duplicate) {
+            return { received: true, status: result.status, duplicate: true };
+          }
           signature.status = result.status;
           if (result.signedAt) signature.signedAt = result.signedAt;
           await this.signaturesRepo.save(signature);
@@ -1654,7 +2401,7 @@ export class ClmService {
   ) {
     const projectIds = projectId ? [projectId] : await this.scope.visibleProjectIdsForUser(userId);
     if (projectId && !(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     if (!projectIds.length) {
       return { items: [], total: 0, page: 1, limit: 10 };
@@ -1732,66 +2479,29 @@ export class ClmService {
     };
   }
 
-  async reindexContractText(contractId: string) {
+  async reindexContractText(userId: string, contractId: string) {
+    await this.assertContractAccess(userId, contractId);
     const versions = await this.versions.find({
       where: { contractId },
       order: { createdAt: 'DESC' },
     });
-    let indexed = 0;
-    await this.textIndexRepo.delete({ contractId });
+    const queued = [];
     for (const version of versions) {
-      try {
-        const buffer = await this.storage.read(version.fileKey);
-        let text = '';
-        if (version.mimeType === 'application/pdf' || version.fileExtension === 'pdf') {
-          text = Array.from(buffer.toString('latin1'), (char) => {
-            const code = char.charCodeAt(0);
-            return code < 0x20 && ![0x09, 0x0a, 0x0d].includes(code) ? ' ' : char;
-          })
-            .join('')
-            .replace(/[^\x20-\xFF]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        } else if (
-          version.mimeType ===
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-          version.fileExtension === 'docx'
-        ) {
-          try {
-            const mammoth = await import('mammoth');
-            const result = await mammoth.extractRawText({ buffer });
-            text = (result.value as string) ?? '';
-          } catch {
-            text = buffer
-              .toString('utf-8')
-              .replace(/<[^>]+>/g, '')
-              .trim();
-          }
-        } else {
-          text = buffer.toString('utf-8').trim();
-        }
-        if (text.length > 0) {
-          await this.textIndexRepo.save(
-            this.textIndexRepo.create({
-              contractId,
-              versionId: version.id,
-              content: text.slice(0, 65535),
-              contentHash: createHash('sha256').update(text).digest('hex').slice(0, 64),
-            })
-          );
-          indexed++;
-        }
-      } catch {
-        continue;
-      }
+      queued.push(
+        await this.contractExtraction.createAndStart(
+          contractId,
+          version.id,
+          version.uploadedById ?? userId
+        )
+      );
     }
-    return { ok: true, versionsProcessed: versions.length, indexed };
+    return { ok: true, versionsProcessed: versions.length, queued };
   }
 
   private async listContractsForAlerts(userId: string, projectId?: string) {
     const projectIds = projectId ? [projectId] : await this.scope.visibleProjectIdsForUser(userId);
     if (projectId && !(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
     if (!projectIds.length) return [];
     return this.contracts.find({
@@ -1812,7 +2522,7 @@ export class ClmService {
 
   private async assertProjectAccess(userId: string, projectId: string) {
     if (!(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
   }
 
@@ -1820,7 +2530,9 @@ export class ClmService {
     if (!documentId) return;
     const document = await this.documents.findOne({ where: { id: documentId } });
     if (!document || document.projectId !== projectId) {
-      throw new ForbiddenException('El documento indicado no pertenece al proyecto del contrato');
+      throw new ForbiddenException(
+        'El documento indicado no pertenece al centro de costos del contrato'
+      );
     }
   }
 
@@ -1886,6 +2598,91 @@ export class ClmService {
         return status;
       default:
         return 'draft';
+    }
+  }
+
+  private buildPaymentPayload(
+    dto: CreatePaymentDto | UpdatePaymentDto,
+    existing?: Partial<ContractPayment>
+  ) {
+    const concept = this.optionalPaymentValue(dto.concept) ?? existing?.concept;
+    const amount = this.optionalPaymentValue(dto.amount) ?? existing?.amount;
+    const percentage = this.optionalPaymentValue(dto.percentage) ?? existing?.percentage;
+    const paymentCondition =
+      this.optionalPaymentValue(dto.paymentCondition) ?? existing?.paymentCondition;
+    const currency = this.optionalPaymentValue(dto.currency) ?? existing?.currency ?? 'MXN';
+    const dueDate = this.optionalPaymentValue(dto.dueDate) ?? existing?.dueDate ?? null;
+    const paymentDate = this.optionalPaymentValue(dto.paymentDate) ?? existing?.paymentDate ?? null;
+    const invoiceNumber =
+      this.optionalPaymentValue(dto.invoiceNumber) ?? existing?.invoiceNumber ?? null;
+    const invoiceFileKey =
+      this.optionalPaymentValue(dto.invoiceFileKey) ?? existing?.invoiceFileKey ?? null;
+    const notes = this.optionalPaymentValue(dto.notes) ?? existing?.notes ?? null;
+    const rawStatus = this.optionalPaymentValue(dto.status);
+
+    return {
+      concept,
+      amount,
+      percentage,
+      paymentCondition,
+      currency,
+      dueDate,
+      paymentDate,
+      invoiceNumber,
+      invoiceFileKey,
+      notes,
+      status: this.resolvePaymentStatus(rawStatus, paymentDate, dueDate, existing?.status),
+    };
+  }
+
+  private resolvePaymentStatus(
+    explicitStatus?: string | null,
+    paymentDate?: string | null,
+    dueDate?: string | null,
+    fallback?: string
+  ) {
+    if (explicitStatus) {
+      return explicitStatus;
+    }
+
+    if (paymentDate) {
+      return 'paid';
+    }
+
+    if (dueDate) {
+      const today = new Date().toISOString().slice(0, 10);
+      return dueDate < today ? 'overdue' : 'scheduled';
+    }
+
+    return fallback ?? 'pending';
+  }
+
+  private optionalPaymentValue(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const trimmed = typeof value === 'string' ? value.trim() : value;
+    return trimmed === '' ? null : trimmed;
+  }
+
+  private paymentProofFileName(payment: ContractPayment) {
+    const storedName = payment.invoiceFileKey?.match(/^[0-9a-f-]{36}-(.+)$/i)?.[1];
+    if (storedName) {
+      return storedName;
+    }
+
+    const safeConcept = (payment.concept || 'comprobante-pago')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return `${safeConcept || 'comprobante-pago'}.bin`;
+  }
+
+  private assertStatusTransition(from: Contract['status'], to: Contract['status']) {
+    if (!STATUS_TRANSITIONS[from]?.includes(to)) {
+      throw new BadRequestException(`Cambio de estado no permitido: ${from} → ${to}`);
     }
   }
 

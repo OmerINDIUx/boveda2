@@ -8,6 +8,9 @@ import {
 
 @Injectable()
 export class StubErpProvider implements ErpIntegration {
+  readonly name = 'stub';
+  readonly configured = true;
+
   async syncInvoice(_data: ErpSyncInvoice): Promise<ErpSyncResult> {
     return { success: true, externalId: `ERP-INV-${Date.now()}` };
   }

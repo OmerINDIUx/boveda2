@@ -11,6 +11,14 @@ export class UpdatePaymentDto {
 
   @IsOptional()
   @IsString()
+  percentage?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentCondition?: string;
+
+  @IsOptional()
+  @IsString()
   currency?: string;
 
   @IsOptional()
@@ -28,6 +36,10 @@ export class UpdatePaymentDto {
   @IsOptional()
   @IsString()
   invoiceNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceFileKey?: string;
 
   @IsOptional()
   @IsString()

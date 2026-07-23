@@ -141,7 +141,7 @@ export class ProjectEmailsService {
 
   async sendEmail(dto: SendProjectEmailDto) {
     const project = await this.projects.findOne({ where: { id: dto.projectId } });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
+    if (!project) throw new NotFoundException('Centro de costos no encontrado');
 
     const address = await this.addresses.findOne({
       where: { projectId: dto.projectId, isActive: true },

@@ -39,7 +39,7 @@ export class ApprovalsService {
 
   async listFlows(userId: string, projectId: string) {
     if (!(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
 
     const flows = await this.flows.find({
@@ -53,7 +53,7 @@ export class ApprovalsService {
 
   async createFlow(userId: string, dto: CreateApprovalFlowDto) {
     if (!(await this.scope.canAccessProject(userId, dto.projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
 
     if (dto.scopeType === 'document_specific' && dto.targetDocumentId) {

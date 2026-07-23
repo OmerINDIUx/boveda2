@@ -25,8 +25,18 @@ export interface SignatureStatusResponse {
   signers: Array<{ name: string; email: string; signedAt?: Date }>;
 }
 
+export interface SignatureWebhookResponse {
+  envelopeId: string;
+  status: string;
+  signedAt?: Date;
+}
+
 export interface SignatureProvider {
+  readonly name: string;
+  readonly configured: boolean;
   send(request: SignatureSendRequest): Promise<SignatureSendResponse>;
   checkStatus(providerRequestId: string): Promise<SignatureStatusResponse>;
   cancel(providerRequestId: string): Promise<void>;
+  verifyWebhook?(rawBody: Buffer, signature: string): boolean;
+  handleWebhook?(payload: Record<string, unknown>): Promise<SignatureWebhookResponse>;
 }

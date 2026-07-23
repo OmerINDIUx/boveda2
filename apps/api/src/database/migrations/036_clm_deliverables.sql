@@ -1,0 +1,20 @@
+CREATE TABLE contract_deliverables (
+  id CHAR(36) PRIMARY KEY,
+  contract_id CHAR(36) NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  description TEXT NULL,
+  due_date DATE NULL,
+  acceptance_criteria TEXT NULL,
+  responsible_user_id CHAR(36) NULL,
+  status VARCHAR(40) NOT NULL DEFAULT 'pending',
+  delivered_at DATETIME NULL,
+  accepted_at DATETIME NULL,
+  metadata JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  INDEX idx_contract_deliverables_status (contract_id, status),
+  INDEX idx_contract_deliverables_due_date (due_date),
+  CONSTRAINT fk_contract_deliverables_contract FOREIGN KEY (contract_id) REFERENCES contracts (id),
+  CONSTRAINT fk_contract_deliverables_responsible FOREIGN KEY (responsible_user_id) REFERENCES users (id)
+);

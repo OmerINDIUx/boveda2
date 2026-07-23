@@ -4,12 +4,21 @@ export class CreatePaymentDto {
   @IsString()
   concept!: string;
 
+  @IsOptional()
   @IsString()
-  amount!: string;
+  amount?: string;
 
   @IsOptional()
   @IsString()
   currency?: string;
+
+  @IsOptional()
+  @IsString()
+  percentage?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentCondition?: string;
 
   @IsOptional()
   @IsString()
@@ -26,6 +35,10 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   invoiceNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceFileKey?: string;
 
   @IsOptional()
   @IsString()

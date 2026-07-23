@@ -28,6 +28,7 @@ import { ContractSignatureRequest } from './entities/contract-signature-request.
 import { ContractVersion } from './contract-version.entity';
 import { Tag } from './entities/tag.entity';
 import { Counterparty } from './entities/counterparty.entity';
+import { ContractDeliverable } from './entities/contract-deliverable.entity';
 
 @Entity('contracts')
 export class Contract {
@@ -142,6 +143,9 @@ export class Contract {
 
   @OneToMany(() => ContractMilestone, (milestone) => milestone.contract)
   milestones!: ContractMilestone[];
+
+  @OneToMany(() => ContractDeliverable, (deliverable) => deliverable.contract)
+  deliverables!: ContractDeliverable[];
 
   @OneToMany(() => ContractAttachment, (attachment) => attachment.contract)
   attachments!: ContractAttachment[];

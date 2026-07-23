@@ -75,7 +75,7 @@ function buildEmptyStep(stepOrder: number): WorkflowStep {
 
 const STEP_LABELS: Record<number, string> = {
   1: 'Información general',
-  2: 'Proyectos',
+  2: 'Centros de costos',
   3: 'Pasos del flujo',
   4: 'Resumen',
 };
@@ -450,7 +450,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
     if (step === 1) {
       if (!form.name.trim()) return 'Completa el nombre del flujo.';
       if (form.scopeType === 'document_specific' && !canUseDocumentSpecificScope) {
-        return 'El alcance por documento solo está disponible cuando seleccionas un solo proyecto.';
+        return 'El alcance por documento solo está disponible cuando seleccionas un solo centro de costos.';
       }
       if (form.scopeType === 'document_specific' && !form.targetDocumentId) {
         return 'Selecciona el documento objetivo para este flujo.';
@@ -459,7 +459,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
     if (step === 2) {
       if (mode === 'create' && !selectedProjectIds.length) {
-        return 'Selecciona al menos un proyecto o usa la opción de todos los proyectos.';
+        return 'Selecciona al menos un centro de costos o usa la opción de todos los centros de costos.';
       }
       return null;
     }
@@ -574,7 +574,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
       <div className="quick-filters-grid">
         {mode === 'edit' ? (
           <SelectField
-            label="Proyecto"
+            label="Centro de costos"
             value={form.projectId}
             onChange={(value) => setForm((current) => ({ ...current, projectId: value }))}
             options={projects.map((project) => ({
@@ -588,8 +588,8 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
             value={projectAssignmentMode}
             onChange={(value) => setProjectAssignmentMode(value as ProjectAssignmentMode)}
             options={[
-              { value: 'all_projects', label: 'Todos los proyectos' },
-              { value: 'selected_projects', label: 'Seleccionar proyectos' },
+              { value: 'all_projects', label: 'Todos los centros de costos' },
+              { value: 'selected_projects', label: 'Seleccionar centros de costos' },
             ]}
           />
         )}
@@ -608,7 +608,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
             }))
           }
           options={[
-            { value: 'global', label: 'Todo el proyecto' },
+            { value: 'global', label: 'Todo el centro de costos' },
             { value: 'document_specific', label: 'Documento específico' },
           ]}
           disabled={!canUseDocumentSpecificScope}
@@ -637,7 +637,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
         ) : null}
         {!canUseDocumentSpecificScope ? (
           <div className="approval-inline-note">
-            El alcance por documento se habilita cuando el flujo aplica a un solo proyecto.
+            El alcance por documento se habilita cuando el flujo aplica a un solo centro de costos.
           </div>
         ) : null}
       </div>
@@ -650,9 +650,9 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
       return (
         <div className="wizard-readonly-section">
           <div className="selection-summary-card approval-selection-highlight">
-            <strong>Proyecto asignado</strong>
+            <strong>Centro de costos asignado</strong>
             <span className="muted">
-              {project ? `${project.code} · ${project.name}` : 'Sin proyecto'}
+              {project ? `${project.code} · ${project.name}` : 'Sin centro de costos'}
             </span>
           </div>
         </div>
@@ -663,16 +663,16 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
       <section>
         {projectAssignmentMode === 'all_projects' ? (
           <div className="selection-summary-card approval-selection-highlight">
-            <strong>{projects.length} proyectos seleccionados</strong>
+            <strong>{projects.length} centros de costos seleccionados</strong>
             <span className="muted">
-              El flujo se creará en todos los proyectos visibles para tu usuario.
+              El flujo se creará en todos los centros de costos visibles para tu usuario.
             </span>
           </div>
         ) : (
           <div className="project-picker-card approval-project-picker">
             <input
               type="search"
-              placeholder="Buscar proyecto por clave o nombre"
+              placeholder="Buscar centro de costos por clave o nombre"
               value={projectSearch}
               onChange={(event) => setProjectSearch(event.target.value)}
             />
@@ -693,11 +693,11 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 );
               })}
               {!filteredProjects.length ? (
-                <p className="muted">No hay proyectos que coincidan con la búsqueda.</p>
+                <p className="muted">No hay centros de costos que coincidan con la búsqueda.</p>
               ) : null}
             </div>
             <span className="muted">
-              {selectedProjectIds.length} proyecto
+              {selectedProjectIds.length} centro de costos
               {selectedProjectIds.length === 1 ? '' : 's'} seleccionado
               {selectedProjectIds.length === 1 ? '' : 's'}.
             </span>
@@ -823,7 +823,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <dd>
                 {form.scopeType === 'document_specific'
                   ? 'Documento específico'
-                  : 'Todo el proyecto'}
+                  : 'Todo el centro de costos'}
               </dd>
               <dt>Bloquea publicación</dt>
               <dd>{form.requireForPublication ? 'Sí, requiere aprobación' : 'No bloquea'}</dd>
@@ -837,7 +837,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </div>
 
           <div className="wizard-summary-card">
-            <h3>Proyectos</h3>
+            <h3>Centros de costos</h3>
             {projectSummary.length > 0 ? (
               <div className="simple-document-list">
                 {projectSummary.slice(0, 10).map((project) => (
@@ -848,14 +848,14 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 ))}
                 {projectSummary.length > 10 ? (
                   <small className="muted">
-                    +{projectSummary.length - 10} proyecto
+                    +{projectSummary.length - 10} centro de costos
                     {projectSummary.length - 10 === 1 ? '' : 's'} adicional
                     {projectSummary.length - 10 === 1 ? '' : 'es'}.
                   </small>
                 ) : null}
               </div>
             ) : (
-              <p className="muted">Sin proyectos seleccionados.</p>
+              <p className="muted">Sin centros de costos seleccionados.</p>
             )}
           </div>
 
@@ -886,7 +886,7 @@ export function ApprovalFlowFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <button className="button" type="button" onClick={submit} disabled={saving}>
             {saving
               ? 'Guardando...'
-              : `Guardar flujo${mode === 'create' && selectedProjectIds.length > 1 ? ` en ${selectedProjectIds.length} proyectos` : ''}`}
+              : `Guardar flujo${mode === 'create' && selectedProjectIds.length > 1 ? ` en ${selectedProjectIds.length} centros de costos` : ''}`}
           </button>
         </div>
       </div>

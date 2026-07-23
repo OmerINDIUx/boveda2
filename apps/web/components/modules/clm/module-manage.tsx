@@ -6,7 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiGet } from '../../../lib/api';
 import { normalizeLabel } from '../../../lib/labels';
 import type { ContractDetail } from './types';
-import { buildFallbackDetail, formatCurrency, formatDate } from './utils';
+import { formatCurrency, formatDate } from './utils';
+import { SectionLoadWarning } from './section-load-warning';
 
 type ModuleKey =
   | 'obligations'
@@ -53,7 +54,7 @@ const moduleMeta: Record<
     empty: 'Aun no hay comentarios registrados.',
   },
   versions: {
-    title: 'Versiones',
+    title: 'Contratos',
     createLabel: 'Subir version',
     createHref: (id) => `/clm/${id}/versions/new`,
     empty: 'Aun no hay versiones registradas.',
@@ -71,16 +72,16 @@ const moduleMeta: Record<
     empty: 'Aun no hay solicitudes de firma registradas.',
   },
   negotiations: {
-    title: 'Negociacion',
+    title: 'Negociación',
     createLabel: 'Nueva ronda',
     createHref: (id) => `/clm/${id}/negotiations/new`,
-    empty: 'Aun no hay rondas de negociacion registradas.',
+    empty: 'Aún no hay rondas de negociación registradas.',
   },
   amendments: {
-    title: 'Enmiendas',
-    createLabel: 'Nueva enmienda',
+    title: 'Convenios modificatorios',
+    createLabel: 'Nuevo convenio',
     createHref: (id) => `/clm/${id}/amendments/new`,
-    empty: 'Aun no hay enmiendas registradas.',
+    empty: 'Aún no hay convenios modificatorios registrados.',
   },
 };
 
@@ -109,13 +110,17 @@ function renderModuleItems(module: ModuleKey, detail: ContractDetail) {
         </div>
       ));
     case 'attachments':
-      return detail.attachments.map((item) => (
-        <div key={item.id} className="simple-document-item">
-          <strong>{item.name}</strong>
-          <small>{item.fileName}</small>
-          <span>{item.notes ?? 'Sin notas.'}</span>
-        </div>
-      ));
+      return detail.attachments
+        .filter((item) => item.isCurrent ?? true)
+        .map((item) => (
+          <div key={item.id} className="simple-document-item">
+            <strong>{item.name}</strong>
+            <small>
+              Versión {item.versionLabel || '1'} · {item.fileName}
+            </small>
+            <span>{item.notes ?? 'Sin notas.'}</span>
+          </div>
+        ));
     case 'comments':
       return detail.comments.map((item) => (
         <div key={item.id} className="simple-document-item">
@@ -137,20 +142,32 @@ function renderModuleItems(module: ModuleKey, detail: ContractDetail) {
         <div key={item.id} className="simple-document-item">
           <strong>{item.concept}</strong>
           <small>
-            {formatCurrency(item.amount, item.currency)} · {normalizeLabel(item.status)}
+            {item.amount
+              ? formatCurrency(item.amount, item.currency)
+              : item.percentage
+                ? `${Number(item.percentage)}%`
+                : 'Sin importe'}{' '}
+            · {normalizeLabel(item.status)}
           </small>
           <span>
             {item.invoiceNumber ? `Factura: ${item.invoiceNumber} · ` : ''}
-            Vence: {formatDate(item.dueDate)}
+            {item.paymentCondition ? `Condición: ${item.paymentCondition} · ` : ''}Vence:{' '}
+            {formatDate(item.dueDate)}
           </span>
         </div>
       ));
     case 'signatures':
       return detail.signatures.map((item) => (
         <div key={item.id} className="simple-document-item">
-          <strong>{normalizeLabel(item.provider)}</strong>
+          <strong>
+            {item.attachment
+              ? `${item.attachment.name} · Versión ${item.attachment.versionLabel}`
+              : item.version
+                ? `Contrato · Versión ${item.version.versionLabel}`
+                : 'Documento contractual'}
+          </strong>
           <small>
-            {normalizeLabel(item.status)} ·{' '}
+            {normalizeLabel(item.provider)} · {normalizeLabel(item.status)} ·{' '}
             {item.signedAt ? `Firmado: ${formatDate(item.signedAt)}` : 'Pendiente'}
           </small>
           <span>
@@ -192,7 +209,7 @@ function getCount(module: ModuleKey, detail: ContractDetail) {
     case 'milestones':
       return detail.milestones.length;
     case 'attachments':
-      return detail.attachments.length;
+      return detail.attachments.filter((item) => item.isCurrent ?? true).length;
     case 'comments':
       return detail.comments.length;
     case 'versions':
@@ -227,13 +244,7 @@ export function ContractModuleManagePage({ module }: { module: ModuleKey }) {
         setDetail(result);
       } catch {
         if (!active) return;
-        const fallback = buildFallbackDetail(contractId);
-        if (fallback) {
-          setDetail(fallback);
-          setMessage('Vista de respaldo sin conexión a la API.');
-        } else {
-          setMessage('No se pudo cargar el módulo.');
-        }
+        setMessage('No se pudo cargar el módulo. Verifica la sesión y el acceso al contrato.');
       } finally {
         if (active) setLoading(false);
       }
@@ -285,6 +296,7 @@ export function ContractModuleManagePage({ module }: { module: ModuleKey }) {
         </div>
       </div>
       {message ? <article className="card muted">{message}</article> : null}
+      <SectionLoadWarning detail={detail} section={module} label={meta.title.toLowerCase()} />
       <div className="grid" style={{ marginBottom: 16 }}>
         <article className="card span-4 project-metric info">
           <span className="muted">Registros</span>

@@ -44,7 +44,7 @@ export class ProjectEmail {
   @Column({ name: 'from_name', length: 255, nullable: true })
   fromName?: string;
 
-  @Column({ type: 'text' })
+  @Column({ name: 'to_address', type: 'text' })
   toAddress!: string;
 
   @Column({ type: 'text', nullable: true })

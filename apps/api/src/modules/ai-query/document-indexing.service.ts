@@ -15,13 +15,13 @@ import { DocumentEmbedding } from '../documents/document-embedding.entity';
 import { DocumentRecord } from '../documents/document.entity';
 import { DocumentVersion } from '../versions/document-version.entity';
 
-type ExtractedSegment = {
+export type ExtractedSegment = {
   text: string;
   pageNumber?: number;
   sectionLabel?: string;
 };
 
-type ExtractedDocument = {
+export type ExtractedDocument = {
   contentType: 'pdf' | 'docx' | 'xlsx' | 'text';
   segments: ExtractedSegment[];
 };
@@ -51,6 +51,22 @@ export class DocumentIndexingService {
     private readonly storage: StorageService,
     private readonly config: ConfigService
   ) {}
+
+  extractFile(fileName: string, mimeType: string, buffer: Buffer) {
+    return this.extractText(fileName, mimeType, buffer);
+  }
+
+  async createPersistentEmbeddings(text: string) {
+    return {
+      local: this.createHashEmbedding(text),
+      ollama: await this.createOllamaEmbedding(text).catch(() => undefined),
+      ollamaModel: OLLAMA_EMBEDDING_MODEL,
+    };
+  }
+
+  createLocalEmbedding(text: string) {
+    return this.createHashEmbedding(text);
+  }
 
   async ensureVersionIndexed(document: DocumentRecord, version: DocumentVersion) {
     const buffer = await this.storage.read(version.fileKey);
@@ -214,6 +230,11 @@ export class DocumentIndexingService {
     }
 
     if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+      const pdfplumber = await this.extractPdfWithPdfplumber(buffer).catch(() => null);
+      if (pdfplumber?.segments.length) {
+        return pdfplumber;
+      }
+
       const pdftotext = await this.extractWithPdftotext(buffer).catch(() => null);
       if (pdftotext?.segments.length) {
         return pdftotext;
@@ -338,6 +359,32 @@ sys.stdout.write(json.dumps(output, ensure_ascii=True))
       child.stdin.write(stdin);
       child.stdin.end();
     });
+  }
+
+  private async extractPdfWithPdfplumber(buffer: Buffer): Promise<ExtractedDocument> {
+    const pythonCode = `
+import io, json, sys
+import pdfplumber
+
+payload = sys.stdin.buffer.read()
+segments = []
+with pdfplumber.open(io.BytesIO(payload)) as document:
+    for page_number, page in enumerate(document.pages, start=1):
+        text = page.extract_text(x_tolerance=2, y_tolerance=3, layout=False) or ""
+        text = "\\n".join(line.strip() for line in text.replace("\\x00", " ").splitlines() if line.strip())
+        if text:
+            segments.append({"text": text, "pageNumber": page_number})
+
+sys.stdout.write(json.dumps({"contentType": "pdf", "segments": segments}, ensure_ascii=True))
+`;
+    const configured = process.env.HOLOCRON_PYTHON_PATH ?? process.env.PYTHON_PATH ?? 'python';
+    const executable = configured.trim() || 'python';
+    const result = await this.runPython(executable, pythonCode, [], buffer);
+    const parsed = JSON.parse(result) as ExtractedDocument;
+    return {
+      contentType: 'pdf',
+      segments: (parsed.segments ?? []).filter((segment) => segment.text?.trim().length),
+    };
   }
 
   private async extractWithPdftotext(buffer: Buffer): Promise<ExtractedDocument> {

@@ -70,7 +70,7 @@ export class DocumentsService {
       : await this.scope.visibleProjectIdsForUser(userId);
     if (query.projectId) {
       if (!(await this.scope.canAccessProject(userId, query.projectId))) {
-        throw new ForbiddenException('No tienes acceso a este proyecto');
+        throw new ForbiddenException('No tienes acceso a este centro de costos');
       }
     } else if (!visibleProjectIds.length) {
       return [];
@@ -112,7 +112,7 @@ export class DocumentsService {
   async create(userId: string, dto: CreateDocumentDto) {
     try {
       if (!(await this.scope.canAccessProject(userId, dto.projectId))) {
-        throw new ForbiddenException('No tienes acceso a este proyecto');
+        throw new ForbiddenException('No tienes acceso a este centro de costos');
       }
       const folder = await this.resolveProjectFolder(dto.projectId, dto.folderId);
       const disciplineId = this.optionalValue(dto.disciplineId);
@@ -594,7 +594,7 @@ ${html}
 
     const folder = await this.folders.findOne({ where: { id: folderId, projectId } });
     if (!folder) {
-      throw new BadRequestException('La carpeta seleccionada no pertenece al proyecto');
+      throw new BadRequestException('La carpeta seleccionada no pertenece al centro de costos');
     }
 
     return folder;
@@ -638,7 +638,7 @@ ${html}
         message.includes('Duplicate entry')
       ) {
         return new BadRequestException(
-          'Ya existe un documento con ese numero documental dentro del proyecto.'
+          'Ya existe un documento con ese numero documental dentro del centro de costos.'
         );
       }
 
@@ -647,7 +647,7 @@ ${html}
         dbError?.code === 'ER_ROW_IS_REFERENCED_2'
       ) {
         return new BadRequestException(
-          'Alguno de los datos relacionados ya no es valido. Recarga proyecto, carpeta y responsable e intenta de nuevo.'
+          'Alguno de los datos relacionados ya no es valido. Recarga centro de costos, carpeta y responsable e intenta de nuevo.'
         );
       }
     } else if (error instanceof Error) {

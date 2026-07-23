@@ -5,36 +5,39 @@ import { useEffect, useState } from 'react';
 import { SectionHeader } from '../section-header';
 import { apiGet, apiPost } from '../../../lib/api';
 import { Project, FilePayload } from './types';
-import { fallbackProjects, fileToPayload, getErrorMessage } from './utils';
+import { fileToPayload, getErrorMessage } from './utils';
+
+type ImportResult = { total: number; success: number; errors?: unknown[] };
 
 export function ClmImportPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [file, setFile] = useState<FilePayload | null>(null);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     async function load() {
       try {
         const p = await apiGet<Project[]>('/projects');
-        setProjects(p.length ? p : fallbackProjects);
-      } catch {
-        setProjects(fallbackProjects);
+        setProjects(p);
+      } catch (projectError) {
+        setProjects([]);
+        setError(getErrorMessage(projectError, 'No se pudieron cargar los centros de costos.'));
       }
     }
     void load();
   }, []);
   async function submit() {
     if (!projectId || !file) {
-      setError('Selecciona proyecto y archivo CSV.');
+      setError('Selecciona centro de costos y archivo CSV.');
       return;
     }
     setSaving(true);
     setError('');
     setResult(null);
     try {
-      const r = await apiPost('/clm/contracts/import', {
+      const r = await apiPost<ImportResult>('/clm/contracts/import', {
         projectId,
         fileName: file.fileName,
         base64Content: file.base64Content,
@@ -57,7 +60,7 @@ export function ClmImportPage() {
       {error ? <article className="card muted">{error}</article> : null}
       <article className="card">
         <div className="field">
-          <label>Proyecto</label>
+          <label>Centro de costos</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
             <option value="">Selecciona</option>
             {projects.map((p) => (

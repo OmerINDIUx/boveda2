@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
@@ -71,10 +76,18 @@ export class UploadSessionsService {
       size !== buffer.byteLength ||
       (session.totalSize > 0 && buffer.byteLength !== session.totalSize)
     ) {
-      throw new Error('Uploaded file size does not match the expected size');
+      throw new BadRequestException(
+        `El archivo recibido tiene ${buffer.byteLength} bytes, pero se esperaban ${session.totalSize}.`
+      );
     }
 
-    const stored = await this.storage.put(buffer, session.fileName, session.mimeType);
+    let stored: StoredFile;
+    try {
+      stored = await this.storage.put(buffer, session.fileName, session.mimeType);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Error de almacenamiento desconocido';
+      throw new InternalServerErrorException(`No fue posible guardar el archivo. ${detail}`);
+    }
     await rm(session.dir, { recursive: true, force: true });
     this.sessions.delete(uploadId);
     return stored;

@@ -6,8 +6,16 @@ import { SectionHeader } from '../section-header';
 import { apiGet, apiPost } from '../../../lib/api';
 import { TextField } from './utils';
 
+type CustomField = {
+  id: string;
+  contractType: string;
+  fieldKey: string;
+  fieldLabel: string;
+  fieldType: string;
+};
+
 export function ClmCustomFieldsPage() {
-  const [fields, setFields] = useState<any[]>([]);
+  const [fields, setFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     contractType: '',
@@ -18,7 +26,7 @@ export function ClmCustomFieldsPage() {
   const [saving, setSaving] = useState(false);
   async function load() {
     try {
-      const f = await apiGet<any[]>('/clm/custom-fields');
+      const f = await apiGet<CustomField[]>('/clm/custom-fields');
       setFields(f);
     } catch {
       setFields([]);

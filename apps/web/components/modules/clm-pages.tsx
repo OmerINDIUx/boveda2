@@ -90,6 +90,9 @@ type ContractDetail = ContractListItem & {
   attachments: Array<{
     id: string;
     name: string;
+    attachmentGroupId?: string;
+    versionLabel?: string;
+    isCurrent?: boolean;
     fileName: string;
     notes?: string;
     createdAt: string;
@@ -399,6 +402,7 @@ export function ClmWorkspacePage() {
     let active = true;
     async function load() {
       try {
+        setMessage('');
         const params = new URLSearchParams();
         if (search) params.set('search', search);
         if (statusFilter) params.set('status', statusFilter);
@@ -413,15 +417,18 @@ export function ClmWorkspacePage() {
           getToken()
         );
         if (!active) return;
-        setContracts(items.length ? items : fallbackContracts);
-        setSelectedId((prev) =>
-          items.length ? (items.find((c) => c.id === prev)?.id ?? items[0]?.id ?? '') : ''
-        );
-      } catch {
+        setContracts(items);
+        setSelectedId((prev) => items.find((c) => c.id === prev)?.id ?? items[0]?.id ?? '');
+      } catch (error) {
         if (!active) return;
         setContracts(fallbackContracts);
         setSelectedId(fallbackContracts[0]?.id ?? '');
-        setMessage('Vista de respaldo.');
+        setMessage(
+          `Vista de respaldo. Motivo: ${getErrorMessage(
+            error,
+            'No se pudo cargar el listado de contratos.'
+          )}`
+        );
       }
     }
     void load();
@@ -629,7 +636,7 @@ export function ClmWorkspacePage() {
               </div>
               <div className="project-state-grid">
                 <div className="state-card">
-                  <span>Proyecto</span>
+                  <span>Centro de costos</span>
                   <strong>{selectedContract.project?.name ?? selectedContract.projectId}</strong>
                 </div>
                 <div className="state-card">
@@ -708,7 +715,12 @@ export function ContractDetailPage() {
         if (fallback) {
           setDetail(fallback);
           setLifecycleForm((prev) => ({ ...prev, stage: fallback.lifecycleStage ?? 'request' }));
-          setMessage('Vista de respaldo.');
+          setMessage(
+            `Vista de respaldo. Motivo: ${getErrorMessage(
+              err,
+              'No se pudo cargar el detalle del contrato.'
+            )}`
+          );
           return;
         }
         setMessage(err?.message ?? 'No se pudo cargar el detalle.');
@@ -774,7 +786,7 @@ export function ContractDetailPage() {
       );
       setAskResult(response);
     } catch {
-      setMessage('No se pudo consultar con IA.');
+      setMessage('No se pudo consultar con G.OTA.');
     }
   }
 
@@ -839,7 +851,7 @@ export function ContractDetailPage() {
     { key: 'lifecycle', label: 'Ciclo de vida', icon: <History size={16} /> },
     { key: 'obligations', label: 'Obligaciones', icon: <CheckSquare size={16} /> },
     { key: 'milestones', label: 'Hitos', icon: <CalendarClock size={16} /> },
-    { key: 'amendments', label: 'Enmiendas', icon: <FilePlus2 size={16} /> },
+    { key: 'amendments', label: 'Convenios', icon: <FilePlus2 size={16} /> },
     { key: 'payments', label: 'Pagos', icon: <DollarSign size={16} /> },
     { key: 'signatures', label: 'Firmas', icon: <FileSignature size={16} /> },
     { key: 'negotiations', label: 'Negociación', icon: <MessageSquare size={16} /> },
@@ -1109,9 +1121,9 @@ export function ContractDetailPage() {
       {activeTab === 'amendments' && (
         <article className="card">
           <div className="panel-header">
-            <h2>Enmiendas</h2>
+            <h2>Convenios modificatorios</h2>
             <Link className="button" href={`/clm/${detail.id}/amendments`}>
-              Nueva enmienda
+              Nuevo convenio
             </Link>
           </div>
           <div className="simple-document-list">
@@ -1220,13 +1232,17 @@ export function ContractDetailPage() {
             </Link>
           </div>
           <div className="simple-document-list">
-            {(detail.attachments ?? []).map((a) => (
-              <div key={a.id} className="simple-document-item">
-                <strong>{a.name}</strong>
-                <small>{a.fileName}</small>
-                <span>{a.notes ?? ''}</span>
-              </div>
-            ))}
+            {(detail.attachments ?? [])
+              .filter((attachment) => attachment.isCurrent ?? true)
+              .map((a) => (
+                <div key={a.id} className="simple-document-item">
+                  <strong>{a.name}</strong>
+                  <small>
+                    Versión {a.versionLabel || '1'} · {a.fileName}
+                  </small>
+                  <span>{a.notes ?? ''}</span>
+                </div>
+              ))}
           </div>
         </article>
       )}
@@ -1251,7 +1267,7 @@ export function ContractDetailPage() {
       )}
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
-          <h2>Consulta IA del contrato</h2>
+          <h2>Consulta con G.OTA</h2>
           <Bot size={18} />
         </div>
         <div className="field">
@@ -1639,7 +1655,7 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   async function submit() {
     if (!form.projectId || !form.name.trim()) {
-      setError('Completa proyecto y nombre.');
+      setError('Completa centro de costos y nombre.');
       return;
     }
     setSaving(true);
@@ -1710,7 +1726,7 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <>
             <div className="quick-filters-grid clm-form-grid">
               <div className="field">
-                <label>Proyecto</label>
+                <label>Centro de costos</label>
                 <select
                   value={form.projectId}
                   onChange={(e) => setForm({ ...form, projectId: e.target.value })}
@@ -2229,7 +2245,7 @@ export function ClmImportPage() {
   }, []);
   async function submit() {
     if (!projectId || !file) {
-      setError('Selecciona proyecto y archivo CSV.');
+      setError('Selecciona centro de costos y archivo CSV.');
       return;
     }
     setSaving(true);
@@ -2259,7 +2275,7 @@ export function ClmImportPage() {
       {error ? <article className="card muted">{error}</article> : null}
       <article className="card">
         <div className="field">
-          <label>Proyecto</label>
+          <label>Centro de costos</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
             <option value="">Selecciona</option>
             {projects.map((p) => (

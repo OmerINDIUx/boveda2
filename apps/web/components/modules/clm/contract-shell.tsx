@@ -4,16 +4,12 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import {
   Activity,
-  CheckSquare,
   FileSignature,
   FileText,
   FolderKanban,
   History,
   LayoutDashboard,
   MessageSquare,
-  Scale,
-  Upload,
-  Wallet,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -39,45 +35,41 @@ const sectionNav: NavItem[] = [
   },
   {
     href: '/versions',
-    label: 'Versiones',
+    label: 'Contratos',
     icon: <FileText size={16} />,
-    match: ['/versions'],
+    match: [
+      '/versions',
+      '/original',
+      '/attachments',
+      '/amendments',
+      '/records/change_orders',
+      '/negotiations',
+      '/records/penalties',
+      '/records/guarantees',
+      '/records/retentions',
+      '/records/releases',
+      '/obligations',
+      '/deliverables',
+      '/payments',
+    ],
   },
   {
-    href: '/negotiations',
-    label: 'Negociacion',
-    icon: <Scale size={16} />,
-    match: ['/negotiations'],
+    href: '/records/escalations',
+    label: 'Escalamientos',
+    icon: <History size={16} />,
+    match: ['/records/escalations', '/records/claims', '/records/risks'],
   },
   {
     href: '/signatures',
-    label: 'Firma',
+    label: 'Firmas',
     icon: <FileSignature size={16} />,
     match: ['/signatures'],
-  },
-  {
-    href: '/obligations',
-    label: 'Obligaciones',
-    icon: <CheckSquare size={16} />,
-    match: ['/obligations'],
   },
   {
     href: '/milestones',
     label: 'Hitos',
     icon: <Activity size={16} />,
     match: ['/milestones'],
-  },
-  {
-    href: '/payments',
-    label: 'Pagos',
-    icon: <Wallet size={16} />,
-    match: ['/payments'],
-  },
-  {
-    href: '/attachments',
-    label: 'Anexos',
-    icon: <Upload size={16} />,
-    match: ['/attachments'],
   },
   {
     href: '/comments',
@@ -138,11 +130,12 @@ export function ContractShell({ children }: { children: ReactNode }) {
                 key={href}
                 className="button secondary"
                 href={href}
+                aria-current={active ? 'page' : undefined}
                 style={{
                   justifyContent: 'flex-start',
                   borderColor: active ? 'var(--accent)' : undefined,
-                  background: active ? 'var(--accent-bg)' : undefined,
-                  color: active ? 'var(--accent-strong)' : undefined,
+                  background: active ? 'var(--color-accent-light)' : undefined,
+                  color: active ? 'var(--color-accent-hover)' : undefined,
                 }}
               >
                 {item.icon} {item.label}

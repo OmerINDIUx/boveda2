@@ -19,7 +19,7 @@ export default function NegotiationCreatePage() {
 
   async function submit() {
     if (!contractId || !form.partyName.trim()) {
-      setError('Indica la parte negociadora.');
+      setError('Indica el nombre de la contraparte.');
       return;
     }
     setSaving(true);
@@ -38,7 +38,7 @@ export default function NegotiationCreatePage() {
     <section className="projects-workspace">
       <div className="topbar">
         <div>
-          <h1>Nueva ronda de negociación</h1>
+          <h1>Nueva ronda del convenio</h1>
         </div>
         <div className="projects-actions">
           <Link className="button secondary" href={`/clm/${contractId}/negotiations`}>
@@ -49,14 +49,14 @@ export default function NegotiationCreatePage() {
       {error ? <article className="card muted">{error}</article> : null}
       <article className="card">
         <div className="field">
-          <label>Parte negociadora</label>
+          <label>Contraparte</label>
           <input
             value={form.partyName}
             onChange={(e) => setForm({ ...form, partyName: e.target.value })}
           />
         </div>
         <div className="field">
-          <label>Texto original</label>
+          <label>Texto o solicitud original</label>
           <textarea
             value={form.originalText}
             onChange={(e) => setForm({ ...form, originalText: e.target.value })}
@@ -64,7 +64,7 @@ export default function NegotiationCreatePage() {
           />
         </div>
         <div className="field">
-          <label>Texto propuesto</label>
+          <label>Propuesta o respuesta de tu organización</label>
           <textarea
             value={form.proposedText}
             onChange={(e) => setForm({ ...form, proposedText: e.target.value })}
@@ -73,7 +73,7 @@ export default function NegotiationCreatePage() {
         </div>
         <div className="projects-actions" style={{ marginTop: 12 }}>
           <button className="button" type="button" onClick={submit} disabled={saving}>
-            {saving ? 'Guardando...' : 'Registrar negociación'}
+            {saving ? 'Guardando...' : 'Registrar ronda'}
           </button>
         </div>
       </article>

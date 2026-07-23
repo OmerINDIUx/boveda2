@@ -3,16 +3,23 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpException,
   Param,
   Patch,
   Post,
   Query,
+  RawBodyRequest,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { ActiveUserGuard } from '../../common/guards/active-user.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -25,6 +32,7 @@ import { CloseContractDto } from './dto/close-contract.dto';
 import { ContractSearchDto } from './dto/contract-search.dto';
 import { CreateAmendmentDto } from './dto/create-amendment.dto';
 import { CreateContractAttachmentDto } from './dto/create-contract-attachment.dto';
+import { CreateContractAttachmentVersionDto } from './dto/create-contract-attachment-version.dto';
 import { CreateClauseDto } from './dto/create-clause.dto';
 import { CreateContractCommentDto } from './dto/create-contract-comment.dto';
 import { CreateContractDto } from './dto/create-contract.dto';
@@ -53,6 +61,19 @@ import { UpdateLifecycleStageDto } from './dto/update-lifecycle-stage.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { ClmService } from './clm.service';
+import { UpdateContractExtractionDto } from './dto/update-contract-extraction.dto';
+import { ApproveContractExtractionDto } from './dto/approve-contract-extraction.dto';
+import { AskGotaQueryDto } from './dto/ask-gota-query.dto';
+import {
+  CreateContractDeliverableDto,
+  UpdateContractDeliverableDto,
+} from './dto/contract-deliverable.dto';
+
+function buildContentDisposition(disposition: 'inline' | 'attachment', fileName: string) {
+  const fallbackName = fileName.replace(/[^\x20-\x7E]+/g, '_').replace(/["\\]/g, '_') || 'contract';
+  const encodedName = encodeURIComponent(fileName);
+  return `${disposition}; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`;
+}
 
 @ApiTags('clm')
 @ApiBearerAuth()
@@ -103,7 +124,7 @@ export class ClmController {
   }
 
   @Post('contracts/:id/lifecycle')
-  @Permissions(PermissionKey.ContractsManage)
+  @Permissions(PermissionKey.ApprovalsManage)
   updateLifecycle(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
@@ -122,14 +143,85 @@ export class ClmController {
     return this.clm.createVersion(user.id, id, dto);
   }
 
-  @Delete('contracts/:id/versions/:versionId')
+  @Get('contracts/:id/versions/:versionId/content')
   @Permissions(PermissionKey.ContractsManage)
-  deleteVersion(
+  async versionContent(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Res() res: Response
+  ) {
+    const file = await this.clm.getVersionFile(user.id, id, versionId);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', buildContentDisposition('inline', file.fileName));
+    res.send(file.buffer);
+  }
+
+  @Get('contracts/:id/versions/:versionId/extraction')
+  @Permissions(PermissionKey.ContractsManage)
+  extraction(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Param('versionId') versionId: string
   ) {
-    return this.clm.deleteVersion(user.id, id, versionId);
+    return this.clm.getVersionExtraction(user.id, id, versionId);
+  }
+
+  @Patch('contracts/:id/versions/:versionId/extraction')
+  @Permissions(PermissionKey.ContractsManage)
+  updateExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Body() dto: UpdateContractExtractionDto
+  ) {
+    return this.clm.updateVersionExtraction(user.id, id, versionId, dto.facts);
+  }
+
+  @Post('contracts/:id/versions/:versionId/extraction/start')
+  @Permissions(PermissionKey.ContractsManage)
+  startExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string
+  ) {
+    return this.clm.startVersionExtraction(user.id, id, versionId);
+  }
+
+  @Post('contracts/:id/versions/:versionId/extraction/retry')
+  @Permissions(PermissionKey.ContractsManage)
+  retryExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string
+  ) {
+    return this.clm.retryVersionExtraction(user.id, id, versionId);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('contracts/:id/versions/:versionId/extraction/approve')
+  @Permissions(PermissionKey.ContractsManage)
+  approveExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Body() dto: ApproveContractExtractionDto
+  ) {
+    return this.clm.approveVersionExtraction(user.id, id, versionId, dto.password, dto.facts);
+  }
+
+  @Get('contracts/:id/versions/:versionId/download')
+  @Permissions(PermissionKey.ContractsManage)
+  async downloadVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Res() res: Response
+  ) {
+    const file = await this.clm.getVersionFile(user.id, id, versionId);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', buildContentDisposition('attachment', file.fileName));
+    res.send(file.buffer);
   }
 
   @Post('contracts/:id/attachments')
@@ -140,6 +232,98 @@ export class ClmController {
     @Body() dto: CreateContractAttachmentDto
   ) {
     return this.clm.addAttachment(user.id, id, dto);
+  }
+
+  @Post('contracts/:id/attachments/:attachmentId/versions')
+  @Permissions(PermissionKey.ContractsManage)
+  addAttachmentVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Body() dto: CreateContractAttachmentVersionDto
+  ) {
+    return this.clm.addAttachmentVersion(user.id, id, attachmentId, dto);
+  }
+
+  @Get('contracts/:id/attachments/:attachmentId/extraction')
+  @Permissions(PermissionKey.ContractsManage)
+  attachmentExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string
+  ) {
+    return this.clm.getAttachmentExtraction(user.id, id, attachmentId);
+  }
+
+  @Patch('contracts/:id/attachments/:attachmentId/extraction')
+  @Permissions(PermissionKey.ContractsManage)
+  updateAttachmentExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Body() dto: UpdateContractExtractionDto
+  ) {
+    return this.clm.updateAttachmentExtraction(user.id, id, attachmentId, dto.facts);
+  }
+
+  @Post('contracts/:id/attachments/:attachmentId/extraction/start')
+  @Permissions(PermissionKey.ContractsManage)
+  startAttachmentExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string
+  ) {
+    return this.clm.startAttachmentExtraction(user.id, id, attachmentId);
+  }
+
+  @Post('contracts/:id/attachments/:attachmentId/extraction/retry')
+  @Permissions(PermissionKey.ContractsManage)
+  retryAttachmentExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string
+  ) {
+    return this.clm.retryAttachmentExtraction(user.id, id, attachmentId);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('contracts/:id/attachments/:attachmentId/extraction/approve')
+  @Permissions(PermissionKey.ContractsManage)
+  approveAttachmentExtraction(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Body() dto: ApproveContractExtractionDto
+  ) {
+    return this.clm.approveAttachmentExtraction(user.id, id, attachmentId, dto.password, dto.facts);
+  }
+
+  @Get('contracts/:id/attachments/:attachmentId/content')
+  @Permissions(PermissionKey.ContractsManage)
+  async attachmentContent(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Res() res: Response
+  ) {
+    const file = await this.clm.getAttachmentFile(user.id, id, attachmentId);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', buildContentDisposition('inline', file.fileName));
+    res.send(file.buffer);
+  }
+
+  @Get('contracts/:id/attachments/:attachmentId/download')
+  @Permissions(PermissionKey.ContractsManage)
+  async downloadAttachment(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Res() res: Response
+  ) {
+    const file = await this.clm.getAttachmentFile(user.id, id, attachmentId);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', buildContentDisposition('attachment', file.fileName));
+    res.send(file.buffer);
   }
 
   @Delete('contracts/:id/attachments/:attachmentId')
@@ -171,16 +355,6 @@ export class ClmController {
     @Body() dto: UpdateContractObligationDto
   ) {
     return this.clm.updateObligation(user.id, id, obligationId, dto);
-  }
-
-  @Delete('contracts/:id/obligations/:obligationId')
-  @Permissions(PermissionKey.ContractsManage)
-  deleteObligation(
-    @CurrentUser() user: RequestUser,
-    @Param('id') id: string,
-    @Param('obligationId') obligationId: string
-  ) {
-    return this.clm.deleteObligation(user.id, id, obligationId);
   }
 
   @Post('contracts/:id/obligations/:obligationId/remind')
@@ -220,16 +394,6 @@ export class ClmController {
     return this.clm.updateMilestone(user.id, id, milestoneId, dto);
   }
 
-  @Delete('contracts/:id/milestones/:milestoneId')
-  @Permissions(PermissionKey.ContractsManage)
-  deleteMilestone(
-    @CurrentUser() user: RequestUser,
-    @Param('id') id: string,
-    @Param('milestoneId') milestoneId: string
-  ) {
-    return this.clm.deleteMilestone(user.id, id, milestoneId);
-  }
-
   @Post('contracts/:id/comments')
   @Permissions(PermissionKey.ContractsManage)
   addComment(
@@ -240,14 +404,25 @@ export class ClmController {
     return this.clm.addComment(user.id, id, dto);
   }
 
-  @Delete('contracts/:id/comments/:commentId')
+  @Post('contracts/:id/deliverables')
   @Permissions(PermissionKey.ContractsManage)
-  deleteComment(
+  addDeliverable(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Param('commentId') commentId: string
+    @Body() dto: CreateContractDeliverableDto
   ) {
-    return this.clm.deleteComment(user.id, id, commentId);
+    return this.clm.addDeliverable(user.id, id, dto);
+  }
+
+  @Patch('contracts/:id/deliverables/:deliverableId')
+  @Permissions(PermissionKey.ContractsManage)
+  updateDeliverable(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('deliverableId') deliverableId: string,
+    @Body() dto: UpdateContractDeliverableDto
+  ) {
+    return this.clm.updateDeliverable(user.id, id, deliverableId, dto);
   }
 
   @Post('contracts/:id/close')
@@ -266,6 +441,33 @@ export class ClmController {
   @Permissions(PermissionKey.ContractsManage)
   ask(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: AskContractQueryDto) {
     return this.clm.ask(user.id, id, dto);
+  }
+
+  @Post('gota/ask')
+  @Permissions(PermissionKey.ContractsManage)
+  askGota(@CurrentUser() user: RequestUser, @Body() dto: AskGotaQueryDto) {
+    return this.clm.askGota(user.id, dto);
+  }
+
+  @Get('gota/sources')
+  @Permissions(PermissionKey.ContractsManage)
+  listGotaSources(@CurrentUser() user: RequestUser) {
+    return this.clm.listGotaSources(user.id);
+  }
+
+  @Get('gota/sources/:versionId/knowledge')
+  @Permissions(PermissionKey.ContractsManage)
+  getGotaKnowledge(@CurrentUser() user: RequestUser, @Param('versionId') versionId: string) {
+    return this.clm.getGotaKnowledge(user.id, versionId);
+  }
+
+  @Post('gota/sources/:versionId/normalize-transcription')
+  @Permissions(PermissionKey.ContractsManage)
+  normalizeGotaTranscription(
+    @CurrentUser() user: RequestUser,
+    @Param('versionId') versionId: string
+  ) {
+    return this.clm.normalizeGotaTranscription(user.id, versionId);
   }
 
   @Post('contracts/:id/amendments')
@@ -308,6 +510,42 @@ export class ClmController {
     @Body() dto: UpdatePaymentDto
   ) {
     return this.clm.updatePayment(user.id, id, paymentId, dto);
+  }
+
+  @Get('contracts/:id/payments/:paymentId/proof')
+  @Permissions(PermissionKey.ClmFinance)
+  async downloadPaymentProof(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('paymentId') paymentId: string,
+    @Res() res: Response
+  ) {
+    const file = await this.clm.getPaymentProof(user.id, id, paymentId);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', buildContentDisposition('attachment', file.fileName));
+    res.send(file.buffer);
+  }
+
+  @Post('contracts/:id/payments/:paymentId/sync-erp')
+  @Permissions(PermissionKey.ClmFinance)
+  syncPaymentToErp(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('paymentId') paymentId: string
+  ) {
+    return this.clm.syncPaymentToErp(user.id, id, paymentId);
+  }
+
+  @Get('integrations/status')
+  @Permissions(PermissionKey.ContractsManage)
+  integrationStatus() {
+    return this.clm.getIntegrationStatus();
+  }
+
+  @Post('integrations/erp/test')
+  @Permissions(PermissionKey.ClmFinance)
+  testErpConnection() {
+    return this.clm.testErpConnection();
   }
 
   @Post('contracts/:id/signatures')
@@ -602,8 +840,18 @@ export class ClmController {
   }
 
   @Post('signatures/webhook/docusign')
-  docusignWebhook(@Body() payload: Record<string, unknown>) {
-    return this.clm.handleSignatureWebhook('docusign', payload);
+  @Public()
+  docusignWebhook(
+    @Body() payload: Record<string, unknown>,
+    @Req() request: RawBodyRequest<Request>,
+    @Headers('x-docusign-signature-1') signature: string
+  ) {
+    return this.clm.handleSignatureWebhook(
+      'docusign',
+      payload,
+      request.rawBody ?? Buffer.alloc(0),
+      signature
+    );
   }
 
   @Get('search')
@@ -620,7 +868,7 @@ export class ClmController {
 
   @Post('contracts/:id/reindex')
   @Permissions(PermissionKey.ContractsManage)
-  reindexContract(@Param('id') id: string) {
-    return this.clm.reindexContractText(id);
+  reindexContract(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.clm.reindexContractText(user.id, id);
   }
 }

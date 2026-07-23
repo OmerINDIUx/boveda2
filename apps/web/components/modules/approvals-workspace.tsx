@@ -523,7 +523,7 @@ export function ApprovalsWorkspace() {
           </div>
           <div className="quick-filters-grid">
             <SelectField
-              label="Proyecto"
+              label="Centro de costos"
               value={flowForm.projectId}
               onChange={(value) => setFlowForm((current) => ({ ...current, projectId: value }))}
               options={projects.map((project) => ({
@@ -707,7 +707,7 @@ export function ApprovalsWorkspace() {
                       <FolderKanban />
                       {projectMap.get(item.projectId)?.code ??
                         projectMap.get(item.projectId)?.name ??
-                        'Sin proyecto'}
+                        'Sin centro de costos'}
                     </span>
                     <span className="active-request-meta-item">
                       <Clock />

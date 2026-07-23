@@ -122,7 +122,7 @@ export class BitacorasService {
   }
 
   async update(user: RequestUser, entryId: string, dto: UpdateBitacoraEntryDto) {
-    await this.assertEntryAccess(user.id, entryId);
+    const entry = await this.assertEntryAccess(user.id, entryId);
     if (entry.estado !== 'borrador') {
       throw new ForbiddenException('Solo se pueden editar entradas en estado borrador');
     }
@@ -157,7 +157,7 @@ export class BitacorasService {
   }
 
   async sign(user: RequestUser, entryId: string, dto: SignBitacoraEntryDto) {
-    await this.assertEntryAccess(user.id, entryId);
+    const entry = await this.assertEntryAccess(user.id, entryId);
     if (entry.estado !== 'borrador') {
       throw new ForbiddenException('La entrada ya está firmada o cerrada');
     }
@@ -359,7 +359,7 @@ export class BitacorasService {
 
   private async assertAccess(userId: string, projectId: string) {
     if (!(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
   }
 

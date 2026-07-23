@@ -2,7 +2,7 @@
   "name": "holocron",
   "version": "0.1.0",
   "private": true,
-  "description": "Holocron - boveda documental empresarial para proyectos, documentos, RFIs, IA documental y CLM.",
+  "description": "Holocron - boveda documental empresarial para centros de costos, documentos, RFIs, IA documental y CLM.",
   "workspaces": [
     "apps/*",
     "packages/*"

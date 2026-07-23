@@ -4,41 +4,57 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from '../../../lib/api';
-import { ContractDetail, Project, Tag } from './types';
+import { ContractDetail, Project } from './types';
 import {
-  fallbackProjects,
   statusOptions,
   lifecycleStageOptions,
   stripLifecycleFields,
   TextField,
+  getErrorMessage,
 } from './utils';
+
+type ContractFormState = {
+  projectId: string;
+  name: string;
+  supplierName: string;
+  clientName: string;
+  responsibleArea: string;
+  status: string;
+  lifecycleStage: string;
+  startDate: string;
+  endDate: string;
+  renewable: boolean;
+  renewalDate: string;
+  amount: string;
+  currency: string;
+  responsibleUserId: string;
+  renewalNoticeDays: string;
+  closeReason: string;
+};
 
 export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const params = useParams<{ id: string }>();
   const contractId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [form, setForm] = useState<any>({
+  const [form, setForm] = useState<ContractFormState>({
     projectId: '',
     name: '',
     supplierName: '',
     clientName: '',
     responsibleArea: '',
-    contractType: '',
     status: 'draft',
     lifecycleStage: 'request',
     startDate: '',
     endDate: '',
+    renewable: false,
     renewalDate: '',
-    amount: '',
+    amount: '0',
     currency: 'MXN',
     responsibleUserId: '',
     renewalNoticeDays: '30',
     closeReason: '',
-    parentContractId: '',
   });
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,21 +64,15 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
     async function loadProjects() {
       try {
         const p = await apiGet<Project[]>('/projects');
-        if (active) setProjects(p.length ? p : fallbackProjects);
-      } catch {
-        if (active) setProjects(fallbackProjects);
-      }
-    }
-    async function loadTags() {
-      try {
-        const t = await apiGet<Tag[]>('/clm/tags');
-        if (active) setTags(t);
-      } catch {
-        setTags([]);
+        if (active) setProjects(p);
+      } catch (projectError) {
+        if (active) {
+          setProjects([]);
+          setError(getErrorMessage(projectError, 'No se pudieron cargar los centros de costos.'));
+        }
       }
     }
     void loadProjects();
-    void loadTags();
     return () => {
       active = false;
     };
@@ -82,20 +92,18 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
           supplierName: d.supplierName ?? '',
           clientName: d.clientName ?? '',
           responsibleArea: d.responsibleArea ?? '',
-          contractType: d.contractType ?? '',
           status: d.status,
           lifecycleStage: d.lifecycleStage ?? 'request',
           startDate: d.startDate ?? '',
           endDate: d.endDate ?? '',
+          renewable: d.renewable ?? Boolean(d.renewalDate),
           renewalDate: d.renewalDate ?? '',
-          amount: d.amount ?? '',
+          amount: d.amount ?? '0',
           currency: d.currency ?? 'MXN',
           responsibleUserId: d.responsibleUserId ?? '',
           renewalNoticeDays: String(d.renewalNoticeDays ?? 30),
           closeReason: d.closeReason ?? '',
-          parentContractId: d.parentContractId ?? '',
         });
-        setSelectedTagIds(d.tags?.map((t: { id: string }) => t.id) ?? []);
       } catch {
         setError('No se pudo cargar el contrato.');
       } finally {
@@ -110,38 +118,40 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   async function submit() {
     if (!form.projectId || !form.name.trim()) {
-      setError('Completa proyecto y nombre.');
+      setError('Completa centro de costos y nombre del contrato.');
       return;
     }
     setSaving(true);
     setError('');
     try {
-      const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ''));
+      const { renewalDate, renewalNoticeDays, ...baseFields } = form;
+      const submissionFields = form.renewable
+        ? { ...baseFields, renewalDate, renewalNoticeDays }
+        : baseFields;
+      const payload = Object.fromEntries(
+        Object.entries(submissionFields).filter(([, value]) => value !== '')
+      );
       if (mode === 'create') {
         let created: ContractDetail;
         try {
           created = await apiPost<ContractDetail>('/clm/contracts', payload);
-        } catch (error: any) {
-          if (!String(error?.message ?? '').includes('lifecycleStage should not exist'))
-            throw error;
+        } catch (error) {
+          if (!getErrorMessage(error, '').includes('lifecycleStage should not exist')) throw error;
           created = await apiPost<ContractDetail>('/clm/contracts', stripLifecycleFields(payload));
         }
-        if (selectedTagIds.length)
-          await apiPost(`/clm/contracts/${created.id}/tags`, { tagIds: selectedTagIds });
         router.push(`/clm/${created.id}`);
         return;
       }
       if (!contractId) return;
       try {
         await apiPatch(`/clm/contracts/${contractId}`, payload);
-      } catch (error: any) {
-        if (!String(error?.message ?? '').includes('lifecycleStage should not exist')) throw error;
+      } catch (error) {
+        if (!getErrorMessage(error, '').includes('lifecycleStage should not exist')) throw error;
         await apiPatch(`/clm/contracts/${contractId}`, stripLifecycleFields(payload));
       }
-      await apiPost(`/clm/contracts/${contractId}/tags`, { tagIds: selectedTagIds });
       router.push(`/clm/${contractId}`);
-    } catch (err: any) {
-      setError(err?.message ?? 'Error al guardar.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Error al guardar.'));
     } finally {
       setSaving(false);
     }
@@ -173,7 +183,7 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <>
             <div className="quick-filters-grid clm-form-grid">
               <div className="field">
-                <label>Proyecto</label>
+                <label>Centro de costos</label>
                 <select
                   value={form.projectId}
                   onChange={(e) => setForm({ ...form, projectId: e.target.value })}
@@ -181,18 +191,18 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <option value="">Selecciona</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.code} · {p.name}
+                      {p.name}
                     </option>
                   ))}
                 </select>
               </div>
               <TextField
-                label="Nombre"
+                label="Nombre del contrato"
                 value={form.name}
                 onChange={(v) => setForm({ ...form, name: v })}
               />
               <TextField
-                label="Proveedor"
+                label="Proveedor interno"
                 value={form.supplierName}
                 onChange={(v) => setForm({ ...form, supplierName: v })}
               />
@@ -205,11 +215,6 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 label="Área responsable"
                 value={form.responsibleArea}
                 onChange={(v) => setForm({ ...form, responsibleArea: v })}
-              />
-              <TextField
-                label="Tipo"
-                value={form.contractType}
-                onChange={(v) => setForm({ ...form, contractType: v })}
               />
               <div className="field">
                 <label>Estado</label>
@@ -249,14 +254,34 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 value={form.endDate}
                 onChange={(v) => setForm({ ...form, endDate: v })}
               />
+              <div className="field">
+                <label>¿Necesita renovación?</label>
+                <select
+                  value={form.renewable ? 'yes' : 'no'}
+                  onChange={(e) => setForm({ ...form, renewable: e.target.value === 'yes' })}
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Sí</option>
+                </select>
+              </div>
+              {form.renewable ? (
+                <>
+                  <TextField
+                    label="Fecha de renovación"
+                    type="date"
+                    value={form.renewalDate}
+                    onChange={(v) => setForm({ ...form, renewalDate: v })}
+                  />
+                  <TextField
+                    label="Días de preaviso"
+                    value={form.renewalNoticeDays}
+                    onChange={(v) => setForm({ ...form, renewalNoticeDays: v })}
+                  />
+                </>
+              ) : null}
               <TextField
-                label="Renovación"
-                type="date"
-                value={form.renewalDate}
-                onChange={(v) => setForm({ ...form, renewalDate: v })}
-              />
-              <TextField
-                label="Monto"
+                label="Monto (opcional)"
+                type="number"
                 value={form.amount}
                 onChange={(v) => setForm({ ...form, amount: v })}
               />
@@ -265,39 +290,7 @@ export function ContractFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 value={form.currency}
                 onChange={(v) => setForm({ ...form, currency: v })}
               />
-              <TextField
-                label="Días preaviso"
-                value={form.renewalNoticeDays}
-                onChange={(v) => setForm({ ...form, renewalNoticeDays: v })}
-              />
-              <TextField
-                label="Contrato padre (id)"
-                value={form.parentContractId}
-                onChange={(v) => setForm({ ...form, parentContractId: v })}
-              />
             </div>
-            {tags.length ? (
-              <div className="field" style={{ marginTop: 12 }}>
-                <label>Tags</label>
-                <div className="projects-actions" style={{ gap: 4 }}>
-                  {tags.map((t) => (
-                    <button
-                      key={t.id}
-                      className={`button ${selectedTagIds.includes(t.id) ? '' : 'secondary'}`}
-                      type="button"
-                      onClick={() =>
-                        setSelectedTagIds((prev) =>
-                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id]
-                        )
-                      }
-                      style={{ fontSize: 12, padding: '2px 8px' }}
-                    >
-                      {t.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
             <div className="projects-actions" style={{ marginTop: 16 }}>
               <button className="button" type="button" onClick={submit} disabled={saving}>
                 {saving ? 'Guardando...' : mode === 'create' ? 'Crear contrato' : 'Guardar cambios'}

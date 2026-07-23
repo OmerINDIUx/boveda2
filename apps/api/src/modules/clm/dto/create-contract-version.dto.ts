@@ -10,8 +10,13 @@ export class CreateContractVersionDto {
   @IsString()
   mimeType!: string;
 
+  @IsOptional()
   @IsString()
-  base64Content!: string;
+  base64Content?: string;
+
+  @IsOptional()
+  @IsString()
+  fileKey?: string;
 
   @IsOptional()
   @IsString()

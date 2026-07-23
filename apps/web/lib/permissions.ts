@@ -2,8 +2,12 @@ import { PermissionKey } from '@holocron/shared';
 export { PermissionKey } from '@holocron/shared';
 
 export const permissionCatalog = [
-  { key: PermissionKey.ProjectsView, label: 'Ver proyecto', module: 'Proyectos' },
-  { key: PermissionKey.ProjectsManage, label: 'Gestionar proyectos', module: 'Proyectos' },
+  { key: PermissionKey.ProjectsView, label: 'Ver centro de costos', module: 'Centros de costos' },
+  {
+    key: PermissionKey.ProjectsManage,
+    label: 'Gestionar centros de costos',
+    module: 'Centros de costos',
+  },
   { key: PermissionKey.DocumentsCreate, label: 'Crear documento', module: 'Documentos' },
   { key: PermissionKey.DocumentsView, label: 'Ver documento', module: 'Documentos' },
   { key: PermissionKey.DocumentsEdit, label: 'Editar documento', module: 'Documentos' },

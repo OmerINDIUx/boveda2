@@ -112,7 +112,7 @@ type DisciplineOption = {
   description?: string;
 };
 
-type ProjectCatalogCategory = 'workType' | 'currentStage' | 'priority';
+type ProjectCatalogCategory = 'workType' | 'currentStage' | 'priority' | 'status';
 
 type CatalogOption = {
   id: string;
@@ -155,7 +155,7 @@ const emptyForm: ProjectForm = {
 };
 
 const STEPS = [
-  { number: 1, title: 'Información general', description: 'Datos básicos del proyecto' },
+  { number: 1, title: 'Información general', description: 'Datos básicos del centro de costos' },
   { number: 2, title: 'Equipo y planificación', description: 'Responsables, prioridad y fechas' },
   { number: 3, title: 'Alcance técnico', description: 'Disciplinas y configuración' },
 ];
@@ -189,10 +189,21 @@ function clearDraftLocally() {
 
 function validateStep(step: number, form: ProjectForm): string | null {
   if (step === 0) {
-    if (!form.name.trim()) return 'El nombre del proyecto es obligatorio.';
+    if (!form.name.trim()) return 'El nombre del centro de costos es obligatorio.';
     if (!form.code.trim()) return 'El código interno es obligatorio.';
   }
   return null;
+}
+
+function buildProjectPayload(
+  form: ProjectForm,
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries({ ...form, ...overrides }).filter(
+      ([, value]) => Array.isArray(value) || value !== ''
+    )
+  );
 }
 
 const emptyFilters: Filters = {
@@ -471,7 +482,7 @@ export function ProjectsListPage() {
     const overdueDocuments = projects.reduce((sum, project) => sum + project.metrics.critical, 0);
 
     return [
-      { label: 'Proyectos activos', value: activeProjects, tone: 'ok', icon: FolderTree },
+      { label: 'Centros de costos activos', value: activeProjects, tone: 'ok', icon: FolderTree },
       { label: 'Con alertas críticas', value: criticalProjects, tone: 'warn', icon: AlertTriangle },
       { label: 'Documentos trazados', value: totalDocuments, tone: 'info', icon: FileText },
       { label: 'Críticos o vencidos', value: overdueDocuments, tone: 'danger', icon: FileClock },
@@ -492,16 +503,16 @@ export function ProjectsListPage() {
     <section className="projects-workspace">
       <div className="topbar">
         <div>
-          <h1>Proyectos</h1>
+          <h1>Centros de costos</h1>
           <p className="muted">
-            Cada proyecto concentra sus documentos, carpetas, responsables y trazabilidad.
+            Cada centro de costos concentra sus documentos, carpetas, responsables y trazabilidad.
           </p>
         </div>
         <div className="projects-actions">
           {canManage ? (
             <Link className="button" href="/projects/new">
               <Plus size={18} />
-              Nuevo proyecto
+              Nuevo centro de costos
             </Link>
           ) : null}
           <Link className="button secondary" href="/rfis/new">
@@ -528,7 +539,7 @@ export function ProjectsListPage() {
 
       <article className="card" style={{ marginTop: 16 }}>
         <div className="panel-header">
-          <h2>Listado de proyectos</h2>
+          <h2>Listado de centros de costos</h2>
           <span className="pill">
             {loading ? 'Cargando' : `${filteredProjects.length} registros`}
           </span>
@@ -647,7 +658,9 @@ export function ProjectDetailPage() {
         current ? { ...current, project: { ...current.project, isActive: false } } : current
       );
     } catch (error) {
-      setError(getErrorMessage(error, 'No fue posible desactivar el proyecto en este momento.'));
+      setError(
+        getErrorMessage(error, 'No fue posible desactivar el centro de costos en este momento.')
+      );
     }
   }
 
@@ -679,7 +692,7 @@ export function ProjectDetailPage() {
     return (
       <section className="projects-workspace">
         <article className="card">
-          <p className="muted">Cargando detalle del proyecto...</p>
+          <p className="muted">Cargando detalle del centro de costos...</p>
         </article>
       </section>
     );
@@ -689,7 +702,7 @@ export function ProjectDetailPage() {
     return (
       <section className="projects-workspace">
         <article className="card">
-          <p className="muted">No fue posible abrir este proyecto.</p>
+          <p className="muted">No fue posible abrir este centro de costos.</p>
         </article>
       </section>
     );
@@ -701,7 +714,8 @@ export function ProjectDetailPage() {
         <div>
           <h1>{detail.project.name}</h1>
           <p className="muted">
-            Aquí vive la estructura completa del proyecto: carpetas, documentos y seguimiento.
+            Aquí vive la estructura completa del centro de costos: carpetas, documentos y
+            seguimiento.
           </p>
         </div>
         <div className="projects-actions">
@@ -806,7 +820,7 @@ export function ProjectDetailPage() {
 
         <article className="card span-4">
           <div className="panel-header">
-            <h2>Carpetas del proyecto</h2>
+            <h2>Carpetas del centro de costos</h2>
             <div className="projects-actions">
               {canManage ? (
                 <button
@@ -822,7 +836,7 @@ export function ProjectDetailPage() {
             </div>
           </div>
           <p className="muted">
-            Cada documento del proyecto debe vivir dentro de una de estas carpetas.
+            Cada documento del centro de costos debe vivir dentro de una de estas carpetas.
           </p>
           {showCreateFolder ? (
             <div
@@ -1005,7 +1019,7 @@ export function ProjectDetailPage() {
         </div>
         <div className="projects-actions" style={{ marginBottom: 12 }}>
           <Link className="button secondary" href={`/documents?projectId=${detail.project.id}`}>
-            Abrir vista documental del proyecto
+            Abrir vista documental del centro de costos
           </Link>
         </div>
         <div className="table-scroll">
@@ -1076,7 +1090,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [formOptions, setFormOptions] = useState<FormOptionsResponse>({
     users: [],
     disciplines: [],
-    catalogs: { workType: [], currentStage: [], priority: [] },
+    catalogs: { workType: [], currentStage: [], priority: [], status: [] },
   });
 
   const [codeTouched, setCodeTouched] = useState(false);
@@ -1095,30 +1109,21 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
         );
         if (!active) return;
         setFormOptions(response);
+        const validUserIds = new Set(response.users.map((user) => user.id));
+        const validDisciplineIds = new Set(response.disciplines.map((discipline) => discipline.id));
+        setForm((current) => ({
+          ...current,
+          responsibleUserId: validUserIds.has(current.responsibleUserId)
+            ? current.responsibleUserId
+            : '',
+          assignedUserIds: current.assignedUserIds.filter((id) => validUserIds.has(id)),
+          disciplineIds: current.disciplineIds.filter((id) => validDisciplineIds.has(id)),
+        }));
       } catch {
         if (!active) return;
-        const fallbackUsers = fallbackProjects.flatMap((project) => [
-          ...(project.responsible ? [project.responsible] : []),
-          ...project.assignedUsers,
-        ]);
-        const uniqueUsers = Array.from(
-          new Map(fallbackUsers.map((user) => [user.id, user])).values()
-        );
-        const fallbackDisciplines = Array.from(
-          new Map(
-            fallbackProjects
-              .flatMap((project) => project.disciplines)
-              .map((discipline) => [discipline.id, discipline])
-          ).values()
-        );
-
         setFormOptions({
-          users: uniqueUsers.map((user) => ({ id: user.id, name: user.name, email: user.email })),
-          disciplines: fallbackDisciplines.map((discipline) => ({
-            id: discipline.id,
-            code: discipline.code,
-            name: discipline.name,
-          })),
+          users: [],
+          disciplines: [],
           catalogs: {
             workType: [
               {
@@ -1198,6 +1203,24 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 isActive: true,
               },
             ],
+            status: [
+              {
+                id: 'status-1',
+                category: 'status',
+                value: 'planificacion',
+                label: 'Planificación',
+                sortOrder: 10,
+                isActive: true,
+              },
+              {
+                id: 'status-2',
+                category: 'status',
+                value: 'en_ejecucion',
+                label: 'En ejecución',
+                sortOrder: 20,
+                isActive: true,
+              },
+            ],
           },
         });
       }
@@ -1270,7 +1293,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
           setCodeTouched(true);
           setError('No fue posible cargar la API; se habilitó el formulario con datos locales.');
         } else if (active) {
-          setError('No fue posible cargar el proyecto para editar.');
+          setError('No fue posible cargar el centro de costos para editar.');
         }
       } finally {
         if (active) setLoading(false);
@@ -1293,18 +1316,14 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   async function submit() {
     if (!form.name.trim() || !form.code.trim()) {
-      setError('Completa al menos el nombre y el código del proyecto.');
+      setError('Completa al menos el nombre y el código del centro de costos.');
       return;
     }
 
     setSaving(true);
     setError('');
 
-    const payload = {
-      ...form,
-      assignedUserIds: form.assignedUserIds,
-      disciplineIds: form.disciplineIds,
-    };
+    const payload = buildProjectPayload(form);
 
     try {
       if (mode === 'create') {
@@ -1316,7 +1335,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
       }
 
       if (!projectId) {
-        setError('Falta el identificador del proyecto.');
+        setError('Falta el identificador del centro de costos.');
         return;
       }
 
@@ -1332,8 +1351,8 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
         getErrorMessage(
           error,
           mode === 'create'
-            ? 'No fue posible crear el proyecto.'
-            : 'No fue posible actualizar el proyecto.'
+            ? 'No fue posible crear el centro de costos.'
+            : 'No fue posible actualizar el centro de costos.'
         )
       );
     } finally {
@@ -1355,7 +1374,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
   async function handleSaveDraft() {
     setSaving(true);
     setError('');
-    const payload = { ...form, status: 'borrador' };
+    const payload = buildProjectPayload(form, { status: 'borrador', isDraft: true });
     try {
       await apiPost('/projects', payload, getToken() ?? undefined);
       clearDraftLocally();
@@ -1384,10 +1403,10 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
     <section className="projects-workspace">
       <div className="topbar">
         <div>
-          <h1>{mode === 'create' ? 'Nuevo proyecto' : 'Editar proyecto'}</h1>
+          <h1>{mode === 'create' ? 'Nuevo centro de costos' : 'Editar centro de costos'}</h1>
           <p className="muted">
             {mode === 'create'
-              ? 'Completa la información del proyecto en 3 pasos.'
+              ? 'Completa la información del centro de costos en 3 pasos.'
               : 'Formulario independiente para edición, sin compartir estado con el listado.'}
           </p>
         </div>
@@ -1456,7 +1475,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     }))}
                   />
                   <div className="field">
-                    <label>Catálogos del proyecto</label>
+                    <label>Catálogos del centro de costos</label>
                     <div className="projects-actions">
                       <Link className="button secondary" href="/admin/project-catalogs">
                         Administrar catálogos
@@ -1477,7 +1496,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                     onChange={(value) => setForm((current) => ({ ...current, targetDate: value }))}
                   />
                   <div className="field span-2">
-                    <label>Disciplinas del proyecto</label>
+                    <label>Disciplinas del centro de costos</label>
                     <div
                       style={{
                         display: 'grid',
@@ -1514,7 +1533,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                       </Link>
                       {mode === 'edit' ? (
                         <Link className="button secondary" href="/admin/project-users">
-                          Administrar usuarios del proyecto
+                          Administrar usuarios del centro de costos
                         </Link>
                       ) : null}
                     </div>
@@ -1602,8 +1621,8 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                         onChange={(ids) =>
                           setForm((current) => ({ ...current, assignedUserIds: ids }))
                         }
-                        placeholder="Selecciona usuarios del proyecto"
-                        helpText="Podrán ver todos los archivos del proyecto"
+                        placeholder="Selecciona usuarios del centro de costos"
+                        helpText="Podrán ver todos los archivos del centro de costos"
                         searchPlaceholder="Buscar usuario..."
                       />
                       <SelectField
@@ -1631,7 +1650,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   {/* Paso 3: Alcance técnico */}
                   {step === 2 && (
                     <MultiSelectField
-                      label="Disciplinas del proyecto"
+                      label="Disciplinas del centro de costos"
                       items={formOptions.disciplines.map((d) => ({
                         id: d.id,
                         name: d.name,
@@ -1640,7 +1659,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                       selectedIds={form.disciplineIds}
                       onChange={(ids) => setForm((current) => ({ ...current, disciplineIds: ids }))}
                       placeholder="Selecciona disciplinas"
-                      helpText="Define el alcance técnico del proyecto"
+                      helpText="Define el alcance técnico del centro de costos"
                       searchPlaceholder="Buscar disciplina..."
                       renderItem={(item) => (
                         <>
@@ -1696,7 +1715,7 @@ export function ProjectFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   </>
                 ) : (
                   <button className="button" type="button" onClick={submit} disabled={saving}>
-                    {saving ? 'Guardando...' : 'Guardar proyecto'}
+                    {saving ? 'Guardando...' : 'Guardar centro de costos'}
                   </button>
                 )}
               </div>

@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { User } from '../../users/user.entity';
 import { Contract } from '../contract.entity';
+import { ContractAttachment } from '../contract-attachment.entity';
 import { ContractVersion } from '../contract-version.entity';
 
 @Entity('contract_signature_requests')
@@ -29,6 +30,13 @@ export class ContractSignatureRequest {
   @ManyToOne(() => ContractVersion, { nullable: true })
   @JoinColumn({ name: 'version_id' })
   version?: ContractVersion;
+
+  @Column({ name: 'attachment_id', nullable: true })
+  attachmentId?: string;
+
+  @ManyToOne(() => ContractAttachment, { nullable: true })
+  @JoinColumn({ name: 'attachment_id' })
+  attachment?: ContractAttachment;
 
   @Column({ length: 40, default: 'stub' })
   provider!: string;

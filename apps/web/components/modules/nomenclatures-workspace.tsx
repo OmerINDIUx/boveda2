@@ -17,7 +17,7 @@ type Rule = {
 };
 
 const SEGMENT_TYPES = [
-  { value: 'project_code', label: 'Código de proyecto' },
+  { value: 'project_code', label: 'Código del centro de costos' },
   { value: 'discipline', label: 'Disciplina' },
   { value: 'sequential', label: 'Secuencial' },
   { value: 'year', label: 'Año' },

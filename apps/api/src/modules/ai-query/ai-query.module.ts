@@ -39,5 +39,6 @@ import { ConversationSession } from './conversation-session.entity';
   ],
   controllers: [AiQueryController],
   providers: [AiQueryService, AiQueryScheduler, DocumentIndexingService, OllamaChatService],
+  exports: [DocumentIndexingService, OllamaChatService],
 })
 export class AiQueryModule {}

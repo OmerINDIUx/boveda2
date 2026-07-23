@@ -234,7 +234,7 @@ function RfiSummaryCard({ detail }: { detail: RfiDetail }) {
 
       <div className="project-state-grid">
         <div className="state-card">
-          <span>Proyecto</span>
+          <span>Centro de costos</span>
           <strong>{detail.project?.name ?? detail.projectId}</strong>
         </div>
         <div className="state-card">
@@ -324,7 +324,7 @@ function RfiFormFields({
   return (
     <div className="quick-filters-grid rfi-filters-grid">
       <SelectField
-        label="Proyecto"
+        label="Centro de costos"
         value={form.projectId}
         onChange={(value) => onChange('projectId', value)}
         options={projects.map((project) => ({
@@ -530,7 +530,7 @@ export function RfisWorkspace() {
         </div>
         <div className="quick-filters-grid rfi-filters-grid">
           <SelectField
-            label="Proyecto"
+            label="Centro de costos"
             value={filters.projectId}
             onChange={(value) => setFilters((current) => ({ ...current, projectId: value }))}
             options={projects.map((project) => ({
@@ -568,7 +568,7 @@ export function RfisWorkspace() {
                 onChange={(event) =>
                   setFilters((current) => ({ ...current, search: event.target.value }))
                 }
-                placeholder="Título, descripción, proyecto o documento"
+                placeholder="Título, descripción, centro de costos o documento"
               />
             </div>
           </div>
@@ -700,7 +700,7 @@ export function RfiCreatePage() {
         setFormOptions(response);
       } catch {
         if (!active) return;
-        setError('No fue posible cargar miembros y documentos del proyecto.');
+        setError('No fue posible cargar miembros y documentos del centro de costos.');
       }
     }
 
@@ -712,7 +712,7 @@ export function RfiCreatePage() {
 
   async function submit() {
     if (!form.projectId || !form.title.trim() || !form.description.trim()) {
-      setError('Completa al menos proyecto, título y descripción del RFI.');
+      setError('Completa al menos centro de costos, título y descripción del RFI.');
       return;
     }
 
@@ -745,7 +745,7 @@ export function RfiCreatePage() {
         <div>
           <h1>Nuevo RFI</h1>
           <p className="muted">
-            Pantalla dedicada para registrar consultas formales por proyecto, documento y
+            Pantalla dedicada para registrar consultas formales por centro de costos, documento y
             responsable.
           </p>
         </div>

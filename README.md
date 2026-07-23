@@ -1,12 +1,12 @@
 # Holocron V1
 
-Holocron es una boveda documental empresarial orientada a proyectos con control de acceso, visor documental, aprobaciones, RFIs, dashboard ejecutivo, consulta inteligente con IA y CLM.
+Holocron es una boveda documental empresarial orientada a centros de costos con control de acceso, visor documental, aprobaciones, RFIs, dashboard ejecutivo, consulta inteligente con IA y CLM.
 
 ## Modulos V1
 
 - Autenticacion JWT
 - Roles y permisos
-- Proyectos
+- Centros de costos
 - Carpetas y disciplinas
 - Documentos, visor y versiones
 - Auditoria
@@ -67,7 +67,7 @@ Contrasena para todos: `Holocron123!`
 - `admin@holocron.local`:
   Administrador completo
 - `pm@holocron.local`:
-  Gerente de proyecto
+  Gerente de centro de costos
 - `reviewer@holocron.local`:
   Revisor operativo
 - `viewer@holocron.local`:
@@ -75,7 +75,7 @@ Contrasena para todos: `Holocron123!`
 
 ## Datos demo cargados
 
-- 1 proyecto con disciplinas y carpetas
+- 1 centro de costos con disciplinas y carpetas
 - 2 documentos
 - 1 documento restringido por permiso explicito
 - 1 flujo de aprobacion y 1 solicitud pendiente

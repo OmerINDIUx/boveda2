@@ -111,7 +111,7 @@ export function RfiJustGoPage() {
 
   async function handleNext() {
     if (!selectedProjectId || !selectedTemplateId) {
-      setError('Selecciona proyecto y plantilla.');
+      setError('Selecciona centro de costos y plantilla.');
       return;
     }
 
@@ -228,14 +228,14 @@ export function RfiJustGoPage() {
         <article className="card" style={{ marginTop: 16 }}>
           <div className="panel-header">
             <h2>
-              <Zap size={18} style={{ color: 'var(--color-accent)' }} /> Paso 1: Elige proyecto y
-              plantilla
+              <Zap size={18} style={{ color: 'var(--color-accent)' }} /> Paso 1: Elige centro de
+              costos y plantilla
             </h2>
           </div>
 
           <div className="quick-filters-grid rfi-filters-grid">
             <div className="field">
-              <label>Proyecto</label>
+              <label>Centro de costos</label>
               <select
                 value={selectedProjectId}
                 onChange={(e) => {
@@ -243,7 +243,7 @@ export function RfiJustGoPage() {
                   setSelectedTemplateId('');
                 }}
               >
-                <option value="">Selecciona un proyecto</option>
+                <option value="">Selecciona un centro de costos</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.code} · {p.name}
@@ -257,7 +257,7 @@ export function RfiJustGoPage() {
                 <label>Plantilla rápida</label>
                 {filteredTemplates.length === 0 ? (
                   <p className="muted" style={{ padding: '0.5rem 0' }}>
-                    No hay plantillas disponibles para este proyecto.{' '}
+                    No hay plantillas disponibles para este centro de costos.{' '}
                     <Link href="/rfi-templates/new" style={{ color: 'var(--color-primary)' }}>
                       Crear una
                     </Link>

@@ -5,8 +5,8 @@ Holocron usa un monorepo modular. La API concentra reglas de negocio, permisos, 
 ## Principios
 
 - Cada modulo expone controller, service, DTOs y entidades.
-- Los documentos pertenecen a proyectos y carpetas.
-- La visibilidad se calcula por membresia de proyecto, rol y permisos explicitos.
+- Los documentos pertenecen a centros de costos y carpetas.
+- La visibilidad se calcula por membresia de centro de costos, rol y permisos explicitos.
 - Las versiones son inmutables; las acciones relevantes se registran en auditoria.
 - El almacenamiento usa un contrato comun con implementaciones local y S3.
 - IA documental y CLM nacen desacoplados para poder conectar LLMs, embeddings, OCR y motores de workflow despues.
@@ -14,7 +14,7 @@ Holocron usa un monorepo modular. La API concentra reglas de negocio, permisos, 
 ## Modulos
 
 - Usuarios, roles y permisos
-- Proyectos
+- Centros de costos
 - Carpetas y disciplinas
 - Documentos y versiones
 - Auditoria

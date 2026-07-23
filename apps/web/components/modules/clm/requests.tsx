@@ -92,7 +92,8 @@ export function ContractRequestsPage() {
                 {normalizeLabel(r.urgencyLevel)}
               </small>
               <small className="muted">
-                {r.project?.name ?? 'Sin proyecto'} · {new Date(r.createdAt).toLocaleDateString()}
+                {r.project?.name ?? 'Sin centro de costos'} ·{' '}
+                {new Date(r.createdAt).toLocaleDateString()}
               </small>
             </Link>
           ))}

@@ -27,12 +27,30 @@ import {
   formatCurrency,
   formatDate,
   getContractTone,
+  getErrorMessage,
   getLifecycleLabel,
   statusOptions,
-  fallbackContracts,
   TextField,
   BatchActionsBar,
 } from './utils';
+
+function normalizeContractsResponse(
+  response: ContractListItem[] | PaginatedResponse<ContractListItem>
+) {
+  if (Array.isArray(response)) {
+    return {
+      items: response,
+      total: response.length,
+      totalPages: response.length ? 1 : 0,
+    };
+  }
+
+  return {
+    items: response.items ?? [],
+    total: response.total ?? response.items?.length ?? 0,
+    totalPages: response.totalPages ?? 1,
+  };
+}
 
 export function ClmWorkspacePage() {
   const [contracts, setContracts] = useState<ContractListItem[]>([]);
@@ -58,6 +76,7 @@ export function ClmWorkspacePage() {
     let active = true;
     async function load() {
       try {
+        setMessage('');
         const params = new URLSearchParams();
         if (search) params.set('search', search);
         if (statusFilter) params.set('status', statusFilter);
@@ -68,11 +87,12 @@ export function ClmWorkspacePage() {
         if (amountMax) params.set('amountMax', amountMax);
         params.set('page', String(page));
         const qs = params.toString();
-        const result = await apiGet<PaginatedResponse<ContractListItem>>(
+        const raw = await apiGet<PaginatedResponse<ContractListItem> | ContractListItem[]>(
           `/clm/contracts${qs ? `?${qs}` : ''}`
         );
+        const result = normalizeContractsResponse(raw);
         if (!active) return;
-        setContracts(result.items.length ? result.items : fallbackContracts);
+        setContracts(result.items);
         setTotal(result.total);
         setTotalPages(result.totalPages);
         setSelectedId((prev: string) =>
@@ -82,13 +102,18 @@ export function ClmWorkspacePage() {
               '')
             : ''
         );
-      } catch {
+      } catch (error) {
         if (!active) return;
-        setContracts(fallbackContracts);
-        setTotal(fallbackContracts.length);
-        setTotalPages(1);
-        setSelectedId(fallbackContracts[0]?.id ?? '');
-        setMessage('Vista de respaldo.');
+        setContracts([]);
+        setTotal(0);
+        setTotalPages(0);
+        setSelectedId('');
+        setMessage(
+          `No se pudo cargar el listado de contratos. Motivo: ${getErrorMessage(
+            error,
+            'Error desconocido de la API.'
+          )}`
+        );
       }
     }
     void load();
@@ -144,8 +169,11 @@ export function ClmWorkspacePage() {
       setBatchMsg(`Lote: ${result.success} ok, ${result.failed} errores.`);
       setSelected(new Set());
       setPage(1);
-      const res = await apiGet<PaginatedResponse<ContractListItem>>('/clm/contracts');
-      setContracts(res.items.length ? res.items : fallbackContracts);
+      const raw = await apiGet<PaginatedResponse<ContractListItem> | ContractListItem[]>(
+        '/clm/contracts'
+      );
+      const res = normalizeContractsResponse(raw);
+      setContracts(res.items);
       setTotal(res.total);
       setTotalPages(res.totalPages);
     } catch {
@@ -418,7 +446,7 @@ export function ClmWorkspacePage() {
               </div>
               <div className="project-state-grid">
                 <div className="state-card">
-                  <span>Proyecto</span>
+                  <span>Centro de costos</span>
                   <strong>{selectedContract.project?.name ?? selectedContract.projectId}</strong>
                 </div>
                 <div className="state-card">

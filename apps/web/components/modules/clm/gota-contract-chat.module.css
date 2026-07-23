@@ -1,0 +1,571 @@
+.page {
+  display: grid;
+  gap: 18px;
+}
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.header h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+}
+.header p {
+  margin: 0;
+  color: var(--muted);
+}
+.eyebrow {
+  color: #6d4aff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.alert {
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b42318;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  min-height: calc(100vh - 210px);
+}
+.scopePanel,
+.chat {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(31, 24, 55, 0.06);
+  overflow: hidden;
+}
+.scopePanel {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+}
+.scopeHeading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.scopeHeading > div {
+  display: grid;
+  gap: 2px;
+}
+.scopeHeading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.scopeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--surface-strong);
+}
+.scopeTabs button {
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.scopeTabs button.active {
+  background: var(--surface);
+  color: #6d4aff;
+  box-shadow: 0 2px 8px rgba(31, 24, 55, 0.1);
+}
+.loadingSources,
+.allScope {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  text-align: center;
+  color: var(--muted);
+}
+.allScope p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.singlePicker {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.singlePicker select {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.sourceList {
+  display: grid;
+  gap: 7px;
+  overflow: auto;
+}
+.sourceList button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.sourceList button.sourceSelected {
+  border-color: #8b72ff;
+  background: #f3f0ff;
+}
+.sourceList button > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.sourceList strong,
+.sourceList small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sourceList small {
+  color: var(--muted);
+}
+.checkbox {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #a69adb;
+  border-radius: 5px;
+  color: #fff;
+  background: #fff;
+}
+.sourceSelected .checkbox {
+  background: #6d4aff;
+}
+.knowledgeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #8b72ff;
+  border-radius: 10px;
+  background: #f3f0ff;
+  color: #5b3fe1;
+  font-weight: 750;
+  cursor: pointer;
+}
+.knowledgeButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.knowledgeHelp {
+  color: var(--muted);
+  text-align: center;
+}
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.chatTopbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.chatTopbar > div {
+  display: grid;
+}
+.chatTopbar span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+.gotaAvatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #6d4aff, #a78bfa);
+  color: #fff;
+  font-weight: 900;
+}
+.messages {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+}
+.emptyChat {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+}
+.emptyChat h2 {
+  color: var(--text);
+  margin: 10px 0 6px;
+}
+.emptyChat p {
+  margin: 0;
+}
+.userMessage,
+.assistantMessage {
+  max-width: min(78%, 760px);
+  padding: 12px 15px;
+  border-radius: 16px;
+  line-height: 1.55;
+}
+.userMessage {
+  align-self: flex-end;
+  background: #6d4aff;
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+.assistantMessage {
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  border-bottom-left-radius: 5px;
+}
+.userMessage p,
+.assistantMessage p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.contextInfo {
+  display: block;
+  margin-top: 9px;
+  color: #6d4aff;
+}
+.citations {
+  margin-top: 8px;
+}
+.citations > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6d4aff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.citations > div {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+.citations article {
+  padding: 9px;
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.citations article p {
+  margin-top: 3px;
+  color: var(--muted);
+}
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+}
+.composer textarea {
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font: inherit;
+  background: var(--surface);
+}
+.composer small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+.knowledgeBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(19, 15, 35, 0.55);
+  backdrop-filter: blur(4px);
+}
+.knowledgeModal {
+  display: flex;
+  flex-direction: column;
+  width: min(1050px, 96vw);
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(15, 10, 35, 0.3);
+}
+.knowledgeModal > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.knowledgeModal h2 {
+  margin: 5px 0;
+  font-size: 19px;
+}
+.knowledgeModal header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.knowledgeModal header > button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+}
+.knowledgeTabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 22px 0;
+}
+.knowledgeTabs button {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 750;
+  cursor: pointer;
+}
+.knowledgeTabs button.active {
+  background: #f3f0ff;
+  color: #5b3fe1;
+}
+.knowledgeBody {
+  overflow: auto;
+  padding: 16px 22px 24px;
+}
+.factList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+.factList article {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-strong);
+}
+.factList article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.factList h3 {
+  margin: 10px 0 6px;
+  font-size: 14px;
+}
+.factList pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  color: var(--text);
+}
+.factList blockquote {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid #a78bfa;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.factFields {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.factFields div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 72%);
+}
+
+.factFields dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.factFields dd {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.factValue {
+  margin: 12px 0;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+.decision {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.decision.accepted {
+  background: #dcfce7;
+  color: #15803d;
+}
+.decision.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.decision.pending {
+  background: #fef3c7;
+  color: #a16207;
+}
+.transcription {
+  display: grid;
+  gap: 14px;
+}
+.transcriptionTools {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.transcriptionTools > div {
+  display: flex;
+  gap: 6px;
+}
+.transcriptionTools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-weight: 750;
+  cursor: pointer;
+}
+.transcriptionTools button.active,
+.transcriptionTools > button:last-child {
+  border-color: #c4b5fd;
+  background: #f3f0ff;
+  color: #5b3fe1;
+}
+.transcriptionTools button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.transcription article {
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-strong);
+}
+.transcription article > strong {
+  color: #5b3fe1;
+}
+.transcription p {
+  margin: 9px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  .scopePanel {
+    min-height: 260px;
+  }
+  .chat {
+    min-height: 620px;
+  }
+}
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+  }
+  .userMessage,
+  .assistantMessage {
+    max-width: 92%;
+  }
+  .composer {
+    grid-template-columns: 1fr;
+  }
+  .composer small {
+    grid-column: auto;
+  }
+  .knowledgeBackdrop {
+    padding: 8px;
+  }
+  .factList {
+    grid-template-columns: 1fr;
+  }
+  .transcriptionTools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

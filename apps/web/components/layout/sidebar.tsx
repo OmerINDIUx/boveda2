@@ -49,7 +49,7 @@ const groups: NavGroup[] = [
     items: [
       {
         href: '/projects',
-        label: 'Proyectos',
+        label: 'Centros de costos',
         icon: FolderKanban,
         permission: PermissionKey.ProjectsView,
       },
@@ -130,7 +130,12 @@ const groups: NavGroup[] = [
   {
     label: 'Utilidades',
     items: [
-      { href: '/ai-query', label: 'Consulta IA', icon: Bot, permission: PermissionKey.AiQuery },
+      {
+        href: '/ai-query',
+        label: 'Consulta con G.OTA',
+        icon: Bot,
+        permission: PermissionKey.AiQuery,
+      },
       { href: '/notifications', label: 'Notificaciones', icon: Bell, permission: null },
     ],
   },

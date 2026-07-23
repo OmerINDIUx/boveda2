@@ -550,7 +550,7 @@ export class RfisService {
 
   private async assertAccess(userId: string, projectId: string) {
     if (!(await this.scope.canAccessProject(userId, projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
   }
 
@@ -581,7 +581,7 @@ export class RfisService {
     if (!assignedToId) return;
     const count = await this.members.count({ where: { projectId, userId: assignedToId } });
     if (!count) {
-      throw new NotFoundException('El responsable asignado no pertenece al proyecto');
+      throw new NotFoundException('El responsable asignado no pertenece al centro de costos');
     }
   }
 
@@ -589,7 +589,7 @@ export class RfisService {
     if (!documentId) return;
     const document = await this.documents.findOne({ where: { id: documentId } });
     if (!document || document.projectId !== projectId) {
-      throw new NotFoundException('El documento relacionado no pertenece al proyecto');
+      throw new NotFoundException('El documento relacionado no pertenece al centro de costos');
     }
   }
 

@@ -6,7 +6,7 @@ export default function AdminPage() {
     <>
       <SectionHeader
         title="Administración"
-        description="Usuarios, roles, permisos globales y catálogos separados del alta de proyectos."
+        description="Usuarios, roles, permisos globales y catálogos separados del alta de centros de costos."
       />
       <section className="grid">
         <Link className="card span-3" href="/admin/users">
@@ -19,10 +19,10 @@ export default function AdminPage() {
           Matriz de permisos
         </Link>
         <Link className="card span-3" href="/admin/project-users">
-          Usuarios por proyecto
+          Usuarios por centro de costos
         </Link>
         <Link className="card span-3" href="/admin/project-catalogs">
-          Catálogos de proyecto
+          Catálogos de centros de costos
         </Link>
         <Link className="card span-3" href="/admin/project-disciplines">
           Disciplinas

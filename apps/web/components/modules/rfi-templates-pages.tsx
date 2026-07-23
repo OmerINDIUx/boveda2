@@ -37,9 +37,9 @@ function getToken() {
 }
 
 const assignRuleTypes = [
-  { value: 'project_role', label: 'Rol en el proyecto' },
+  { value: 'project_role', label: 'Rol en el centro de costos' },
   { value: 'specific_user', label: 'Usuario específico' },
-  { value: 'discipline_lead', label: 'Responsable del proyecto' },
+  { value: 'discipline_lead', label: 'Responsable del centro de costos' },
   { value: 'document_uploader', label: 'Último subidor de documento' },
 ];
 
@@ -137,7 +137,7 @@ export function RfiTemplatesListPage() {
         </div>
         <div className="quick-filters-grid rfi-filters-grid">
           <div className="field">
-            <label>Proyecto</label>
+            <label>Centro de costos</label>
             <select value={filterProjectId} onChange={(e) => setFilterProjectId(e.target.value)}>
               <option value="">Todos (globales + específicas)</option>
               {projects.map((p) => (
@@ -193,7 +193,7 @@ export function RfiTemplatesListPage() {
                 ) : null}
                 {template.projectId ? (
                   <div className="simple-document-item">
-                    <strong>Proyecto</strong>
+                    <strong>Centro de costos</strong>
                     <small>Específica</small>
                   </div>
                 ) : (
@@ -244,7 +244,7 @@ export function RfiTemplateFormPage() {
         );
         setProjects(response.projects);
       } catch {
-        setError('No fue posible cargar proyectos.');
+        setError('No fue posible cargar centros de costos.');
       }
     }
 
@@ -372,9 +372,9 @@ export function RfiTemplateFormPage() {
             />
           </div>
           <div className="field">
-            <label>Proyecto (opcional)</label>
+            <label>Centro de costos (opcional)</label>
             <select value={form.projectId} onChange={(e) => update('projectId', e.target.value)}>
-              <option value="">Global (todos los proyectos)</option>
+              <option value="">Global (todos los centros de costos)</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.code} · {p.name}
@@ -451,7 +451,7 @@ export function RfiTemplateFormPage() {
           </div>
           {form.autoAssignType === 'project_role' ? (
             <div className="field">
-              <label>Rol en el proyecto</label>
+              <label>Rol en el centro de costos</label>
               <select
                 value={form.autoAssignProjectRole}
                 onChange={(e) => update('autoAssignProjectRole', e.target.value)}

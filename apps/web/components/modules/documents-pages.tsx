@@ -645,7 +645,10 @@ export function DocumentsListPage() {
       } catch (catalogError) {
         if (!active) return;
         setError(
-          getErrorMessage(catalogError, 'No fue posible cargar los proyectos o disciplinas.')
+          getErrorMessage(
+            catalogError,
+            'No fue posible cargar los centros de costos o disciplinas.'
+          )
         );
       }
     }
@@ -810,7 +813,7 @@ export function DocumentsListPage() {
     const parts = folderBreadcrumbs.map((item) => item.name);
     const nextName = sanitizeFolderName(folderDraft.name);
     if (nextName) parts.push(nextName);
-    return parts.join(' / ') || 'Raíz del proyecto';
+    return parts.join(' / ') || 'Raíz del centro de costos';
   }, [folderBreadcrumbs, folderDraft.name]);
 
   const projectStats = useMemo(
@@ -837,7 +840,12 @@ export function DocumentsListPage() {
     hint: string;
     count: number;
   }> = [
-    { id: 'all', label: 'Todo', hint: 'Vista completa del proyecto', count: documents.length },
+    {
+      id: 'all',
+      label: 'Todo',
+      hint: 'Vista completa del centro de costos',
+      count: documents.length,
+    },
     {
       id: 'pending',
       label: 'Pendientes',
@@ -991,7 +999,7 @@ export function DocumentsListPage() {
             onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
           >
             <Search size={15} />
-            {selectedProject ? 'Cambiar proyecto' : 'Abrir proyecto'}
+            {selectedProject ? 'Cambiar centro de costos' : 'Abrir centro de costos'}
           </button>
           {selectedProjectId && (
             <Link
@@ -1011,7 +1019,7 @@ export function DocumentsListPage() {
               }}
             >
               <Building2 size={15} />
-              Proyecto
+              Centro de costos
             </Link>
           )}
           {canManageFolders && selectedProjectId && (
@@ -1158,7 +1166,7 @@ export function DocumentsListPage() {
           }}
         >
           <Building2 size={12} />
-          {selectedProject?.code ?? 'Proyecto'}
+          {selectedProject?.code ?? 'Centro de costos'}
         </button>
         {folderBreadcrumbs.map((folder) => (
           <button
@@ -1411,7 +1419,7 @@ export function DocumentsListPage() {
                   <p
                     style={{ fontSize: '0.75rem', color: '#9ca3af', padding: '0.5rem', margin: 0 }}
                   >
-                    Sin carpetas en este proyecto
+                    Sin carpetas en este centro de costos
                   </p>
                 )}
               </div>
@@ -1852,7 +1860,7 @@ export function DocumentsListPage() {
                   }}
                 >
                   <Bot size={15} />
-                  Consultar con IA
+                  Consulta con G.OTA
                 </Link>
               </div>
 
@@ -1870,7 +1878,7 @@ export function DocumentsListPage() {
                 <div>
                   <strong style={{ color: '#374151' }}>Ubicación:</strong>{' '}
                   {selectedDocument.folder?.name
-                    ? `${selectedDocument.project?.name ?? 'Proyecto'} / ${selectedDocument.folder.name}`
+                    ? `${selectedDocument.project?.name ?? 'Centro de costos'} / ${selectedDocument.folder.name}`
                     : 'Sin carpeta'}
                 </div>
                 <div>
@@ -1908,7 +1916,7 @@ export function DocumentsListPage() {
         <div className="document-project-picker">
           <div className="card document-project-picker-card">
             <div className="panel-header">
-              <h2>Abrir proyecto</h2>
+              <h2>Abrir centro de costos</h2>
               <button
                 className="button secondary"
                 type="button"
@@ -1919,13 +1927,13 @@ export function DocumentsListPage() {
               </button>
             </div>
             <div className="field">
-              <label>Buscar proyecto</label>
+              <label>Buscar centro de costos</label>
               <div className="search-input">
                 <Search size={16} />
                 <input
                   value={projectSearch}
                   onChange={(event) => setProjectSearch(event.target.value)}
-                  placeholder="Código o nombre del proyecto"
+                  placeholder="Código o nombre del centro de costos"
                 />
               </div>
             </div>
@@ -1945,7 +1953,7 @@ export function DocumentsListPage() {
                 </button>
               ))}
               {!filteredProjects.length ? (
-                <p className="muted">No encontramos proyectos con ese criterio.</p>
+                <p className="muted">No encontramos centros de costos con ese criterio.</p>
               ) : null}
             </div>
           </div>
@@ -2154,7 +2162,7 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
       return;
     }
     if (mode === 'create' && (!form.projectId || !form.name || !form.documentNumber)) {
-      setError('Completa proyecto, nombre y número documental.');
+      setError('Completa centro de costos, nombre y número documental.');
       return;
     }
     if (mode === 'create' && !form.folderId) {
@@ -2255,7 +2263,7 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
           <h1>{mode === 'create' ? 'Nuevo documento' : 'Nueva versión'}</h1>
           <p className="muted">
             {mode === 'create'
-              ? 'Alta documental amarrada a proyecto, carpeta, disciplina y responsables.'
+              ? 'Alta documental amarrada a centro de costos, carpeta, disciplina y responsables.'
               : `Sube una nueva revisión para ${detail?.documentNumber ?? 'el documento seleccionado'}.`}
           </p>
         </div>
@@ -2282,7 +2290,7 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
           {mode === 'create' ? (
             <>
               <SelectField
-                label="Proyecto"
+                label="Centro de costos"
                 value={form.projectId}
                 onChange={(value) =>
                   setForm((current) => ({
@@ -2325,7 +2333,7 @@ function DocumentForm({ mode, documentId }: { mode: 'create' | 'version'; docume
                 options={visibleFolders.map((folder) => ({ value: folder.id, label: folder.path }))}
                 placeholder={
                   visibleFolders.length
-                    ? 'Selecciona la carpeta del proyecto'
+                    ? 'Selecciona la carpeta del centro de costos'
                     : 'No hay carpetas disponibles'
                 }
               />
@@ -2690,7 +2698,7 @@ export function DocumentDetailPage() {
           ) : null}
           <Link className="button secondary" href={`/ai-query?documentId=${detail.id}`}>
             <Bot size={18} />
-            Consultar con IA
+            Consulta con G.OTA
           </Link>
           {['docx', 'xlsx', 'pptx'].includes(detail.fileExtension ?? '') ? (
             <button
@@ -2717,8 +2725,8 @@ export function DocumentDetailPage() {
       <div className="grid">
         <QuickMetric
           icon={FolderTree}
-          label="Proyecto"
-          value={detail.project?.name ?? 'Sin proyecto'}
+          label="Centro de costos"
+          value={detail.project?.name ?? 'Sin centro de costos'}
           highlight
         />
         <QuickMetric
@@ -4611,7 +4619,7 @@ export function DocumentApprovalPage() {
         {!flows.length ? (
           <p className="muted">
             Si no eliges un workflow, el sistema intentará usar el flujo global o específico del
-            proyecto. Si todavía no existe, configúralo en la página de aprobaciones.
+            centro de costos. Si todavía no existe, configúralo en la página de aprobaciones.
           </p>
         ) : null}
         {selectedFlow ? (

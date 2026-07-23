@@ -109,9 +109,9 @@ export function ContractRequestFormPage() {
               </select>
             </div>
             <div className="field">
-              <label>Proyecto</label>
+              <label>Centro de costos</label>
               <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)}>
-                <option value="">Sin proyecto</option>
+                <option value="">Sin centro de costos</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}

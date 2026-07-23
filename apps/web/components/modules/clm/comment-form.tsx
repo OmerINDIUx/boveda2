@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { apiPost } from '../../../lib/api';
+import { getErrorMessage } from './utils';
 
 export function ContractCommentCreatePage() {
   const params = useParams<{ id: string }>();
@@ -22,8 +23,8 @@ export function ContractCommentCreatePage() {
     try {
       await apiPost(`/clm/contracts/${contractId}/comments`, { body });
       router.push(`/clm/${contractId}`);
-    } catch (err: any) {
-      setError(err?.message ?? 'Error al guardar.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Error al guardar.'));
     } finally {
       setSaving(false);
     }

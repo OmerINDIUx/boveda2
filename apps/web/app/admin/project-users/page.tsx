@@ -74,7 +74,7 @@ function ProjectUsersWorkspace() {
         }));
       } catch {
         if (!active) return;
-        setError('No fue posible cargar proyectos y usuarios para la asignación.');
+        setError('No fue posible cargar centros de costos y usuarios para la asignación.');
       }
     }
 
@@ -116,7 +116,7 @@ function ProjectUsersWorkspace() {
 
   async function assignUser() {
     if (!form.projectId || !form.userId) {
-      setError('Selecciona proyecto y usuario.');
+      setError('Selecciona centro de costos y usuario.');
       return;
     }
 
@@ -153,9 +153,10 @@ function ProjectUsersWorkspace() {
     <section className="projects-workspace">
       <div className="topbar">
         <div>
-          <h1>Usuarios por proyecto</h1>
+          <h1>Usuarios por centro de costos</h1>
           <p className="muted">
-            Asignación separada del alta del proyecto para evitar errores durante la creación.
+            Asignación separada del alta del centro de costos para evitar errores durante la
+            creación.
           </p>
         </div>
       </div>
@@ -165,14 +166,14 @@ function ProjectUsersWorkspace() {
       <section className="grid">
         <article className="card span-4">
           <div className="field">
-            <label>Proyecto</label>
+            <label>Centro de costos</label>
             <select
               value={form.projectId}
               onChange={(event) =>
                 setForm((current) => ({ ...current, projectId: event.target.value }))
               }
             >
-              <option value="">Selecciona un proyecto</option>
+              <option value="">Selecciona un centro de costos</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.code} · {project.name}
@@ -205,7 +206,7 @@ function ProjectUsersWorkspace() {
             </select>
           </div>
           <div className="field">
-            <label>Rol en proyecto</label>
+            <label>Rol en centro de costos</label>
             <select
               value={form.role}
               onChange={(event) =>
@@ -258,7 +259,7 @@ function ProjectUsersWorkspace() {
                   <th>Usuario</th>
                   <th>Correo</th>
                   <th>Rol global</th>
-                  <th>Rol en proyecto</th>
+                  <th>Rol en centro de costos</th>
                   <th>Documentos</th>
                   <th>Contratos</th>
                 </tr>

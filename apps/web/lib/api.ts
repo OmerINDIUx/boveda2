@@ -45,16 +45,22 @@ async function request<T>(
   path: string,
   options?: { body?: unknown; token?: string; signal?: AbortSignal; timeout?: number }
 ): Promise<T> {
+  const timeoutMs = options?.timeout ?? DEFAULT_TIMEOUT;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options?.timeout ?? DEFAULT_TIMEOUT);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
 
   const externalSignal = options?.signal;
+  const abortFromExternalSignal = () => controller.abort(externalSignal?.reason);
   if (externalSignal) {
     if (externalSignal.aborted) {
       clearTimeout(timer);
       throw new DOMException('Aborted', 'AbortError');
     }
-    externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    externalSignal.addEventListener('abort', abortFromExternalSignal, { once: true });
   }
 
   try {
@@ -80,8 +86,16 @@ async function request<T>(
       return undefined as T;
     }
     return JSON.parse(text) as T;
+  } catch (error) {
+    if (timedOut) {
+      throw new Error(
+        `[${method} ${path}] La solicitud tardó más de ${Math.round(timeoutMs / 1000)} segundos.`
+      );
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener('abort', abortFromExternalSignal);
   }
 }
 
@@ -93,9 +107,10 @@ export async function apiPost<T>(
   path: string,
   body: unknown,
   token?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeout?: number
 ): Promise<T> {
-  return request<T>('POST', path, { body, token, signal });
+  return request<T>('POST', path, { body, token, signal, timeout });
 }
 
 export async function apiPatch<T>(

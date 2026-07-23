@@ -172,7 +172,7 @@ export class AiQueryService {
 
   private async getVisibleDocuments(userId: string, dto: AskDocumentQueryDto) {
     if (dto.projectId && !(await this.scope.canAccessProject(userId, dto.projectId))) {
-      throw new ForbiddenException('No tienes acceso a este proyecto');
+      throw new ForbiddenException('No tienes acceso a este centro de costos');
     }
 
     const user = await this.users.findOne({ where: { id: userId }, relations: ['roles'] });
