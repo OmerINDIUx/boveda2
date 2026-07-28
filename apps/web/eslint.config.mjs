@@ -44,6 +44,7 @@ export default [
           value,
         ])
       ),
+      'next/no-html-link-for-pages': 'off',
     },
     languageOptions: {
       parserOptions: {

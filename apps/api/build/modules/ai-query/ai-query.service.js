@@ -163,6 +163,26 @@ let AiQueryService = class AiQueryService {
             pendingDocuments: docsWithVersions.length - indexedCount,
         };
     }
+    async documentAnalysis(userId, documentId) {
+        const [document] = await this.getVisibleDocuments(userId, { documentId, question: '' });
+        if (!document)
+            throw new common_1.NotFoundException('Documento no encontrado dentro del alcance del usuario');
+        const version = document.currentVersionId
+            ? await this.versions.findOne({ where: { id: document.currentVersionId } })
+            : null;
+        if (!version) {
+            return { document: { id: document.id, name: document.name, documentNumber: document.documentNumber }, version: null, status: 'pending', transcription: [], indexItems: [] };
+        }
+        const chunks = await this.chunks.find({ where: { documentId, versionId: version.id }, order: { chunkIndex: 'ASC' } });
+        return {
+            document: { id: document.id, name: document.name, documentNumber: document.documentNumber },
+            version: { id: version.id, revision: version.revision, fileName: version.fileName, extractedAt: version.contentExtractedAt },
+            status: version.contentExtractionStatus,
+            error: version.contentExtractionError,
+            transcription: chunks.map((chunk) => ({ id: chunk.id, pageNumber: chunk.pageNumber, sectionLabel: chunk.sectionLabel, text: chunk.content.trim() })),
+            indexItems: [],
+        };
+    }
     async getVisibleDocuments(userId, dto) {
         if (dto.projectId && !(await this.scope.canAccessProject(userId, dto.projectId))) {
             throw new common_1.ForbiddenException('No tienes acceso a este proyecto');

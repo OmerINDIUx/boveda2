@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nest
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'node:crypto';
-import { In, LessThan, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { AccessScopeService } from '../../common/access-scope.service';
 import { PermissionKey } from '../../common/permissions';
 import { RequestUser } from '../../common/interfaces/request-user.interface';
@@ -349,12 +349,8 @@ export class RfisService {
   // ─── Template CRUD ───────────────────────────────────────────────
 
   async listTemplates(user: RequestUser, projectId?: string) {
-    const where: Record<string, unknown> = {};
-    if (projectId) {
-      where.projectId = projectId;
-    }
     return this.templates.find({
-      where,
+      where: projectId ? [{ projectId }, { projectId: IsNull() }] : {},
       relations: { project: true, createdBy: true },
       order: { name: 'ASC' },
     });
@@ -493,28 +489,36 @@ export class RfisService {
   // ─── Inbound email processing ──────────────────────────────────────
 
   async processInboundEmail(dto: InboundEmailDto) {
-    const match = dto.to.match(/rfi-([a-f0-9]+)@/);
+    const recipientAddress = this.extractEmailAddress(dto.to);
+    const senderAddress = this.extractEmailAddress(dto.from);
+    const match = recipientAddress.match(/rfi-([a-f0-9]+)@/);
     if (!match) {
       this.logger.warn(`Correo entrante no corresponde a ningún RFI: ${dto.to}`);
       return { ok: false, reason: 'Destino no reconocido' };
     }
 
+    const duplicate = await this.comments.findOne({ where: { emailMessageId: dto.messageId } });
+    if (duplicate) {
+      return { ok: true, commentId: duplicate.id, duplicate: true };
+    }
+
     const rfi = await this.rfis.findOne({
-      where: { replyToAddress: dto.to },
+      where: { replyToAddress: recipientAddress },
       relations: ['project'],
     });
     if (!rfi) {
-      this.logger.warn(`RFI no encontrado para dirección: ${dto.to}`);
+      this.logger.warn(`RFI no encontrado para dirección: ${recipientAddress}`);
       return { ok: false, reason: 'RFI no encontrado' };
     }
 
-    const sender = await this.users.findOne({ where: { email: dto.from } });
+    const sender = await this.users.findOne({ where: { email: senderAddress } });
     if (!sender) {
-      this.logger.warn(`Usuario no encontrado para email: ${dto.from}`);
+      this.logger.warn(`Usuario no encontrado para email: ${senderAddress}`);
       return { ok: false, reason: 'Remitente no registrado en Holocron' };
     }
 
     await this.assertAccess(sender.id, rfi.projectId);
+    const before = this.snapshot(rfi);
 
     const comment = await this.comments.save(
       this.comments.create({
@@ -527,15 +531,24 @@ export class RfisService {
       })
     );
 
-    await this.logHistory(rfi.id, sender.id, 'email_received', undefined, {
+    if (rfi.status !== 'closed') {
+      rfi.answer = dto.body;
+      rfi.status = 'answered';
+      rfi.closedAt = undefined;
+      await this.rfis.save(rfi);
+    }
+
+    await this.logHistory(rfi.id, sender.id, 'email_received', before, {
       commentId: comment.id,
       subject: dto.subject,
+      status: rfi.status,
     });
 
-    if (rfi.assignedToId && rfi.assignedToId !== sender.id) {
+    const notificationUserId = sender.id === rfi.assignedToId ? rfi.createdById : rfi.assignedToId;
+    if (notificationUserId && notificationUserId !== sender.id) {
       await this.notifications.notify({
-        recipients: [{ userId: rfi.assignedToId }],
-        notificationType: 'rfi_assigned',
+        recipients: [{ userId: notificationUserId }],
+        notificationType: 'rfi_responded',
         title: 'Respuesta por correo recibida',
         body: `${sender.name} respondió al RFI "${rfi.title}" desde el correo.`,
         entityType: 'rfi',
@@ -546,6 +559,11 @@ export class RfisService {
     }
 
     return { ok: true, commentId: comment.id };
+  }
+
+  private extractEmailAddress(value: string) {
+    const bracketed = value.match(/<([^>]+)>/);
+    return (bracketed?.[1] ?? value).trim().toLowerCase();
   }
 
   private async assertAccess(userId: string, projectId: string) {

@@ -6,12 +6,10 @@ import {
   ClipboardCheck,
   Clock,
   FileQuestion,
-  FileText,
   FolderKanban,
   Gauge,
   GitBranch,
   Landmark,
-  LockKeyhole,
   Mail,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,9 +18,11 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { hasPermission } from '../../lib/auth';
+import { brand } from '../../lib/brand';
 import { PermissionKey } from '../../lib/permissions';
 
 type NavItem = {
@@ -52,12 +52,6 @@ const groups: NavGroup[] = [
         label: 'Centros de costos',
         icon: FolderKanban,
         permission: PermissionKey.ProjectsView,
-      },
-      {
-        href: '/documents',
-        label: 'Documentos',
-        icon: FileText,
-        permission: PermissionKey.DocumentsView,
       },
       {
         href: '/rfis',
@@ -296,7 +290,18 @@ function SidebarContent({
         }}
       >
         {collapsed ? (
-          <LockKeyhole size={22} style={{ color: '#14b8a6' }} />
+          <Image
+            src={brand.logo}
+            alt="Holocom"
+            width={28}
+            height={28}
+            style={{
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+              objectFit: 'contain',
+            }}
+          />
         ) : (
           <>
             <Link
@@ -309,8 +314,33 @@ function SidebarContent({
                 textDecoration: 'none',
               }}
             >
-              <LockKeyhole size={22} style={{ color: '#14b8a6' }} />
-              <span style={{ fontSize: '1.125rem', fontWeight: 800 }}>Holocron</span>
+              <Image
+                src={brand.logo}
+                alt="Holocom"
+                width={28}
+                height={28}
+                style={{
+                  width: 28,
+                  height: 28,
+                  flexShrink: 0,
+                  objectFit: 'contain',
+                }}
+              />
+              <span style={{ display: 'grid', lineHeight: 1.05 }}>
+                <span style={{ fontSize: '1.125rem', fontWeight: 800 }}>Holocron</span>
+                <span
+                  style={{
+                    marginTop: '0.2rem',
+                    color: '#9fc5ff',
+                    fontSize: '0.575rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Holocom
+                </span>
+              </span>
             </Link>
             {!mobile && (
               <button
@@ -381,11 +411,11 @@ function SidebarContent({
                       minHeight: collapsed ? '2.5rem' : '2.25rem',
                       padding: collapsed ? '0' : '0 0.75rem',
                       borderRadius: collapsed ? '0' : 'var(--radius-md)',
-                      color: isActive ? '#5eead4' : '#94a3b8',
+                      color: isActive ? '#bfdbfe' : '#94a3b8',
                       textDecoration: 'none',
                       fontSize: 'var(--font-sm)',
                       fontWeight: isActive ? 600 : 400,
-                      background: isActive ? 'rgba(15, 118, 110, 0.2)' : 'transparent',
+                      background: isActive ? 'rgba(0, 102, 249, 0.22)' : 'transparent',
                       position: 'relative',
                       transition: 'background 120ms ease, color 120ms ease',
                     }}
@@ -415,7 +445,7 @@ function SidebarContent({
                           width: 3,
                           height: '60%',
                           borderRadius: '0 3px 3px 0',
-                          background: '#14b8a6',
+                          background: '#0066f9',
                         }}
                       />
                     )}

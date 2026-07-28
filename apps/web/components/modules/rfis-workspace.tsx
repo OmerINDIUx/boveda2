@@ -22,6 +22,22 @@ import { normalizeLabel } from '../../lib/labels';
 type ProjectOption = { id: string; name: string; code: string };
 type ProjectMemberOption = { id: string; name: string; email: string; role: string };
 type DocumentOption = { id: string; name: string; documentNumber: string };
+type RfiTemplateOption = {
+  id: string;
+  name: string;
+  description?: string;
+  projectId?: string;
+  defaultPriority: 'low' | 'normal' | 'high' | 'urgent';
+  defaultDueDays?: number;
+};
+
+type EvaluatedRfiTemplate = {
+  title: string;
+  description: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  dueDate?: string;
+  assignedToId?: string;
+};
 
 type RfiListItem = {
   id: string;
@@ -651,13 +667,21 @@ export function RfisWorkspace() {
 
 export function RfiCreatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialProjectId = searchParams.get('projectId') ?? '';
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [formOptions, setFormOptions] = useState<FormOptionsResponse>({
     projects: [],
     projectMembers: [],
     documents: [],
   });
-  const [form, setForm] = useState<CreateRfiForm>(emptyCreateForm);
+  const [form, setForm] = useState<CreateRfiForm>({
+    ...emptyCreateForm,
+    projectId: initialProjectId,
+  });
+  const [templates, setTemplates] = useState<RfiTemplateOption[]>([]);
+  const [templateId, setTemplateId] = useState('');
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [files, setFiles] = useState<FilePayload[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -687,17 +711,19 @@ export function RfiCreatePage() {
     let active = true;
     if (!form.projectId) {
       setFormOptions((current) => ({ ...current, projectMembers: [], documents: [] }));
+      setTemplates([]);
       return;
     }
 
     async function loadProjectOptions() {
       try {
-        const response = await apiGet<FormOptionsResponse>(
-          `/rfis/form-options?projectId=${form.projectId}`,
-          getToken()
-        );
+        const [response, templateResponse] = await Promise.all([
+          apiGet<FormOptionsResponse>(`/rfis/form-options?projectId=${form.projectId}`, getToken()),
+          apiGet<RfiTemplateOption[]>(`/rfis/templates?projectId=${form.projectId}`, getToken()),
+        ]);
         if (!active) return;
         setFormOptions(response);
+        setTemplates(templateResponse);
       } catch {
         if (!active) return;
         setError('No fue posible cargar miembros y documentos del centro de costos.');
@@ -709,6 +735,33 @@ export function RfiCreatePage() {
       active = false;
     };
   }, [form.projectId]);
+
+  async function applyTemplate(nextTemplateId: string) {
+    setTemplateId(nextTemplateId);
+    if (!nextTemplateId || !form.projectId) return;
+
+    setApplyingTemplate(true);
+    setError('');
+    try {
+      const evaluated = await apiPost<EvaluatedRfiTemplate>(
+        `/rfis/templates/${nextTemplateId}/evaluate`,
+        { projectId: form.projectId },
+        getToken()
+      );
+      setForm((current) => ({
+        ...current,
+        title: evaluated.title,
+        description: evaluated.description,
+        priority: evaluated.priority,
+        dueDate: evaluated.dueDate ?? '',
+        assignedToId: evaluated.assignedToId ?? '',
+      }));
+    } catch {
+      setError('No fue posible aplicar la plantilla seleccionada.');
+    } finally {
+      setApplyingTemplate(false);
+    }
+  }
 
   async function submit() {
     if (!form.projectId || !form.title.trim() || !form.description.trim()) {
@@ -725,6 +778,7 @@ export function RfiCreatePage() {
           ...form,
           documentId: form.documentId || undefined,
           assignedToId: form.assignedToId || undefined,
+          templateId: templateId || undefined,
           dueDate: form.dueDate || undefined,
           attachments: files,
         },
@@ -763,6 +817,50 @@ export function RfiCreatePage() {
           <h2>Crear RFI</h2>
           <Plus size={18} color="var(--primary)" />
         </div>
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            background: 'var(--color-primary-light)',
+            borderColor: 'var(--color-primary-border)',
+          }}
+        >
+          <div className="panel-header">
+            <div>
+              <strong>1. Elige una plantilla de solicitud</strong>
+              <p className="muted" style={{ margin: '4px 0 0' }}>
+                La plantilla completa el asunto, la pregunta, el plazo y la asignación; después
+                puedes ajustar cualquier dato.
+              </p>
+            </div>
+            <Sparkles size={18} color="var(--primary)" />
+          </div>
+          <div className="field">
+            <label>Plantilla</label>
+            <select
+              value={templateId}
+              onChange={(event) => void applyTemplate(event.target.value)}
+              disabled={!form.projectId || applyingTemplate}
+            >
+              <option value="">
+                {form.projectId
+                  ? 'Sin plantilla (captura manual)'
+                  : 'Selecciona primero un centro de costos'}
+              </option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                  {template.projectId ? '' : ' · Global'}
+                </option>
+              ))}
+            </select>
+          </div>
+          {form.projectId && !templates.length ? (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              No hay plantillas activas para este centro de costos. Puedes crearlas desde SLA.
+            </p>
+          ) : null}
+        </div>
         <RfiFormFields
           form={form}
           projects={projects}
@@ -771,6 +869,7 @@ export function RfiCreatePage() {
           onChange={(key, value) =>
             setForm((current) => {
               if (key === 'projectId') {
+                setTemplateId('');
                 return { ...current, projectId: value, documentId: '', assignedToId: '' };
               }
               return { ...current, [key]: value };
@@ -788,9 +887,36 @@ export function RfiCreatePage() {
         {files.length ? (
           <p className="muted">Adjuntos: {files.map((file) => file.fileName).join(', ')}</p>
         ) : null}
+        <div
+          className="card"
+          style={{
+            marginTop: 16,
+            background: 'var(--color-info-light)',
+            borderColor: 'var(--color-info)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <Mail size={18} color="var(--color-info)" />
+            <div>
+              <strong>Seguimiento por correo</strong>
+              <p className="muted" style={{ margin: '4px 0 0' }}>
+                {form.assignedToId
+                  ? `Al guardar se enviará la solicitud a ${
+                      formOptions.projectMembers.find((member) => member.id === form.assignedToId)
+                        ?.email ?? 'la persona responsable'
+                    }. Su respuesta al correo se agregará automáticamente al expediente del RFI.`
+                  : 'Selecciona una persona responsable para enviar la solicitud por correo y recibir su respuesta en el expediente.'}
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="projects-actions" style={{ marginTop: 16 }}>
           <button className="button" type="button" onClick={submit} disabled={saving}>
-            {saving ? 'Guardando...' : 'Guardar RFI'}
+            {saving
+              ? 'Guardando...'
+              : form.assignedToId
+                ? 'Crear RFI y enviar por correo'
+                : 'Crear RFI'}
           </button>
         </div>
       </article>

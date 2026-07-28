@@ -75,4 +75,16 @@ export class AiQueryController {
   indexingStatus() {
     return this.aiQuery.indexingStatus();
   }
+
+  @Get('documents/:id/analysis')
+  @Permissions(PermissionKey.DocumentsView)
+  documentAnalysis(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.aiQuery.documentAnalysis(user.id, id);
+  }
+
+  @Post('documents/:id/analysis/reindex')
+  @Permissions(PermissionKey.DocumentsView)
+  reindexDocument(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.aiQuery.reindexDocument(user.id, id);
+  }
 }

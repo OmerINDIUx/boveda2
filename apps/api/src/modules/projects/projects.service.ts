@@ -888,6 +888,8 @@ export class ProjectsService {
         documents: documents.length,
         approved: approvedCount,
         critical: overdueCount,
+        overdue: documents.filter((document) => this.isOverdue(document)).length,
+        dueSoon: documents.filter((document) => this.isDueSoon(document)).length,
         progress: documents.length ? Math.round((approvedCount / documents.length) * 100) : 0,
       },
       updatedAt: project.updatedAt,

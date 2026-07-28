@@ -56,7 +56,7 @@ const KPI_CONFIG = [
     key: 'activeProjects',
     label: 'Centros de costos activos',
     icon: FolderKanban,
-    color: '#0f766e',
+    color: 'var(--color-primary)',
     href: '/projects',
   },
   {
@@ -148,7 +148,7 @@ function MetricCard({
       ? '#fee2e2'
       : isWarning && (value ?? 0) > 0
         ? '#fef3c7'
-        : '#ccfbf1';
+        : 'var(--color-primary-soft)';
   const iconColor =
     isCritical && (value ?? 0) > 0
       ? '#dc2626'
@@ -548,13 +548,13 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 function DonutChart({ data }: { data: ChartPoint[] }) {
   const total = data.reduce((s, i) => s + i.value, 0);
   const palette = [
-    '#0f766e',
+    'var(--color-primary)',
     '#0284c7',
     '#d97706',
     '#dc2626',
     '#7c3aed',
     '#475569',
-    '#14b8a6',
+    'var(--color-primary-accent)',
     '#ea580c',
   ];
   if (!data.length || total === 0)
@@ -651,7 +651,8 @@ function BarChart({ data, compact = false }: { data: ChartPoint[]; compact?: boo
               style={{
                 height: '100%',
                 width: `${(item.value / max) * 100}%`,
-                background: 'linear-gradient(90deg, #0f766e, #14b8a6)',
+                background:
+                  'linear-gradient(90deg, var(--color-primary), var(--color-primary-accent))',
                 borderRadius: 'inherit',
                 transition: 'width 400ms ease',
               }}

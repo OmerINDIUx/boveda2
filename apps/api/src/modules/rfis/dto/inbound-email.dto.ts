@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class InboundEmailDto {
   @IsString()
@@ -16,6 +16,7 @@ export class InboundEmailDto {
   @IsString()
   messageId!: string;
 
+  @IsOptional()
   @IsString()
-  inReplyTo!: string;
+  inReplyTo?: string;
 }

@@ -682,7 +682,7 @@ export function ApprovalsWorkspace() {
                     textAlign: 'left',
                     font: 'inherit',
                     width: '100%',
-                    background: isSelected ? '#f0fdfa' : '#fff',
+                    background: isSelected ? 'var(--color-primary-light)' : '#fff',
                   }}
                 >
                   <div className="active-request-top">

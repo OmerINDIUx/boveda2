@@ -12,8 +12,10 @@ import { Repository } from 'typeorm';
 import { StorageService } from '../../storage/storage.service';
 import { DocumentChunk } from '../documents/document-chunk.entity';
 import { DocumentEmbedding } from '../documents/document-embedding.entity';
+import { DocumentMetadata } from '../documents/document-metadata.entity';
 import { DocumentRecord } from '../documents/document.entity';
 import { DocumentVersion } from '../versions/document-version.entity';
+import { DocumentIndexItem, OllamaChatService } from './ollama-chat.service';
 
 export type ExtractedSegment = {
   text: string;
@@ -22,7 +24,7 @@ export type ExtractedSegment = {
 };
 
 export type ExtractedDocument = {
-  contentType: 'pdf' | 'docx' | 'xlsx' | 'text';
+  contentType: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'text';
   segments: ExtractedSegment[];
 };
 
@@ -48,8 +50,10 @@ export class DocumentIndexingService {
     @InjectRepository(DocumentVersion) private readonly versions: Repository<DocumentVersion>,
     @InjectRepository(DocumentChunk) private readonly chunks: Repository<DocumentChunk>,
     @InjectRepository(DocumentEmbedding) private readonly embeddings: Repository<DocumentEmbedding>,
+    @InjectRepository(DocumentMetadata) private readonly metadata: Repository<DocumentMetadata>,
     private readonly storage: StorageService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly ollama: OllamaChatService
   ) {}
 
   extractFile(fileName: string, mimeType: string, buffer: Buffer) {
@@ -146,6 +150,7 @@ export class DocumentIndexingService {
           );
         }
         await this.embeddings.save(embeddingData);
+        await this.saveImportantIndex(document.id, version.id, savedChunks);
       }
 
       version.contentHash = contentHash;
@@ -160,6 +165,59 @@ export class DocumentIndexingService {
       await this.versions.save(version);
       throw error;
     }
+  }
+
+  private async saveImportantIndex(documentId: string, versionId: string, chunks: DocumentChunk[]) {
+    const evidence = chunks
+      .map((chunk) => chunk.content)
+      .join('\n\n')
+      .slice(0, 60000);
+    const generated = await this.ollama.extractDocumentIndex(evidence);
+    const generatedRelationships = generated.items?.filter(
+      (item) => item.category === 'relationships' && item.subject && item.relation && item.target
+    );
+    const items = generatedRelationships?.length
+      ? generated.items
+      : this.buildFallbackIndex(chunks);
+    const metaKey = `ai_index:${versionId}`;
+    const existing = await this.metadata.findOne({ where: { documentId, metaKey } });
+
+    await this.metadata.save(
+      this.metadata.create({
+        ...existing,
+        documentId,
+        metaKey,
+        metaValue: JSON.stringify({
+          items,
+          model: generatedRelationships?.length ? generated.model : 'local-fallback',
+          generatedAt: new Date().toISOString(),
+        }),
+        valueType: 'json',
+      })
+    );
+  }
+
+  private buildFallbackIndex(chunks: DocumentChunk[]): DocumentIndexItem[] {
+    return chunks.slice(0, 12).map((chunk, index) => {
+      const text = chunk.content
+        .replace(/^\s*(?:\[[^\]]+\]\s*)+/u, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const value = text.length > 280 ? `${text.slice(0, 277)}...` : text;
+      return {
+        category: 'relationships',
+        label:
+          chunk.sectionLabel ??
+          (chunk.pageNumber ? `Página ${chunk.pageNumber}` : `Punto ${index + 1}`),
+        value: `${chunk.sectionLabel ?? 'Este apartado'} se relaciona con el documento y aporta este contexto: ${value}`,
+        subject: chunk.sectionLabel ?? `Punto ${index + 1}`,
+        relation: 'se relaciona con',
+        target: 'el documento analizado',
+        context: 'Permite ubicar la información de este apartado dentro del documento completo.',
+        pageNumber: chunk.pageNumber,
+        evidence: value,
+      };
+    });
   }
 
   async searchVisibleChunks(
@@ -287,10 +345,33 @@ def extract_xlsx(data):
                 segments.append({"text": text, "sectionLabel": f"{sheet.title} fila {row_index}"})
     return {"contentType": "xlsx", "segments": segments}
 
+def extract_pptx(data):
+    # PPTX is a ZIP of XML files. Reading the slide XML directly avoids
+    # returning the ZIP bytes (the visible PK corruption) as text.
+    from zipfile import ZipFile
+    from xml.etree import ElementTree
+    import re
+    segments = []
+    with ZipFile(io.BytesIO(data)) as archive:
+        names = [name for name in archive.namelist() if re.fullmatch(r"ppt/slides/slide\\d+\\.xml", name)]
+        names.sort(key=lambda name: int(re.search(r"slide(\\d+)\\.xml$", name).group(1)))
+        for index, name in enumerate(names, start=1):
+            root = ElementTree.fromstring(archive.read(name))
+            texts = [node.text for node in root.iter() if node.tag.endswith("}t") and node.text]
+            text = clean(" ".join(texts))
+            if text:
+                segments.append({"text": text, "sectionLabel": f"Diapositiva {index}"})
+    return {"contentType": "pptx", "segments": segments}
+
 if mime_type == "application/pdf" or file_name.lower().endswith(".pdf"):
     output = extract_pdf(payload)
 elif mime_type in ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel") or file_name.lower().endswith(".xlsx"):
     output = extract_xlsx(payload)
+elif mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation" or file_name.lower().endswith(".pptx"):
+    output = extract_pptx(payload)
+elif payload.startswith(b"PK"):
+    # Never expose compressed Office bytes as if they were readable text.
+    output = {"contentType": "text", "segments": []}
 else:
     output = {"contentType": "text", "segments": [{"text": clean(payload.decode("utf-8", errors="ignore"))}]}
 

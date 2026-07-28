@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import Image from 'next/image';
+import { Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { apiPost } from '../../lib/api';
 import { setSession } from '../../lib/auth';
+import { brand } from '../../lib/brand';
 import { Button } from '../../components/ui/button';
 
 type LoginResponse = {
@@ -89,7 +91,7 @@ export default function LoginPage() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #0f766e 0%, #115e59 50%, #0d9488 100%)',
+          background: 'linear-gradient(135deg, #0066f9 0%, #0057d6 52%, #003d99 100%)',
           position: 'relative',
           overflow: 'hidden',
           padding: '3rem',
@@ -152,13 +154,14 @@ export default function LoginPage() {
               width: '5rem',
               height: '5rem',
               borderRadius: '1.5rem',
-              background: 'rgba(255,255,255,0.15)',
+              background: '#ffffff',
               backdropFilter: 'blur(12px)',
               marginBottom: '1.5rem',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+              boxShadow: '0 12px 34px rgba(0,37,94,0.24)',
+              overflow: 'hidden',
             }}
           >
-            <ShieldCheck size={36} />
+            <Image src={brand.logo} alt={brand.companyName} width={64} height={64} priority />
           </div>
           <h1
             style={{
@@ -170,6 +173,18 @@ export default function LoginPage() {
           >
             {t('app.name')}
           </h1>
+          <div
+            style={{
+              margin: '0 auto 0.75rem',
+              color: '#dbeafe',
+              fontSize: '0.6875rem',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Tecnología Holocom
+          </div>
           <p
             style={{
               fontSize: '1.125rem',
@@ -281,7 +296,7 @@ export default function LoginPage() {
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = 'var(--color-primary)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 102, 249, 0.12)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = 'var(--border)';
@@ -345,7 +360,7 @@ export default function LoginPage() {
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = 'var(--color-primary)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.1)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 102, 249, 0.12)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = 'var(--border)';

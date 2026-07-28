@@ -54,6 +54,9 @@ let AiQueryController = class AiQueryController {
   history(user) {
     return this.aiQuery.historyForUser(user.id);
   }
+  documentAnalysis(user, id) {
+    return this.aiQuery.documentAnalysis(user.id, id);
+  }
 };
 exports.AiQueryController = AiQueryController;
 __decorate(
@@ -81,6 +84,20 @@ __decorate(
   ],
   AiQueryController.prototype,
   'history',
+  null
+);
+__decorate(
+  [
+    (0, common_1.Get)('documents/:id/analysis'),
+    (0, permissions_decorator_1.Permissions)(permissions_1.PermissionKey.DocumentsView),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata('design:type', Function),
+    __metadata('design:paramtypes', [Object, String]),
+    __metadata('design:returntype', void 0),
+  ],
+  AiQueryController.prototype,
+  'documentAnalysis',
   null
 );
 exports.AiQueryController = AiQueryController = __decorate(

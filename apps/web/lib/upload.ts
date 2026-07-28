@@ -4,7 +4,8 @@ const CHUNK_SIZE = 5 * 1024 * 1024;
 
 export async function uploadFile(
   file: File,
-  getToken: () => string | null
+  getToken: () => string | null,
+  onProgress?: (progress: number) => void
 ): Promise<{ fileKey: string; fileName: string; mimeType: string; sizeBytes: number }> {
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
@@ -28,6 +29,7 @@ export async function uploadFile(
     if (!response.ok) {
       throw new Error(await readUploadError(response));
     }
+    onProgress?.(Math.round(((i + 1) / totalChunks) * 100));
   }
 
   return apiPost(buildBrowserApiUrl(`/uploads/${uploadId}/complete`), {}, getToken);

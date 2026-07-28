@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { UploadsWorkspace } from '../../components/modules/uploads-workspace';
 
 export default function UploadsPage() {
-  redirect('/documents');
+  return <UploadsWorkspace />;
 }

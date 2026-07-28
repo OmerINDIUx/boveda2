@@ -226,10 +226,14 @@ export function RfiTemplatesListPage() {
 export function RfiTemplateFormPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isEdit = Boolean(params?.id);
   const templateId = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({
+    ...emptyForm,
+    projectId: searchParams.get('projectId') ?? '',
+  });
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);

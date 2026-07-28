@@ -37,6 +37,32 @@ type OllamaBilingualQueryResult = {
   error?: string;
 };
 
+export type DocumentIndexItem = {
+  category:
+    | 'summary'
+    | 'dates'
+    | 'amounts'
+    | 'people'
+    | 'requirements'
+    | 'decisions'
+    | 'risks'
+    | 'relationships';
+  label: string;
+  value: string;
+  subject?: string;
+  relation?: string;
+  target?: string;
+  context?: string;
+  pageNumber?: number;
+  evidence?: string;
+};
+
+type OllamaDocumentIndexResult = {
+  items?: DocumentIndexItem[];
+  error?: string;
+  model: string;
+};
+
 @Injectable()
 export class OllamaChatService {
   constructor(private readonly config: ConfigService) {}
@@ -167,6 +193,87 @@ export class OllamaChatService {
       const payload = (await response.json()) as OllamaChatResponse;
       const content = payload.message?.content?.trim();
       return content ? { content, model } : { model, error: 'Ollama respondio sin contenido.' };
+    } catch (error) {
+      return {
+        model,
+        error:
+          error instanceof Error && error.name === 'AbortError'
+            ? `Ollama no respondio antes de ${timeoutMs} ms.`
+            : `No pude conectar con Ollama en ${baseUrl}.`,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async extractDocumentIndex(evidence: string): Promise<OllamaDocumentIndexResult> {
+    const baseUrl = this.config.get<string>('OLLAMA_BASE_URL') ?? 'http://127.0.0.1:11434';
+    const model = this.config.get<string>('OLLAMA_MODEL') ?? 'llama3.1';
+    const timeoutMs = Number(this.config.get<string>('OLLAMA_TIMEOUT_MS') ?? 120000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          stream: false,
+          format: 'json',
+          messages: [
+            {
+              role: 'system',
+              content: [
+                'Eres un analista de documentos empresariales.',
+                'Crea un indice semantico de los datos importantes y de las relaciones entre ellos, expresamente presentes en el texto.',
+                'Devuelve JSON valido con la forma {"items":[...]}.',
+                'Cada item contiene category, label, value, subject, relation, target, context, pageNumber y evidence.',
+                'Categorias permitidas: summary, dates, amounts, people, requirements, decisions, risks, relationships.',
+                'Prioriza relationships: cada relación debe explicar qué elemento se refiere a qué otro y por qué importa, por ejemplo "El monto X corresponde a la obra Y", "La fecha Z marca el inicio del proyecto Y" o "La actividad X es responsabilidad de Y".',
+                'No devuelvas solamente listas de datos aislados. Conecta nombres, proyectos, ubicaciones, cifras, fechas, obligaciones y consecuencias cuando el texto lo permita.',
+                'subject es el elemento origen, relation es una frase corta como corresponde a, se refiere a, inicia, termina, depende de, es responsabilidad de o impacta en, y target es el elemento relacionado. context explica la relevancia para entender o responder consultas posteriores.',
+                'Incluye como maximo 24 items, evita duplicados y usa etiquetas claras en espanol.',
+                'No inventes datos ni completes informacion ausente.',
+                'Conserva literalmente folios, nombres, fechas, porcentajes, monedas e importes.',
+                'pageNumber debe ser numerico cuando la evidencia indique una pagina; de lo contrario omitelo.',
+                'evidence debe ser una cita breve que permita verificar el dato.',
+              ].join(' '),
+            },
+            { role: 'user', content: evidence.slice(0, 60000) },
+          ],
+          options: { temperature: 0 },
+        }),
+      });
+
+      if (!response.ok) {
+        return { model, error: `Ollama respondio ${response.status}.` };
+      }
+
+      const payload = (await response.json()) as OllamaChatResponse;
+      const content = payload.message?.content?.trim();
+      if (!content) return { model, error: 'Ollama respondio sin contenido.' };
+
+      const parsed = JSON.parse(content) as { items?: DocumentIndexItem[] };
+      const allowedCategories = new Set<DocumentIndexItem['category']>([
+        'summary',
+        'dates',
+        'amounts',
+        'people',
+        'requirements',
+        'decisions',
+        'risks',
+        'relationships',
+      ]);
+      return {
+        model,
+        items: Array.isArray(parsed.items)
+          ? parsed.items
+              .filter((item) => item?.label && item?.value && allowedCategories.has(item.category))
+              .slice(0, 24)
+          : [],
+      };
     } catch (error) {
       return {
         model,

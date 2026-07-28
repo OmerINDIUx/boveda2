@@ -5,6 +5,7 @@ import { AccessScopeService } from '../../common/access-scope.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentChunk } from '../documents/document-chunk.entity';
 import { DocumentPermission } from '../documents/document-permission.entity';
+import { DocumentMetadata } from '../documents/document-metadata.entity';
 import { DocumentRecord } from '../documents/document.entity';
 import { ProjectMember } from '../projects/project-member.entity';
 import { User } from '../users/user.entity';
@@ -13,7 +14,7 @@ import { AskDocumentQueryDto } from './dto/ask-document-query.dto';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { DocumentIndexingService } from './document-indexing.service';
 import { DocumentQueryHistory } from './document-query-history.entity';
-import { OllamaChatService } from './ollama-chat.service';
+import { DocumentIndexItem, OllamaChatService } from './ollama-chat.service';
 import { ConversationSession } from './conversation-session.entity';
 
 type CitationPayload = {
@@ -34,6 +35,7 @@ export class AiQueryService {
     @InjectRepository(DocumentRecord) private readonly documents: Repository<DocumentRecord>,
     @InjectRepository(DocumentVersion) private readonly versions: Repository<DocumentVersion>,
     @InjectRepository(DocumentChunk) private readonly chunks: Repository<DocumentChunk>,
+    @InjectRepository(DocumentMetadata) private readonly metadata: Repository<DocumentMetadata>,
     @InjectRepository(DocumentPermission)
     private readonly permissions: Repository<DocumentPermission>,
     @InjectRepository(DocumentQueryHistory)
@@ -168,6 +170,101 @@ export class AiQueryService {
       indexedDocuments: indexedCount,
       pendingDocuments: docsWithVersions.length - indexedCount,
     };
+  }
+
+  async documentAnalysis(userId: string, documentId: string) {
+    const [document] = await this.getVisibleDocuments(userId, {
+      documentId,
+      question: '',
+    } as AskDocumentQueryDto);
+    if (!document) {
+      throw new NotFoundException('Documento no encontrado dentro del alcance del usuario');
+    }
+
+    const version = document.currentVersionId
+      ? await this.versions.findOne({ where: { id: document.currentVersionId } })
+      : null;
+    if (!version) {
+      return {
+        document: { id: document.id, name: document.name, documentNumber: document.documentNumber },
+        version: null,
+        status: 'pending',
+        transcription: [],
+        indexItems: [],
+      };
+    }
+
+    const chunks = await this.chunks.find({
+      where: { documentId, versionId: version.id },
+      order: { chunkIndex: 'ASC' },
+    });
+    const storedIndex = await this.metadata.findOne({
+      where: { documentId, metaKey: `ai_index:${version.id}` },
+    });
+    const parsedIndex = this.parseStoredIndex(storedIndex?.metaValue);
+
+    return {
+      document: { id: document.id, name: document.name, documentNumber: document.documentNumber },
+      version: {
+        id: version.id,
+        revision: version.revision,
+        fileName: version.fileName,
+        extractedAt: version.contentExtractedAt,
+      },
+      status: version.contentExtractionStatus,
+      error: version.contentExtractionError,
+      transcription: chunks.map((chunk) => ({
+        id: chunk.id,
+        pageNumber: chunk.pageNumber,
+        sectionLabel: chunk.sectionLabel,
+        text: chunk.content.replace(/^\s*(?:\[[^\]]+\]\s*)+/u, '').trim(),
+      })),
+      indexItems: parsedIndex.items?.length
+        ? parsedIndex.items
+        : chunks.slice(0, 12).map((chunk, index) => ({
+            category: 'summary',
+            label:
+              chunk.sectionLabel ??
+              (chunk.pageNumber ? `Página ${chunk.pageNumber}` : `Punto ${index + 1}`),
+            value: this.trimFragment(chunk.content.replace(/^\s*(?:\[[^\]]+\]\s*)+/u, '').trim()),
+            pageNumber: chunk.pageNumber,
+          })),
+      indexModel: parsedIndex.model,
+    };
+  }
+
+  async reindexDocument(userId: string, documentId: string) {
+    const [document] = await this.getVisibleDocuments(userId, {
+      documentId,
+      question: '',
+    } as AskDocumentQueryDto);
+    if (!document?.currentVersionId) {
+      throw new NotFoundException('El documento no tiene una versión para analizar');
+    }
+    const version = await this.versions.findOne({ where: { id: document.currentVersionId } });
+    if (!version) throw new NotFoundException('Versión no encontrada');
+
+    version.contentHash = undefined;
+    version.contentExtractionStatus = 'pending';
+    version.contentExtractionError = undefined;
+    await this.versions.save(version);
+    void this.indexing.ensureVersionIndexed(document, version).catch(() => undefined);
+    return { ok: true, status: 'pending', versionId: version.id };
+  }
+
+  private parseStoredIndex(value?: string) {
+    if (!value) return {} as { items?: DocumentIndexItem[]; model?: string };
+    try {
+      const parsed = JSON.parse(value) as { items?: DocumentIndexItem[]; model?: string };
+      return {
+        ...parsed,
+        items: Array.isArray(parsed.items)
+          ? parsed.items.filter((item) => item?.label && item?.value)
+          : [],
+      };
+    } catch {
+      return {} as { items?: DocumentIndexItem[]; model?: string };
+    }
   }
 
   private async getVisibleDocuments(userId: string, dto: AskDocumentQueryDto) {

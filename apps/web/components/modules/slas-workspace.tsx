@@ -1,7 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, CheckCircle2, AlertTriangle, XCircle, BarChart3, Activity } from 'lucide-react';
+import {
+  Plus,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  BarChart3,
+  Activity,
+  FileText,
+  Mail,
+} from 'lucide-react';
 import { apiGet, apiPost } from '../../lib/api';
 import { getSessionToken } from '../../lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +52,7 @@ export function SlasWorkspace() {
     warningHours: 3,
   });
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'slas' | 'nomenclatures' | 'metrics'>('slas');
+  const [tab, setTab] = useState<'slas' | 'templates' | 'nomenclatures' | 'metrics'>('slas');
 
   const loadProjects = useCallback(async () => {
     try {
@@ -139,7 +149,7 @@ export function SlasWorkspace() {
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        {(['slas', 'nomenclatures', 'metrics'] as const).map((tabKey) => (
+        {(['slas', 'templates', 'nomenclatures', 'metrics'] as const).map((tabKey) => (
           <button
             key={tabKey}
             onClick={() => setTab(tabKey)}
@@ -156,9 +166,11 @@ export function SlasWorkspace() {
           >
             {tabKey === 'slas'
               ? t('sla.title')
-              : tabKey === 'nomenclatures'
-                ? 'Nomenclaturas'
-                : t('sla.metrics')}
+              : tabKey === 'templates'
+                ? 'Plantillas de solicitud'
+                : tabKey === 'nomenclatures'
+                  ? 'Nomenclaturas'
+                  : t('sla.metrics')}
           </button>
         ))}
       </div>
@@ -370,6 +382,58 @@ export function SlasWorkspace() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'templates' && (
+        <div className="grid">
+          <article className="card span-7" style={{ padding: '1.25rem' }}>
+            <div className="panel-header">
+              <div>
+                <h2 style={{ margin: 0 }}>Plantillas para pedir información</h2>
+                <p className="muted" style={{ margin: '6px 0 0' }}>
+                  Define el asunto, la pregunta, el plazo del SLA y quién debe responder. Estas
+                  plantillas aparecen directamente al crear un RFI.
+                </p>
+              </div>
+              <FileText size={22} color="var(--color-primary)" />
+            </div>
+            <div className="projects-actions" style={{ marginTop: 16 }}>
+              <Link
+                className="button"
+                href={`/rfi-templates/new${selectedProject ? `?projectId=${selectedProject}` : ''}`}
+              >
+                <Plus size={16} />
+                Nueva plantilla
+              </Link>
+              <Link
+                className="button secondary"
+                href={`/rfi-templates${selectedProject ? `?projectId=${selectedProject}` : ''}`}
+              >
+                Administrar plantillas
+              </Link>
+            </div>
+          </article>
+          <article className="card span-5" style={{ padding: '1.25rem' }}>
+            <div className="panel-header">
+              <h2 style={{ margin: 0 }}>Ciclo por correo</h2>
+              <Mail size={20} color="var(--color-primary)" />
+            </div>
+            <div className="simple-document-list">
+              <div className="simple-document-item">
+                <strong>1. Envío</strong>
+                <span>El RFI se envía al correo de la persona responsable.</span>
+              </div>
+              <div className="simple-document-item">
+                <strong>2. Respuesta</strong>
+                <span>La persona responde al mismo correo sin entrar al sistema.</span>
+              </div>
+              <div className="simple-document-item">
+                <strong>3. Expediente</strong>
+                <span>La respuesta queda registrada en la conversación del RFI.</span>
+              </div>
+            </div>
+          </article>
         </div>
       )}
 

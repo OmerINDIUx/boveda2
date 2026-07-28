@@ -40,7 +40,14 @@ type ProjectSummary = {
   responsible: { id: string; name: string; email: string } | null;
   assignedUsers: Array<{ id: string; name: string; email: string; role: string }>;
   disciplines: Array<{ id: string; code: string; name: string }>;
-  metrics: { documents: number; approved: number; critical: number; progress: number };
+  metrics: {
+    documents: number;
+    approved: number;
+    critical: number;
+    overdue: number;
+    dueSoon: number;
+    progress: number;
+  };
 };
 
 type FolderNode = {
@@ -238,7 +245,7 @@ const fallbackProjects: ProjectSummary[] = [
       { id: 'd1', code: 'ARC', name: 'Arquitectura' },
       { id: 'd2', code: 'MEC', name: 'Mecánica' },
     ],
-    metrics: { documents: 48, approved: 31, critical: 5, progress: 65 },
+    metrics: { documents: 48, approved: 31, critical: 5, overdue: 3, dueSoon: 2, progress: 65 },
   },
   {
     id: 'mock-2',
@@ -257,7 +264,7 @@ const fallbackProjects: ProjectSummary[] = [
       { id: 'd3', code: 'CIV', name: 'Civil' },
       { id: 'd4', code: 'ELE', name: 'Eléctrica' },
     ],
-    metrics: { documents: 76, approved: 39, critical: 11, progress: 51 },
+    metrics: { documents: 76, approved: 39, critical: 11, overdue: 7, dueSoon: 4, progress: 51 },
   },
 ];
 
@@ -559,34 +566,68 @@ export function ProjectsListPage() {
         <div className="grid" style={{ marginTop: 16 }}>
           {filteredProjects.map((project) => (
             <article className="card span-6" key={project.id}>
-              <div className="project-hero" style={{ gap: 16 }}>
+              <div className="project-hero project-card-header">
                 <div>
                   <div className="project-code">{project.code}</div>
                   <h2 style={{ marginBottom: 6 }}>{project.name}</h2>
                   <p className="muted">{project.description || 'Sin descripción ejecutiva.'}</p>
                 </div>
-                <div className="project-hero-actions">
-                  <Link className="button secondary" href={`/projects/${project.id}`}>
-                    Ver detalle
+              </div>
+
+              <div className="project-card-actions" aria-label={`Acciones de ${project.name}`}>
+                <Link className="button primary" href={`/documents?projectId=${project.id}`}>
+                  <FileText size={17} />
+                  Ver documentos
+                </Link>
+                <Link className="button outline" href={`/projects/${project.id}`}>
+                  Ver detalle
+                </Link>
+                <Link className="button secondary" href={`/rfis/new?projectId=${project.id}`}>
+                  <MessageSquare size={17} />
+                  Nuevo RFI
+                </Link>
+                {canManage ? (
+                  <Link className="button secondary" href={`/projects/${project.id}/edit`}>
+                    <PencilLine size={17} />
+                    Editar
                   </Link>
-                  <Link className="button secondary" href={`/rfis/new?projectId=${project.id}`}>
-                    <MessageSquare size={18} />
-                    RFI
-                  </Link>
-                  {canManage ? (
-                    <Link className="button secondary" href={`/projects/${project.id}/edit`}>
-                      <PencilLine size={18} />
-                      Editar
-                    </Link>
-                  ) : null}
+                ) : null}
+              </div>
+
+              <div
+                className="document-summary-grid"
+                aria-label={`Resumen documental de ${project.name}`}
+              >
+                <div className="document-summary-card total">
+                  <div className="document-summary-icon">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <span>Total del centro</span>
+                    <strong>{project.metrics.documents}</strong>
+                  </div>
+                </div>
+                <div className="document-summary-card overdue">
+                  <div className="document-summary-icon">
+                    <FileClock size={20} />
+                  </div>
+                  <div>
+                    <span>Vencidos del centro</span>
+                    <strong>{project.metrics.overdue}</strong>
+                  </div>
+                </div>
+                <div className="document-summary-card due-soon">
+                  <div className="document-summary-icon">
+                    <CalendarDays size={20} />
+                  </div>
+                  <div>
+                    <span>Por vencer · próximos 7 días</span>
+                    <strong>{project.metrics.dueSoon}</strong>
+                  </div>
                 </div>
               </div>
 
-              <div className="project-state-grid">
-                <div className="state-card">
-                  <span>Documentos</span>
-                  <Link href={`/documents?projectId=${project.id}`}>Ver documentos</Link>
-                </div>
+              <div className="project-state-grid project-info-grid">
                 <div className="state-card">
                   <span>Etapa</span>
                   <strong>{project.currentStage || 'Sin definir'}</strong>

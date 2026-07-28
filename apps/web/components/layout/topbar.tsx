@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   Command,
   FileQuestion,
-  FileText,
   FolderKanban,
   Gauge,
   Landmark,
@@ -17,15 +16,16 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LanguageSwitcher } from './language-switcher';
 import { apiGet } from '../../lib/api';
 import { clearSession, getSessionUser } from '../../lib/auth';
+import { brand } from '../../lib/brand';
 
 const searchItems = [
   { href: '/dashboard', label: 'Panel', icon: Gauge, section: 'Principal' },
   { href: '/projects', label: 'Centros de costos', icon: FolderKanban, section: 'Gestión' },
-  { href: '/documents', label: 'Documentos', icon: FileText, section: 'Gestión' },
   { href: '/rfis', label: 'Consultas', icon: FileQuestion, section: 'Gestión' },
   { href: '/approvals', label: 'Aprobaciones', icon: ClipboardCheck, section: 'Gestión' },
   { href: '/clm', label: 'Contratos', icon: Landmark, section: 'Gestión' },
@@ -161,8 +161,27 @@ export function TopBar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Link
             href="/dashboard"
-            style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-primary)' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '1.125rem',
+              fontWeight: 800,
+              color: 'var(--color-primary)',
+            }}
           >
+            <Image
+              src={brand.logo}
+              alt="Holocom"
+              width={28}
+              height={28}
+              style={{
+                width: 28,
+                height: 28,
+                flexShrink: 0,
+                objectFit: 'contain',
+              }}
+            />
             Holocron
           </Link>
           <span style={{ color: 'var(--border)' }}>|</span>

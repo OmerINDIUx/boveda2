@@ -4,6 +4,7 @@ import { AuditModule } from '../audit/audit.module';
 import { DocumentChunk } from '../documents/document-chunk.entity';
 import { DocumentEmbedding } from '../documents/document-embedding.entity';
 import { DocumentPermission } from '../documents/document-permission.entity';
+import { DocumentMetadata } from '../documents/document-metadata.entity';
 import { DocumentRecord } from '../documents/document.entity';
 import { DocumentsModule } from '../documents/documents.module';
 import { ProjectMember } from '../projects/project-member.entity';
@@ -31,6 +32,7 @@ import { ConversationSession } from './conversation-session.entity';
       DocumentChunk,
       DocumentEmbedding,
       DocumentPermission,
+      DocumentMetadata,
       DocumentQueryHistory,
       ConversationSession,
       User,

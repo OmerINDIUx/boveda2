@@ -50,14 +50,14 @@
 }
 
 .navItemActive {
-  background: rgba(15, 118, 110, 0.15);
-  color: #14b8a6;
+  background: rgba(var(--color-primary-rgb), 0.15);
+  color: var(--color-primary-accent);
   font-weight: var(--weight-semibold);
 }
 
 .navItemActive:hover {
-  background: rgba(15, 118, 110, 0.2);
-  color: #5eead4;
+  background: rgba(var(--color-primary-rgb), 0.2);
+  color: var(--color-primary-contrast);
 }
 
 .navIcon {

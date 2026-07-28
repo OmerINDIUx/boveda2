@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Bot,
   Building2,
-  ChevronDown,
   ChevronRight,
   CheckCircle2,
   Clock3,
@@ -53,7 +52,7 @@ import { getFileIcon } from '../../lib/file-icons';
 import { PermissionKey } from '../../lib/permissions';
 import { normalizeLabel } from '../../lib/labels';
 
-type ProjectOption = { id: string; name: string; code: string };
+type ProjectOption = { id: string; name: string; code: string; disciplines?: DisciplineOption[] };
 type DisciplineOption = { id: string; name: string; code: string };
 type FolderOption = {
   id: string;
@@ -127,7 +126,7 @@ type DocumentListItem = {
   currentVersionId?: string;
   updatedAt: string;
   createdAt: string;
-  project?: { id: string; name: string; code: string };
+  project?: ProjectOption;
   folder?: { id: string; name: string } | null;
   discipline?: { id: string; code: string; name: string } | null;
   responsibleUser?: { id: string; name: string; email: string } | null;
@@ -601,6 +600,7 @@ export function DocumentsListPage() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [disciplines, setDisciplines] = useState<DisciplineOption[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState(queryProjectId);
+  const [selectedDisciplineId, setSelectedDisciplineId] = useState('');
   const [folders, setFolders] = useState<FolderOption[]>([]);
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState('');
@@ -702,6 +702,7 @@ export function DocumentsListPage() {
   }, [search, selectedProjectId]);
 
   useEffect(() => {
+    setSelectedDisciplineId('');
     setSelectedFolderId('');
     setSelectedDocumentId('');
     setShowCreateFolder(false);
@@ -737,13 +738,53 @@ export function DocumentsListPage() {
     router.replace(`/documents${params.toString() ? `?${params.toString()}` : ''}`);
   }, [queryProjectId, router, searchParams, selectedPreset, selectedProjectId]);
 
+  const visibleFolders = useMemo(
+    () =>
+      selectedDisciplineId
+        ? folders.filter((folder) => folder.disciplineId === selectedDisciplineId)
+        : folders,
+    [folders, selectedDisciplineId]
+  );
   const folderMap = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
-  const folderChildrenMap = useMemo(() => buildFolderChildrenMap(folders), [folders]);
+  const folderChildrenMap = useMemo(() => buildFolderChildrenMap(visibleFolders), [visibleFolders]);
   const folderBreadcrumbs = useMemo(
     () => getFolderBreadcrumbs(selectedFolderId, folderMap),
     [folderMap, selectedFolderId]
   );
-
+  const disciplineFolders = useMemo(
+    () =>
+      (
+        projects.find((project) => project.id === selectedProjectId)?.disciplines ?? disciplines
+      ).map((discipline) => ({
+        discipline,
+        folder: folders.find(
+          (folder) =>
+            folder.disciplineId === discipline.id &&
+            folder.name === `${discipline.code}_${discipline.name}`
+        ),
+      })),
+    [disciplines, folders, projects, selectedProjectId]
+  );
+  const activeDisciplineFolderId =
+    disciplineFolders.find((item) => item.discipline.id === selectedDisciplineId)?.folder?.id ?? '';
+  const visibleFolderBreadcrumbs = useMemo(
+    () =>
+      selectedDisciplineId
+        ? folderBreadcrumbs.filter(
+            (folder) => folder.disciplineId || folder.id === activeDisciplineFolderId
+          )
+        : folderBreadcrumbs,
+    [activeDisciplineFolderId, folderBreadcrumbs, selectedDisciplineId]
+  );
+  const currentFolderChildren = folderChildrenMap[selectedFolderId || 'root'] ?? [];
+  const folderDocumentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const document of documents) {
+      if (document.folderId)
+        counts.set(document.folderId, (counts.get(document.folderId) ?? 0) + 1);
+    }
+    return counts;
+  }, [documents]);
   const filteredDocuments = useMemo(() => {
     return documents.filter((item) => {
       if (selectedPreset === 'pending' && item.status !== 'pending_approval') return false;
@@ -771,7 +812,7 @@ export function DocumentsListPage() {
       const folder = folderMap.get(item.folderId);
       return folder ? isFolderInside(folder, selectedFolderId, folderMap) : false;
     });
-  }, [documents, folderMap, selectedFolderId, selectedPreset]);
+  }, [documents, folderMap, selectedDisciplineId, selectedFolderId, selectedPreset]);
 
   const selectedDocument = useMemo(
     () =>
@@ -789,13 +830,6 @@ export function DocumentsListPage() {
     [documents, projects, selectedProjectId]
   );
 
-  const rootFolders = useMemo(
-    () =>
-      [...(folderChildrenMap.root ?? [])].sort((left, right) =>
-        left.name.localeCompare(right.name)
-      ),
-    [folderChildrenMap]
-  );
   const siblingFolders = useMemo(() => {
     const parentKey = selectedFolderId ? selectedFolderId : 'root';
     return (folderChildrenMap[parentKey] ?? []).map((folder) => folder.name.toLowerCase());
@@ -925,7 +959,8 @@ export function DocumentsListPage() {
   }
 
   async function createFolder() {
-    if (!selectedProjectId || folderRuleError || folderDuplicateError) return;
+    if (!selectedProjectId || !folderDraft.disciplineId || folderRuleError || folderDuplicateError)
+      return;
 
     setFolderSaving(true);
     try {
@@ -954,8 +989,6 @@ export function DocumentsListPage() {
     }
   }
 
-  const [folderExpanded, setFolderExpanded] = useState(true);
-
   return (
     <section>
       {/* Header */}
@@ -971,10 +1004,10 @@ export function DocumentsListPage() {
       >
         <div>
           <h1 style={{ fontSize: '1.375rem', fontWeight: 700, margin: 0 }}>
-            {selectedProject ? `Drive · ${selectedProject.name}` : 'Drive documental'}
+            {selectedProject ? `Documentos · ${selectedProject.name}` : 'Documentos'}
           </h1>
           <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: '#6b7280' }}>
-            Explora archivos por carpeta, disciplina y estado
+            Encuentra, revisa y controla la información vigente del centro de costos
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1022,10 +1055,13 @@ export function DocumentsListPage() {
               Centro de costos
             </Link>
           )}
-          {canManageFolders && selectedProjectId && (
+          {canManageFolders && selectedProjectId && selectedDisciplineId && (
             <button
               type="button"
-              onClick={() => setShowCreateFolder(!showCreateFolder)}
+              onClick={() => {
+                setFolderDraft((prev) => ({ ...prev, disciplineId: selectedDisciplineId }));
+                setShowCreateFolder(!showCreateFolder);
+              }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1056,7 +1092,7 @@ export function DocumentsListPage() {
               padding: '0 0.75rem',
               borderRadius: '6px',
               border: 'none',
-              background: '#0f766e',
+              background: '#4f46e5',
               color: '#fff',
               textDecoration: 'none',
               fontSize: '0.8125rem',
@@ -1148,7 +1184,10 @@ export function DocumentsListPage() {
       >
         <button
           type="button"
-          onClick={() => setSelectedFolderId('')}
+          onClick={() => {
+            setSelectedDisciplineId('');
+            setSelectedFolderId('');
+          }}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -1157,9 +1196,9 @@ export function DocumentsListPage() {
             padding: '0 0.75rem',
             borderRadius: '999px',
             border: '1px solid',
-            borderColor: !selectedFolderId ? '#0f766e' : '#e5e7eb',
-            background: !selectedFolderId ? '#f0fdfa' : '#fff',
-            color: !selectedFolderId ? '#0f766e' : '#6b7280',
+            borderColor: !selectedFolderId ? '#4f46e5' : '#e5e7eb',
+            background: !selectedFolderId ? '#eef2ff' : '#fff',
+            color: !selectedFolderId ? '#4f46e5' : '#6b7280',
             cursor: 'pointer',
             fontSize: '0.75rem',
             fontWeight: !selectedFolderId ? 600 : 400,
@@ -1168,7 +1207,7 @@ export function DocumentsListPage() {
           <Building2 size={12} />
           {selectedProject?.code ?? 'Centro de costos'}
         </button>
-        {folderBreadcrumbs.map((folder) => (
+        {visibleFolderBreadcrumbs.map((folder) => (
           <button
             key={folder.id}
             type="button"
@@ -1181,9 +1220,9 @@ export function DocumentsListPage() {
               padding: '0 0.75rem',
               borderRadius: '999px',
               border: '1px solid',
-              borderColor: folder.id === selectedFolderId ? '#0f766e' : '#e5e7eb',
-              background: folder.id === selectedFolderId ? '#f0fdfa' : '#fff',
-              color: folder.id === selectedFolderId ? '#0f766e' : '#6b7280',
+              borderColor: folder.id === selectedFolderId ? '#4f46e5' : '#e5e7eb',
+              background: folder.id === selectedFolderId ? '#eef2ff' : '#fff',
+              color: folder.id === selectedFolderId ? '#4f46e5' : '#6b7280',
               cursor: 'pointer',
               fontSize: '0.75rem',
               fontWeight: folder.id === selectedFolderId ? 600 : 400,
@@ -1240,8 +1279,8 @@ export function DocumentsListPage() {
                     padding: '0.375rem 0.5rem',
                     borderRadius: '6px',
                     border: 'none',
-                    background: selectedPreset === preset.id ? '#f0fdfa' : 'transparent',
-                    color: selectedPreset === preset.id ? '#0f766e' : '#374151',
+                    background: selectedPreset === preset.id ? '#eef2ff' : 'transparent',
+                    color: selectedPreset === preset.id ? '#4f46e5' : '#374151',
                     cursor: 'pointer',
                     fontSize: '0.8125rem',
                     fontWeight: selectedPreset === preset.id ? 600 : 400,
@@ -1266,10 +1305,10 @@ export function DocumentsListPage() {
                       minWidth: '1.25rem',
                       height: '1.25rem',
                       borderRadius: '999px',
-                      background: selectedPreset === preset.id ? '#ccfbf1' : '#f3f4f6',
+                      background: selectedPreset === preset.id ? '#e0e7ff' : '#f3f4f6',
                       fontSize: '0.6875rem',
                       fontWeight: 700,
-                      color: selectedPreset === preset.id ? '#0f766e' : '#6b7280',
+                      color: selectedPreset === preset.id ? '#4f46e5' : '#6b7280',
                     }}
                   >
                     {preset.count}
@@ -1307,124 +1346,6 @@ export function DocumentsListPage() {
               })}
             </div>
           </div>
-
-          {/* Folders */}
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              padding: '0.75rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '0.5rem',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  color: '#9ca3af',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                Carpetas
-              </div>
-              <div style={{ display: 'flex', gap: '0.25rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setFolderExpanded(!folderExpanded)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#9ca3af',
-                    padding: '2px',
-                    display: 'flex',
-                  }}
-                >
-                  {folderExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </button>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '1.25rem',
-                    height: '1.25rem',
-                    borderRadius: '999px',
-                    background: '#f3f4f6',
-                    fontSize: '0.6875rem',
-                    fontWeight: 700,
-                    color: '#6b7280',
-                  }}
-                >
-                  {folders.length}
-                </span>
-              </div>
-            </div>
-
-            {folderExpanded && (
-              <div>
-                {/* Root folder button */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedFolderId('')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    width: '100%',
-                    padding: '0.5rem 0.5rem',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: !selectedFolderId ? '#f0fdfa' : 'transparent',
-                    color: !selectedFolderId ? '#0f766e' : '#374151',
-                    cursor: 'pointer',
-                    fontSize: '0.8125rem',
-                    fontWeight: !selectedFolderId ? 600 : 400,
-                    textAlign: 'left',
-                    transition: 'background 120ms ease',
-                    marginBottom: '2px',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedFolderId) e.currentTarget.style.background = '#f9fafb';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedFolderId) e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <FolderOpen size={15} style={{ flexShrink: 0 }} />
-                  <span>Raíz</span>
-                </button>
-
-                {/* Folder tree */}
-                {rootFolders.map((folder) => (
-                  <FolderTreeButton
-                    childrenMap={folderChildrenMap}
-                    currentFolderId={selectedFolderId}
-                    folder={folder}
-                    key={folder.id}
-                    onSelect={setSelectedFolderId}
-                  />
-                ))}
-
-                {!loading && !rootFolders.length && (
-                  <p
-                    style={{ fontSize: '0.75rem', color: '#9ca3af', padding: '0.5rem', margin: 0 }}
-                  >
-                    Sin carpetas en este centro de costos
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Center: File list */}
@@ -1436,6 +1357,106 @@ export function DocumentsListPage() {
             overflow: 'hidden',
           }}
         >
+          {/* Discipline and folder navigator */}
+          <div className="documents-folder-navigator">
+            <div className="documents-folder-navigator-header">
+              <div>
+                <strong>{selectedDisciplineId ? 'Carpetas' : 'Disciplinas'}</strong>
+                <span>
+                  {selectedDisciplineId
+                    ? `${currentFolderChildren.length} en este nivel`
+                    : `${disciplineFolders.length} registradas`}
+                </span>
+              </div>
+              <div className="documents-folder-navigator-actions">
+                {!selectedDisciplineId && canManageFolders && selectedProjectId ? (
+                  <Link
+                    className="documents-manage-disciplines"
+                    href={`/projects/${selectedProjectId}/edit`}
+                  >
+                    Administrar disciplinas
+                  </Link>
+                ) : null}
+                {selectedDisciplineId ? (
+                  <button
+                    className="documents-folder-navigator-back"
+                    type="button"
+                    onClick={() => {
+                      if (selectedFolderId === activeDisciplineFolderId) {
+                        setSelectedDisciplineId('');
+                        setSelectedFolderId('');
+                      } else {
+                        setSelectedFolderId(
+                          folderMap.get(selectedFolderId)?.parentId ?? activeDisciplineFolderId
+                        );
+                      }
+                    }}
+                  >
+                    <ChevronRight size={14} style={{ transform: 'rotate(180deg)' }} />
+                    Volver a disciplinas
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {!selectedDisciplineId ? (
+              <div className="documents-folder-grid">
+                {disciplineFolders.map(({ discipline, folder }) => (
+                  <button
+                    className="documents-folder-card documents-discipline-card"
+                    disabled={!folder}
+                    key={discipline.id}
+                    type="button"
+                    onClick={() => {
+                      if (!folder) return;
+                      setSelectedDisciplineId(discipline.id);
+                      setSelectedFolderId(folder.id);
+                    }}
+                  >
+                    <FolderTree size={21} />
+                    <span>
+                      <strong>
+                        {discipline.code} · {discipline.name}
+                      </strong>
+                      <small>
+                        {folder
+                          ? `${folderDocumentCounts.get(folder.id) ?? 0} archivos`
+                          : 'Sin carpeta raíz'}
+                      </small>
+                    </span>
+                    <ChevronRight size={17} />
+                  </button>
+                ))}
+                {!disciplineFolders.length ? (
+                  <div className="documents-folder-empty">
+                    Este centro de costos no tiene disciplinas registradas.
+                  </div>
+                ) : null}
+              </div>
+            ) : currentFolderChildren.length ? (
+              <div className="documents-folder-grid">
+                {currentFolderChildren.map((folder) => (
+                  <button
+                    className="documents-folder-card"
+                    key={folder.id}
+                    type="button"
+                    onClick={() => setSelectedFolderId(folder.id)}
+                  >
+                    <FolderOpen size={21} />
+                    <span>
+                      <strong>{folder.name}</strong>
+                      <small>{folderDocumentCounts.get(folder.id) ?? 0} archivos</small>
+                    </span>
+                    <ChevronRight size={17} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="documents-folder-empty">
+                No hay carpetas dentro de esta disciplina todavía.
+              </div>
+            )}
+          </div>
+
           {/* File header */}
           <div
             style={{
@@ -1537,8 +1558,7 @@ export function DocumentsListPage() {
                       background: '#fff',
                     }}
                   >
-                    <option value="">Sin disciplina</option>
-                    {disciplines.map((d) => (
+                    {(selectedProject?.disciplines ?? disciplines).map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.code} · {d.name}
                       </option>
@@ -1596,7 +1616,7 @@ export function DocumentsListPage() {
                       Boolean(folderDuplicateError) ||
                       !selectedProjectId
                         ? '#9ca3af'
-                        : '#0f766e',
+                        : '#4f46e5',
                     color: '#fff',
                     cursor:
                       folderSaving ||
@@ -1655,7 +1675,7 @@ export function DocumentsListPage() {
                       width: '100%',
                       border: 'none',
                       borderBottom: '1px solid #f3f4f6',
-                      background: selectedDocument?.id === doc.id ? '#f0fdfa' : '#fff',
+                      background: selectedDocument?.id === doc.id ? '#eef2ff' : '#fff',
                       cursor: 'pointer',
                       transition: 'background 120ms ease',
                     }}
@@ -1735,7 +1755,7 @@ export function DocumentsListPage() {
                 <div
                   style={{
                     fontSize: '0.75rem',
-                    color: '#0f766e',
+                    color: '#4f46e5',
                     fontWeight: 600,
                     marginBottom: '0.25rem',
                   }}
@@ -1797,7 +1817,7 @@ export function DocumentsListPage() {
                     padding: '0 0.75rem',
                     borderRadius: '6px',
                     border: 'none',
-                    background: '#0f766e',
+                    background: '#4f46e5',
                     color: '#fff',
                     textDecoration: 'none',
                     fontSize: '0.8125rem',
@@ -1842,6 +1862,10 @@ export function DocumentsListPage() {
                   }}
                 >
                   Versión
+                </Link>
+                <Link href={`/documents/${selectedDocument.id}/analysis`} className="indigo-action">
+                  <Sparkles size={15} />
+                  Ver extracción IA
                 </Link>
                 <Link
                   href={`/ai-query?documentId=${selectedDocument.id}`}
@@ -1960,50 +1984,6 @@ export function DocumentsListPage() {
         </div>
       ) : null}
     </section>
-  );
-}
-
-function FolderTreeButton({
-  folder,
-  currentFolderId,
-  onSelect,
-  childrenMap,
-}: {
-  folder: FolderOption;
-  currentFolderId: string;
-  onSelect: (folderId: string) => void;
-  childrenMap: Record<string, FolderOption[]>;
-}) {
-  const children = [...(childrenMap[folder.id] ?? [])].sort((left, right) =>
-    left.name.localeCompare(right.name)
-  );
-
-  return (
-    <div className="folder-tree-branch">
-      <button
-        className={`folder-tree-node ${currentFolderId === folder.id ? 'active' : ''}`}
-        type="button"
-        onClick={() => onSelect(folder.id)}
-      >
-        <div>
-          <strong>{folder.name}</strong>
-          <small>{folder.path}</small>
-        </div>
-      </button>
-      {children.length ? (
-        <div className="folder-tree-children">
-          {children.map((child) => (
-            <FolderTreeButton
-              childrenMap={childrenMap}
-              currentFolderId={currentFolderId}
-              folder={child}
-              key={child.id}
-              onSelect={onSelect}
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -2612,7 +2592,7 @@ export function DocumentDetailPage() {
 
   if (loading) {
     return (
-      <section className="projects-workspace">
+      <section className="projects-workspace documents-indigo-theme">
         <div className="grid">
           <div className="card span-12">
             <div className="skeleton skeleton-title" />
@@ -2646,7 +2626,7 @@ export function DocumentDetailPage() {
 
   if (!detail) {
     return (
-      <section className="projects-workspace">
+      <section className="projects-workspace documents-indigo-theme">
         <article className="card alert-error">
           <p>{error || 'Documento no disponible.'}</p>
         </article>
@@ -2655,7 +2635,7 @@ export function DocumentDetailPage() {
   }
 
   return (
-    <section className="projects-workspace">
+    <section className="projects-workspace documents-indigo-theme">
       <nav className="breadcrumbs" style={{ marginBottom: 8 }}>
         <Link href="/documents">Documentos</Link>
         {detail.project ? (
@@ -2696,6 +2676,13 @@ export function DocumentDetailPage() {
               Solicitar aprobación
             </Link>
           ) : null}
+          <Link
+            className="button secondary indigo-action"
+            href={`/documents/${detail.id}/analysis`}
+          >
+            <Sparkles size={18} />
+            Ver extracción IA
+          </Link>
           <Link className="button secondary" href={`/ai-query?documentId=${detail.id}`}>
             <Bot size={18} />
             Consulta con G.OTA
